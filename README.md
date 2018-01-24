@@ -1,2 +1,3 @@
 # MrQuake2
-Quake 2 custom renderers playground.
+
+**M**ultiple **R**enderers Quake 2, or **MrQuake2**, is a Quake 2 custom renderers playground.
