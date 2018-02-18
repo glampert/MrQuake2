@@ -205,6 +205,8 @@ typedef struct refimport_s
     int (*FS_LoadFile)(const char * name, void ** buf);
     void (*FS_FreeFile)(void * buf);
 
+    void (*FS_CreatePath)(char * path);
+
     // gamedir will be the current directory that generated
     // files should be stored to, ie: "f:\quake\id1"
     char * (*FS_Gamedir)(void);
@@ -216,6 +218,9 @@ typedef struct refimport_s
     void (*Vid_MenuInit)(void);
     void (*Vid_NewWindow)(int width, int height);
     int (*Vid_GetModeInfo)(int * width, int * height, int mode);
+
+    void (*Sys_SetMemoryHooks)(void (*allocHook)(void *, size_t, game_memtag_t),
+                               void (*freeHook) (void *, size_t, game_memtag_t));
 
 } refimport_t;
 

@@ -19,12 +19,19 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\reflibs\shared\Memory.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\OSWindow.cpp" />
+    <ClCompile Include="..\..\src\reflibs\shared\Palette.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\RefShared.cpp" />
+    <ClCompile Include="..\..\src\reflibs\shared\TextureStore.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\external\stb\stb_image_write.h" />
+    <ClInclude Include="..\..\src\reflibs\shared\Memory.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\OSWindow.hpp" />
+    <ClInclude Include="..\..\src\reflibs\shared\Pool.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\RefShared.hpp" />
+    <ClInclude Include="..\..\src\reflibs\shared\TextureStore.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{D3595C0B-1968-4051-B001-3DBFAF70075D}</ProjectGuid>

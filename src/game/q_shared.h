@@ -257,24 +257,21 @@ SYSTEM SPECIFIC
 ==============================================================
 */
 
-// Large block stack allocation API
-typedef struct
+// Memory tags passed by the game to Sys_Malloc
+typedef enum
 {
-    qbyte * base_ptr;
-    int    max_size;
-    int    curr_size;
-    int    mem_tag;
-} mem_hunk_t;
+    G_MEMTAG_ZTAGALLOC = 0,
+} game_memtag_t;
 
-// Allocate/free a new hunk of memory (allocation is zero filled).
-void Hunk_New(mem_hunk_t * hunk, int max_size, int mem_tag);
-void Hunk_Free(mem_hunk_t * hunk);
+// Platform alloc/free functions.
+void * Sys_Malloc(size_t size_bytes, game_memtag_t mem_tag);
+void Sys_Mfree(void * ptr, size_t size_bytes, game_memtag_t mem_tag);
 
-// Fetch a new slice from the hunk's end.
-qbyte * Hunk_BlockAlloc(mem_hunk_t * hunk, int block_size);
-
-// Get the offset to the end of the allocated region.
-int Hunk_GetTail(mem_hunk_t * hunk);
+// Install custom alloc and free hooks for the game. These two functions are called
+// whenever the game allocates or frees memory, to notify the Ref lib. Can be called
+// with NULLs to restore the defaults.
+void Sys_SetMemoryHooks(void (*allocHook)(void *, size_t, game_memtag_t),
+                        void (*freeHook) (void *, size_t, game_memtag_t));
 
 //=============================================
 

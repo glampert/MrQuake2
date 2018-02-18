@@ -136,12 +136,13 @@ void FS_CreatePath(char * path)
     char * ofs;
     for (ofs = path + 1; *ofs; ofs++)
     {
-        if (*ofs == '/')
+        char sep = *ofs;
+        if (sep == '/' || sep == '\\')
         {
             // create the directory
             *ofs = '\0';
             Sys_Mkdir(path);
-            *ofs = '/';
+            *ofs = sep;
         }
     }
 }

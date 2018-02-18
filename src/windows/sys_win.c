@@ -29,9 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <io.h>
 #include <stdio.h>
 
-#ifdef _MSC_VER
-    #pragma comment(lib, "Winmm.lib") // timeGetTime, Joystick API, etc
-#endif // _MSC_VER
+#pragma comment(lib, "Winmm.lib") // timeGetTime, Joystick API, etc
 
 //=============================================================================
 
@@ -127,6 +125,7 @@ void Sys_Error(const char * error, ...)
     va_list argptr;
     char text[4096] = {0};
 
+    timeEndPeriod(1);
     CL_Shutdown();
     Qcommon_Shutdown();
 
@@ -154,7 +153,7 @@ void Sys_Quit(void)
     CL_Shutdown();
     Qcommon_Shutdown();
 
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
 
 /*
@@ -185,7 +184,7 @@ char * Sys_GetClipboardData(void)
         {
             if ((cliptext = GlobalLock(hClipboardData)) != 0)
             {
-                data = malloc(GlobalSize(hClipboardData) + 1);
+                data = (char *)Z_Malloc((int)(GlobalSize(hClipboardData) + 1));
                 strcpy(data, cliptext);
                 GlobalUnlock(hClipboardData);
             }
@@ -278,74 +277,57 @@ void * Sys_GetGameAPI(void * parms)
 }
 
 //=============================================================================
-// New Hunk alloc API
+// New memory API
 //=============================================================================
 
-enum { HUNK_SIZE_ROUND = 31 };
+static void (*g_MallocHook)(void *, size_t, game_memtag_t) = NULL;
+static void (*g_MfreeHook) (void *, size_t, game_memtag_t) = NULL;
 
 /*
 ================
-Hunk_New
+Sys_Malloc - malloc() hook
 ================
 */
-void Hunk_New(mem_hunk_t * hunk, int max_size, int mem_tag)
+void * Sys_Malloc(size_t size_bytes, game_memtag_t mem_tag)
 {
-    int rounded_size = (max_size + HUNK_SIZE_ROUND) & ~HUNK_SIZE_ROUND;
-    assert(rounded_size >= max_size);
+    void * ptr = malloc(size_bytes);
 
-    hunk->curr_size = 0;
-    hunk->max_size  = rounded_size;
-    hunk->mem_tag   = mem_tag;
-    hunk->base_ptr  = (qbyte *)malloc(rounded_size);
+    if (g_MallocHook != NULL)
+    {
+        g_MallocHook(ptr, size_bytes, mem_tag);
+    }
 
-    memset(hunk->base_ptr, 0, rounded_size);
+    return ptr;
 }
 
 /*
 ================
-Hunk_Free
+Sys_Mfree - free() hook
 ================
 */
-void Hunk_Free(mem_hunk_t * hunk)
+void Sys_Mfree(void * ptr, size_t size_bytes, game_memtag_t mem_tag)
 {
-    if (hunk->base_ptr != NULL)
+    if (ptr != NULL)
     {
-        free(hunk->base_ptr);
-        hunk->base_ptr  = NULL;
-        hunk->curr_size = 0;
-        hunk->max_size  = 0;
-        hunk->mem_tag   = 0;
+        if (g_MfreeHook != NULL)
+        {
+            g_MfreeHook(ptr, size_bytes, mem_tag);
+        }
+
+        free(ptr);
     }
 }
 
 /*
 ================
-Hunk_BlockAlloc
+Sys_SetMemoryHooks
 ================
 */
-byte * Hunk_BlockAlloc(mem_hunk_t * hunk, int block_size)
+void Sys_SetMemoryHooks(void (*allocHook)(void *, size_t, game_memtag_t),
+                        void (*freeHook) (void *, size_t, game_memtag_t))
 {
-    int rounded_size = (block_size + HUNK_SIZE_ROUND) & ~HUNK_SIZE_ROUND;
-    assert(rounded_size >= block_size);
-
-    // The hunk stack doesn't resize.
-    hunk->curr_size += rounded_size;
-    if (hunk->curr_size > hunk->max_size)
-    {
-        Sys_Error("Hunk_BlockAlloc: Overflowed with %d bytes request!\n", rounded_size);
-    }
-
-    return hunk->base_ptr + hunk->curr_size - rounded_size;
-}
-
-/*
-================
-Hunk_GetTail
-================
-*/
-int Hunk_GetTail(mem_hunk_t * hunk)
-{
-    return hunk->curr_size;
+    g_MallocHook = allocHook;
+    g_MfreeHook  = freeHook;
 }
 
 //=============================================================================

@@ -171,22 +171,24 @@ void VID_LoadRefreshDLL(const char * dll_name)
         Com_Error(ERR_FATAL, "GetProcAddress failed on %s\n", dll_name);
     }
 
-    ri.Sys_Error         = VID_Error;
-    ri.Con_Printf        = VID_Printf;
-    ri.Cmd_AddCommand    = Cmd_AddCommand;
-    ri.Cmd_RemoveCommand = Cmd_RemoveCommand;
-    ri.Cmd_ExecuteText   = Cbuf_ExecuteText;
-    ri.Cmd_Argc          = Cmd_Argc;
-    ri.Cmd_Argv          = Cmd_Argv;
-    ri.FS_LoadFile       = FS_LoadFile;
-    ri.FS_FreeFile       = FS_FreeFile;
-    ri.FS_Gamedir        = FS_Gamedir;
-    ri.Cvar_Get          = Cvar_Get;
-    ri.Cvar_Set          = Cvar_Set;
-    ri.Cvar_SetValue     = Cvar_SetValue;
-    ri.Vid_MenuInit      = VID_MenuInit;
-    ri.Vid_NewWindow     = VID_NewWindow;
-    ri.Vid_GetModeInfo   = VID_GetModeInfo;
+    ri.Sys_Error          = VID_Error;
+    ri.Con_Printf         = VID_Printf;
+    ri.Cmd_AddCommand     = Cmd_AddCommand;
+    ri.Cmd_RemoveCommand  = Cmd_RemoveCommand;
+    ri.Cmd_ExecuteText    = Cbuf_ExecuteText;
+    ri.Cmd_Argc           = Cmd_Argc;
+    ri.Cmd_Argv           = Cmd_Argv;
+    ri.FS_LoadFile        = FS_LoadFile;
+    ri.FS_FreeFile        = FS_FreeFile;
+    ri.FS_CreatePath      = FS_CreatePath;
+    ri.FS_Gamedir         = FS_Gamedir;
+    ri.Cvar_Get           = Cvar_Get;
+    ri.Cvar_Set           = Cvar_Set;
+    ri.Cvar_SetValue      = Cvar_SetValue;
+    ri.Vid_MenuInit       = VID_MenuInit;
+    ri.Vid_NewWindow      = VID_NewWindow;
+    ri.Vid_GetModeInfo    = VID_GetModeInfo;
+    ri.Sys_SetMemoryHooks = Sys_SetMemoryHooks;
 
     re = GetRefAPI(ri);
 

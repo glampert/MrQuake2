@@ -3,6 +3,9 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# Don't submit local Q2 data/assets
+data/
+
 # User-specific files
 *.suo
 *.userosscache

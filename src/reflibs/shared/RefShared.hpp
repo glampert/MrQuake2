@@ -4,10 +4,14 @@
 //
 #pragma once
 
+#include <cstdint>
+#include <cstring>
+#include <intrin.h>
+
 /*
 ===============================================================================
 
-    Helper macros & definitions
+    Helper macros & common definitions
 
 ===============================================================================
 */
@@ -25,6 +29,87 @@
 #else // NDEBUG
     #define FASTASSERT(expr) /* nothing */
 #endif // NDEBUG
+
+// ============================================================================
+
+std::uint64_t FnvHash64(const std::uint8_t * bytes, std::size_t len);
+std::uint32_t FnvHash32(const std::uint8_t * bytes, std::size_t len);
+
+using Color8      = std::uint8_t;
+using ColorRGBA32 = std::uint32_t;
+
+struct Vec2u16
+{
+    std::uint16_t x;
+    std::uint16_t y;
+};
+
+template<typename T, std::size_t Size>
+constexpr std::size_t ArrayLength(const T (&)[Size])
+{
+    return Size;
+}
+
+// ============================================================================
+
+class PathName final
+{
+public:
+
+    static constexpr unsigned kNameMaxLen = 64; // MAX_QPATH
+
+    PathName(const char * const path)
+    {
+        FASTASSERT(path != nullptr);
+        m_length = static_cast<std::uint32_t>(std::strlen(path));
+
+        FASTASSERT(m_length < kNameMaxLen);
+        strcpy_s(m_string, path);
+
+        m_hash = FnvHash32(reinterpret_cast<const std::uint8_t *>(m_string), m_length);
+    }
+
+    PathName(const std::uint32_t hash, const char * const path, const std::uint32_t len)
+        : m_hash{ hash }
+        , m_length{ len }
+    {
+        FASTASSERT(hash != 0);
+        FASTASSERT(path != nullptr);
+        FASTASSERT(len < kNameMaxLen);
+        strcpy_s(m_string, path);
+    }
+
+    static std::uint32_t CalcHash(const char * const path)
+    {
+        FASTASSERT(path != nullptr);
+        return FnvHash32(reinterpret_cast<const std::uint8_t *>(path), std::strlen(path));
+    }
+
+    const char * CStrNoExt(char * buffer) const
+    {
+        if (const char * lastDot = std::strrchr(m_string, '.'))
+        {
+            const auto num = std::size_t(lastDot - m_string);
+            std::memcpy(buffer, m_string, num);
+            buffer[num] = '\0';
+            return buffer;
+        }
+        else
+        {
+            return m_string;
+        }
+    }
+
+    std::uint32_t Hash()   const { return m_hash;   }
+    std::uint32_t Length() const { return m_length; }
+    const char *  CStr()   const { return m_string; }
+
+private:
+
+    std::uint32_t m_hash;       // Hash of the following string, for faster lookup.
+    std::uint32_t m_length;     // Cached length of string not including terminator.
+    char m_string[kNameMaxLen]; // File name with game path including extension.
+};
 
 /*
 ===============================================================================
@@ -47,6 +132,7 @@ struct cvar_s;
 class CvarWrapper final
 {
 public:
+
     // These mirror the flags in q_shared.h
     enum {
         kFlagArchive    = 1,
@@ -57,10 +143,10 @@ public:
     };
 
     CvarWrapper(cvar_s * v = nullptr)
-        : m_wrapped_var{v}
+        : m_wrapped_var{ v }
     {
     }
-    CvarWrapper & operator = (cvar_s * v)
+    CvarWrapper & operator=(cvar_s * v)
     {
         m_wrapped_var = v;
         return *this;
@@ -85,6 +171,7 @@ public:
     bool IsNotNull() const { return m_wrapped_var != nullptr; }
 
 private:
+
     cvar_s * m_wrapped_var;
 };
 
@@ -115,13 +202,6 @@ namespace Cmd
     void AppendCommandText(const char * text);
 } // Cmd
 
-namespace FS
-{
-    int LoadFile(const char * name, void ** out_buf);
-    void FreeFile(void * out_buf);
-    const char * GameDir();
-} // FS
-
 namespace Cvar
 {
     CvarWrapper Get(const char * name, const char * default_value, unsigned flags);
@@ -136,5 +216,27 @@ namespace Video
     void NewWindow(int width, int height);
     bool GetModeInfo(int & out_width, int & out_height, int mode_index);
 } // Video
+
+namespace FS
+{
+    int LoadFile(const char * name, void ** out_buf);
+    void FreeFile(void * out_buf);
+    void CreatePath(const char * path);
+    const char * GameDir();
+
+    struct ScopedFile final
+    {
+        void * data_ptr;
+        const int length;
+
+        explicit ScopedFile(const char * const name)
+            : data_ptr{ nullptr }, length{ FS::LoadFile(name, &data_ptr) }
+        { }
+
+        ~ScopedFile() { FS::FreeFile(data_ptr); }
+
+        bool IsLoaded() const { return (data_ptr != nullptr && length > 0); }
+    };
+} // FS
 
 } // GameInterface

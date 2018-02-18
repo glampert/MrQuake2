@@ -28,11 +28,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 winquake_t winquake = {0};
 cvar_t * win_noalttab = NULL;
 
+extern bool com_is_quitting;
 extern unsigned sys_msg_time;
 extern cvar_t * dedicated;
 extern cvar_t * vid_fullscreen;
 extern cvar_t * vid_height;
 extern cvar_t * vid_width;
+
+// Load assets from MrQuake2/data/baseq2/
+#define BASEPATH_OVERRIDE "data"
 
 //=============================================================================
 
@@ -242,7 +246,10 @@ static LRESULT CALLBACK WIN_MainWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
             winquake.active_app = false;
             winquake.hinstance = NULL;
             winquake.hwnd = NULL;
-            Com_Quit();
+            if (!com_is_quitting)
+            {
+                Com_Quit();
+            }
         }
         return 0;
     }
@@ -413,6 +420,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     winquake.hinstance = hInstance;
 
     WIN_ParseCommandLine(lpCmdLine);
+
+    // Set a custom base path for development so we load assets from a normal directory instead of a pak.
+    // This must be set before common init (FS init, actually).
+#ifdef BASEPATH_OVERRIDE
+    FS_SetDefaultBasePath(BASEPATH_OVERRIDE);
+#endif // BASEPATH_OVERRIDE
 
     Qcommon_Init(winquake.argc, winquake.argv);
     oldtime = Sys_Milliseconds();

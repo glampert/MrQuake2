@@ -233,11 +233,14 @@ void Com_Error(error_level_t code, const char * fmt, ...)
 Com_Quit
 
 Both client and server can use this, and it will
-do the apropriate things.
+do the appropriate things.
 =============
 */
+bool com_is_quitting = false;
 void Com_Quit(void)
 {
+    com_is_quitting = true;
+
     SV_Shutdown("Server quit\n", false);
     CL_Shutdown();
 
@@ -1134,7 +1137,7 @@ void Z_Free(void * ptr)
     z_count--;
     z_bytes -= z->size;
 
-    free(z);
+    Sys_Mfree(z, z->size, G_MEMTAG_ZTAGALLOC);
 }
 
 /*
@@ -1166,7 +1169,7 @@ void * Z_TagMalloc(int size, int tag)
     zhead_t * z;
 
     size = size + sizeof(zhead_t);
-    z = malloc(size);
+    z = Sys_Malloc(size, G_MEMTAG_ZTAGALLOC);
 
     if (z == NULL)
     {
@@ -1476,6 +1479,7 @@ void Qcommon_Init(int argc, char ** argv)
     if (dedicated->value)
     {
         Cmd_AddCommand("quit", Com_Quit);
+        Cmd_AddCommand("exit", Com_Quit); // LAMPERT - I like "exit" better :)
     }
 
     Sys_Init();
@@ -1484,6 +1488,7 @@ void Qcommon_Init(int argc, char ** argv)
     SV_Init();
     CL_Init();
 
+    // **** TODO: temporarily disabled ****
     /*
     // add + commands from command line
     if (!Cbuf_AddLateCommands())
@@ -1506,9 +1511,6 @@ void Qcommon_Init(int argc, char ** argv)
         SCR_EndLoadingPlaque();
     }
     */
-    //FIXME this is for temporary testing only! Restore the above once done!
-    Cbuf_AddText("killserver ; maxclients 1 ; deathmatch 0 ; map fact3\n");
-    Cbuf_Execute();
 
     Com_Printf("---- Quake II Initialized! ----\n");
 }

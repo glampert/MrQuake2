@@ -4,7 +4,6 @@
 //
 
 #include "Renderer.hpp"
-#include <string.h>
 
 // Path from the project root where to find shaders for this renderer (wchar_t)
 #define REFD3D11_SHADER_PATH_WIDE L"src\\reflibs\\d3d11\\shaders\\"
@@ -13,26 +12,169 @@ namespace D3D11
 {
 
 ///////////////////////////////////////////////////////////////////////////////
+// TextureImpl
+///////////////////////////////////////////////////////////////////////////////
+
+void TextureImpl::InitD3DSpecific()
+{
+    ID3D11Device* const device = g_Renderer->Device();
+    const unsigned numQualityLevels = g_Renderer->TexStore()->MultisampleQualityLevel(DXGI_FORMAT_R8G8B8A8_UNORM);
+
+    D3D11_TEXTURE2D_DESC tex2dDesc  = {};
+    tex2dDesc.Usage                 = D3D11_USAGE_DEFAULT;
+    tex2dDesc.BindFlags             = D3D11_BIND_SHADER_RESOURCE;
+    tex2dDesc.Format                = DXGI_FORMAT_R8G8B8A8_UNORM;
+    tex2dDesc.Width                 = width;
+    tex2dDesc.Height                = height;
+    tex2dDesc.MipLevels             = 1;
+    tex2dDesc.ArraySize             = 1;
+    tex2dDesc.SampleDesc.Count      = 1;
+    tex2dDesc.SampleDesc.Quality    = numQualityLevels - 1;
+
+    D3D11_SAMPLER_DESC samplerDesc  = {};
+    samplerDesc.Filter              = FilterForTextureType(type);
+    samplerDesc.AddressU            = D3D11_TEXTURE_ADDRESS_CLAMP;
+    samplerDesc.AddressV            = D3D11_TEXTURE_ADDRESS_CLAMP;
+    samplerDesc.AddressW            = D3D11_TEXTURE_ADDRESS_CLAMP;
+    samplerDesc.ComparisonFunc      = D3D11_COMPARISON_ALWAYS;
+    samplerDesc.MaxAnisotropy       = 1;
+    samplerDesc.MipLODBias          = 0.0f;
+    samplerDesc.MinLOD              = 0.0f;
+    samplerDesc.MaxLOD              = D3D11_FLOAT32_MAX;
+
+    D3D11_SUBRESOURCE_DATA initData = {};
+    initData.pSysMem                = pixels;
+    initData.SysMemPitch            = width * 4; // RGBA-8888
+
+    if (FAILED(device->CreateTexture2D(&tex2dDesc, &initData, tex_resource.GetAddressOf())))
+    {
+        GameInterface::Errorf("CreateTexture2D failed!");
+    }
+    if (FAILED(device->CreateShaderResourceView(tex_resource.Get(), nullptr, srv.GetAddressOf())))
+    {
+        GameInterface::Errorf("CreateShaderResourceView failed!");
+    }
+    if (FAILED(device->CreateSamplerState(&samplerDesc, sampler.GetAddressOf())))
+    {
+        GameInterface::Errorf("CreateSamplerState failed!");
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void TextureImpl::InitScrap(const TextureImpl * const scrap_tex)
+{
+    FASTASSERT(scrap_tex != nullptr);
+
+    // Share the scrap texture resource(s)
+    tex_resource = scrap_tex->tex_resource;
+    sampler      = scrap_tex->sampler;
+    srv          = scrap_tex->srv;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+D3D11_FILTER TextureImpl::FilterForTextureType(const TextureType tt)
+{
+    switch (tt)
+    {
+    // TODO: Maybe have a Cvar to select between different filter modes?
+    // Should also generate mipmaps for the non-UI textures!!!
+    case TextureType::kSkin   : return D3D11_FILTER_MIN_MAG_MIP_POINT;
+    case TextureType::kSprite : return D3D11_FILTER_MIN_MAG_MIP_POINT;
+    case TextureType::kWall   : return D3D11_FILTER_MIN_MAG_MIP_POINT;
+    case TextureType::kSky    : return D3D11_FILTER_MIN_MAG_MIP_POINT;
+    case TextureType::kPic    : return D3D11_FILTER_MIN_MAG_MIP_POINT;
+    default : GameInterface::Errorf("Invalid TextureType enum!");
+    } // switch
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// TextureStoreImpl
+///////////////////////////////////////////////////////////////////////////////
+
+void TextureStoreImpl::Init()
+{
+    ID3D11Device* const device = g_Renderer->Device();
+    device->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM,
+                              1, &m_multisample_quality_levels_rgba);
+
+    // Load the default resident textures now
+    TouchResidentTextures();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+unsigned TextureStoreImpl::MultisampleQualityLevel(const DXGI_FORMAT fmt) const
+{
+    FASTASSERT(fmt == DXGI_FORMAT_R8G8B8A8_UNORM); // only format support at the moment
+    (void)fmt;
+
+    return m_multisample_quality_levels_rgba;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+TextureImage * TextureStoreImpl::CreateScrap(int size, const ColorRGBA32 * pix)
+{
+    TextureImpl * scrap_impl = m_teximages_pool.Allocate();
+    Construct(scrap_impl, pix, RegistrationNum(), TextureType::kPic, /*use_scrap =*/true,
+              size, size, Vec2u16{0,0}, Vec2u16{std::uint16_t(size), std::uint16_t(size)}, "pics/scrap.pcx");
+
+    scrap_impl->InitD3DSpecific();
+    return scrap_impl;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+TextureImage * TextureStoreImpl::CreateTexture(const ColorRGBA32 * pix, std::uint32_t regn, TextureType tt, bool use_scrap,
+                                               int w, int h, Vec2u16 scrap0, Vec2u16 scrap1, const char * name)
+{
+    TextureImpl * impl = m_teximages_pool.Allocate();
+    Construct(impl, pix, regn, tt, use_scrap, w, h, scrap0, scrap1, name);
+
+    if (use_scrap)
+    {
+        impl->InitScrap(GetScrapImpl());
+    }
+    else
+    {
+        impl->InitD3DSpecific();
+    }
+
+    return impl;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void TextureStoreImpl::DestroyTexture(TextureImage * tex)
+{
+    TextureImpl * impl = static_cast<TextureImpl *>(tex);
+    Destroy(impl);
+    m_teximages_pool.Deallocate(impl);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // ShaderProgram
 ///////////////////////////////////////////////////////////////////////////////
 
-void ShaderProgram::LoadFromFxFile(const wchar_t * filename, const char * vs_entry,
-                                   const char * ps_entry, const InputLayoutDesc & layout)
+void ShaderProgram::LoadFromFxFile(const wchar_t * const filename, const char * const vs_entry,
+                                   const char * const ps_entry, const InputLayoutDesc & layout)
 {
     FASTASSERT(filename != nullptr && filename[0] != L'\0');
     FASTASSERT(vs_entry != nullptr && vs_entry[0] != '\0');
     FASTASSERT(ps_entry != nullptr && ps_entry[0] != '\0');
 
-    ID3DBlob * vs_blob = nullptr;
-    renderer->CompileShaderFromFile(filename, vs_entry, "vs_4_0", &vs_blob);
+    ComPtr<ID3DBlob> vs_blob;
+    g_Renderer->CompileShaderFromFile(filename, vs_entry, "vs_4_0", vs_blob.GetAddressOf());
     FASTASSERT(vs_blob != nullptr);
 
-    ID3DBlob * ps_blob = nullptr;
-    renderer->CompileShaderFromFile(filename, ps_entry, "ps_4_0", &ps_blob);
+    ComPtr<ID3DBlob> ps_blob;
+    g_Renderer->CompileShaderFromFile(filename, ps_entry, "ps_4_0", ps_blob.GetAddressOf());
     FASTASSERT(ps_blob != nullptr);
 
     HRESULT hr;
-    ID3D11Device * device = renderer->Device();
+    ID3D11Device * const device = g_Renderer->Device();
 
     // Create the vertex shader:
     hr = device->CreateVertexShader(vs_blob->GetBufferPointer(),
@@ -50,20 +192,17 @@ void ShaderProgram::LoadFromFxFile(const wchar_t * filename, const char * vs_ent
         GameInterface::Errorf("Failed to create pixel shader '%s'", ps_entry);
     }
 
-    CreateVertexLayout(std::get<0>(layout), std::get<1>(layout), *vs_blob);
-
-    vs_blob->Release();
-    ps_blob->Release();
+    CreateVertexLayout(std::get<0>(layout), std::get<1>(layout), *vs_blob.Get());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ShaderProgram::CreateVertexLayout(const D3D11_INPUT_ELEMENT_DESC * desc,
-                                       int num_elements, ID3DBlob & vs_blob)
+void ShaderProgram::CreateVertexLayout(const D3D11_INPUT_ELEMENT_DESC * const desc,
+                                       const int num_elements, ID3DBlob & vs_blob)
 {
     FASTASSERT(desc != nullptr && num_elements > 0);
 
-    HRESULT hr = renderer->Device()->CreateInputLayout(
+    HRESULT hr = g_Renderer->Device()->CreateInputLayout(
             desc, num_elements, vs_blob.GetBufferPointer(),
             vs_blob.GetBufferSize(), vertex_layout.GetAddressOf());
 
@@ -77,9 +216,9 @@ void ShaderProgram::CreateVertexLayout(const D3D11_INPUT_ELEMENT_DESC * desc,
 // SpriteBatch
 ///////////////////////////////////////////////////////////////////////////////
 
-void SpriteBatch::Init(int max_verts)
+void SpriteBatch::Init(const int max_verts)
 {
-    num_verts = max_verts;
+    m_num_verts = max_verts;
 
     D3D11_BUFFER_DESC bd = {0};
     bd.Usage             = D3D11_USAGE_DYNAMIC;
@@ -89,14 +228,15 @@ void SpriteBatch::Init(int max_verts)
 
     for (int b = 0; b < 2; ++b)
     {
-        if (FAILED(renderer->Device()->CreateBuffer(&bd, nullptr, vertex_buffers[b].GetAddressOf())))
+        if (FAILED(g_Renderer->Device()->CreateBuffer(&bd, nullptr, m_vertex_buffers[b].GetAddressOf())))
         {
             GameInterface::Errorf("Failed to create SpriteBatch vertex buffer %i", b);
         }
 
-        mapping_info[b] = {};
+        m_mapping_info[b] = {};
     }
 
+    MemTagsTrackAlloc(bd.ByteWidth, MemTag::kVertIndexBuffer);
     GameInterface::Printf("SpriteBatch used %u KB", (bd.ByteWidth / 1024));
 }
 
@@ -105,55 +245,62 @@ void SpriteBatch::Init(int max_verts)
 void SpriteBatch::BeginFrame()
 {
     // Map the current buffer:
-    if (FAILED(renderer->DeviceContext()->Map(vertex_buffers[buffer_index].Get(),
-               0, D3D11_MAP_WRITE_DISCARD, 0, &mapping_info[buffer_index])))
+    if (FAILED(g_Renderer->DeviceContext()->Map(m_vertex_buffers[m_buffer_index].Get(),
+               0, D3D11_MAP_WRITE_DISCARD, 0, &m_mapping_info[m_buffer_index])))
     {
-        GameInterface::Errorf("Failed to map SpriteBatch vertex buffer %i", buffer_index);
+        GameInterface::Errorf("Failed to map SpriteBatch vertex buffer %i", m_buffer_index);
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SpriteBatch::EndFrame(const ShaderProgram & program)
+void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImpl & tex,
+                           ID3D11BlendState * const blend_state, ID3D11Buffer * const cbuffer)
 {
-    ID3D11DeviceContext * context = renderer->DeviceContext();
-    ID3D11Buffer * current_buffer = vertex_buffers[buffer_index].Get();
+    ID3D11DeviceContext * const context = g_Renderer->DeviceContext();
+    ID3D11Buffer * const current_buffer = m_vertex_buffers[m_buffer_index].Get();
 
     // Unmap current buffer:
     context->Unmap(current_buffer, 0);
-    mapping_info[buffer_index] = {};
+    m_mapping_info[m_buffer_index] = {};
+
+    // Bind texture & sampler (t0, s0):
+    context->PSSetShaderResources(0, 1, tex.srv.GetAddressOf());
+    context->PSSetSamplers(0, 1, tex.sampler.GetAddressOf());
+    context->VSSetConstantBuffers(0, 1, &cbuffer); // b0
+
+    // Set blending for transparency:
+    const float blend_factor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    context->OMSetBlendState(blend_state, blend_factor, 0xFFFFFFFF);
 
     // Draw with the current buffer:
-    const UINT offset = 0;
-    const UINT stride = sizeof(Vertex2D);
-    context->IASetVertexBuffers(0, 1, &current_buffer, &stride, &offset);
-    context->IASetInputLayout(program.vertex_layout.Get());
-//context->VSSetConstantBuffers(0, 1, &SpritesConstantBuffer); //TODO
-    context->VSSetShader(program.vs.Get(), nullptr, 0);
-    context->PSSetShader(program.ps.Get(), nullptr, 0);
-    context->Draw(used_verts, 0);
+    g_Renderer->DrawHelper(m_used_verts, program, current_buffer,
+                           D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(Vertex2D));
+
+    // Restore default blend state.
+    context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
     // Move to the next buffer:
-    buffer_index = !buffer_index;
-    used_verts   = 0;
+    m_buffer_index = !m_buffer_index;
+    m_used_verts = 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-Vertex2D * SpriteBatch::Increment(int count)
+Vertex2D * SpriteBatch::Increment(const int count)
 {
-    FASTASSERT(count > 0 && count <= num_verts);
+    FASTASSERT(count > 0 && count <= m_num_verts);
 
-    auto * verts = static_cast<Vertex2D *>(mapping_info[buffer_index].pData);
+    auto * verts = static_cast<Vertex2D *>(m_mapping_info[m_buffer_index].pData);
     FASTASSERT(verts != nullptr);
 
-    verts += used_verts;
-    used_verts += count;
+    verts += m_used_verts;
+    m_used_verts += count;
 
-    if (used_verts > num_verts)
+    if (m_used_verts > m_num_verts)
     {
         GameInterface::Errorf("SpriteBatch overflowed! used_verts=%i, num_verts=%i. "
-                              "Increase size.", used_verts, num_verts);
+                              "Increase size.", m_used_verts, m_num_verts);
     }
 
     return verts;
@@ -172,7 +319,7 @@ void SpriteBatch::PushTriVerts(const Vertex2D tri[3])
 void SpriteBatch::PushQuadVerts(const Vertex2D quad[4])
 {
     Vertex2D * tri = Increment(6);           // Expand quad into 2 triangles
-    const int indexes[6] = { 0,3,2, 2,1,0 }; // CW winding
+    const int indexes[6] = { 0,1,2, 2,3,0 }; // CW winding
     for (int i = 0; i < 6; ++i)
     {
         tri[i] = quad[indexes[i]];
@@ -181,8 +328,8 @@ void SpriteBatch::PushQuadVerts(const Vertex2D quad[4])
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SpriteBatch::PushQuad(float x, float y, float w, float h,
-                           float u0, float v0, float u1, float v1,
+void SpriteBatch::PushQuad(const float x, const float y, const float w, const float h,
+                           const float u0, const float v0, const float u1, const float v1,
                            const DirectX::XMFLOAT4A & color)
 {
     Vertex2D quad[4];
@@ -191,20 +338,20 @@ void SpriteBatch::PushQuad(float x, float y, float w, float h,
     quad[0].xy_uv.z = u0;
     quad[0].xy_uv.w = v0;
     quad[0].rgba    = color;
-    quad[1].xy_uv.x = x;
-    quad[1].xy_uv.y = y + h;
-    quad[1].xy_uv.z = u0;
-    quad[1].xy_uv.w = v1;
+    quad[1].xy_uv.x = x + w;
+    quad[1].xy_uv.y = y;
+    quad[1].xy_uv.z = u1;
+    quad[1].xy_uv.w = v0;
     quad[1].rgba    = color;
     quad[2].xy_uv.x = x + w;
     quad[2].xy_uv.y = y + h;
     quad[2].xy_uv.z = u1;
     quad[2].xy_uv.w = v1;
     quad[2].rgba    = color;
-    quad[3].xy_uv.x = x + w;
-    quad[3].xy_uv.y = y;
-    quad[3].xy_uv.z = u1;
-    quad[3].xy_uv.w = v0;
+    quad[3].xy_uv.x = x;
+    quad[3].xy_uv.y = y + h;
+    quad[3].xy_uv.z = u0;
+    quad[3].xy_uv.w = v1;
     quad[3].rgba    = color;
     PushQuadVerts(quad);
 }
@@ -218,6 +365,8 @@ const DirectX::XMVECTORF32 Renderer::kClearColor = { 0.2f, 0.2f, 0.2f, 1.0f };
 ///////////////////////////////////////////////////////////////////////////////
 
 Renderer::Renderer()
+    : m_frame_started{ false }
+    , m_window_resized{ true }
 {
     GameInterface::Printf("D3D11 Renderer instance created.");
 }
@@ -227,35 +376,39 @@ Renderer::Renderer()
 Renderer::~Renderer()
 {
     GameInterface::Printf("D3D11 Renderer shutting down.");
+
+    // TEMP
+    m_tex_store.DumpAllLoadedTexturesToFile("dump_imgs", "png");
+    // TEMP
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Renderer::Init(const char * window_name, HINSTANCE hinst, WNDPROC wndproc,
-                    int width, int height, bool fullscreen, bool debug_validation,
-                    int sprite_batch_size)
+void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wndproc,
+                    const int width, const int height, const bool fullscreen,
+                    const bool debug_validation, const int sprite_batch_size)
 {
     GameInterface::Printf("D3D11 Renderer initializing.");
 
     // RenderWindow setup
-    window.window_name      = window_name;
-    window.class_name       = window_name;
-    window.hinst            = hinst;
-    window.wndproc          = wndproc;
-    window.width            = width;
-    window.height           = height;
-    window.fullscreen       = fullscreen;
-    window.debug_validation = debug_validation;
-    window.Init();
+    m_window.window_name      = window_name;
+    m_window.class_name       = window_name;
+    m_window.hinst            = hinst;
+    m_window.wndproc          = wndproc;
+    m_window.width            = width;
+    m_window.height           = height;
+    m_window.fullscreen       = fullscreen;
+    m_window.debug_validation = debug_validation;
+    m_window.Init();
 
     // 2D sprite/UI batch setup
-    sprite_batch.Init(sprite_batch_size);
+    m_sprite_batch.Init(sprite_batch_size);
+
+    // Texture cache
+    m_tex_store.Init();
 
     // Load shader progs
     LoadShaders();
-
-    // This won't change
-    DeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -272,8 +425,35 @@ void Renderer::LoadShaders()
             { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
         const int num_elements = ARRAYSIZE(layout);
-        shader_ui_sprites.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"UISprites2D.fx",
-                                         "VS_main", "PS_main", { layout, num_elements });
+        m_shader_ui_sprites.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"UISprites2D.fx",
+                                           "VS_main", "PS_main", { layout, num_elements });
+
+        // Blend state for the screen text:
+        D3D11_BLEND_DESC bs_desc                      = {};
+        bs_desc.RenderTarget[0].BlendEnable           = true;
+        bs_desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+        bs_desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+        bs_desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+        bs_desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+        bs_desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
+        bs_desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
+        bs_desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+        if (FAILED(Device()->CreateBlendState(&bs_desc, m_blend_state_ui_sprites.GetAddressOf())))
+        {
+            GameInterface::Errorf("CreateBlendState failed!");
+        }
+
+        // Create the onstant buffer:
+        D3D11_BUFFER_DESC bd;
+        bd                = {};
+        bd.Usage          = D3D11_USAGE_DEFAULT;
+        bd.ByteWidth      = sizeof(ConstantBufferDataUI);
+        bd.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+        bd.CPUAccessFlags = 0;
+        if (FAILED(Device()->CreateBuffer(&bd, nullptr, m_cbuffer_ui_sprites.GetAddressOf())))
+        {
+            GameInterface::Errorf("Failed to create shader constant buffer!");
+        }
     }
 
     GameInterface::Printf("Shaders loaded successfully.");
@@ -283,27 +463,63 @@ void Renderer::LoadShaders()
 
 void Renderer::BeginFrame()
 {
-    frame_started = true;
-    window.device_context->ClearRenderTargetView(window.framebuffer_rtv.Get(), kClearColor);
+    m_frame_started = true;
+    m_window.device_context->ClearRenderTargetView(m_window.framebuffer_rtv.Get(), kClearColor);
 
-    sprite_batch.BeginFrame();
+    m_sprite_batch.BeginFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Renderer::EndFrame()
 {
-    // Flush the 2D sprites
-    sprite_batch.EndFrame(shader_ui_sprites);
+    Flush2D();
 
-    window.swap_chain->Present(0, 0);
-    frame_started = false;
+    m_window.swap_chain->Present(0, 0);
+
+    m_frame_started  = false;
+    m_window_resized = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Renderer::CompileShaderFromFile(const wchar_t * filename, const char * entry_point,
-                                     const char * shader_model, ID3DBlob ** out_blob) const
+void Renderer::Flush2D()
+{
+    FASTASSERT(m_tex_store.tex_conchars != nullptr);
+    FASTASSERT(m_blend_state_ui_sprites != nullptr);
+
+    if (m_window_resized)
+    {
+        m_cbuffer_data_ui_sprites.screen_dimensions.x = static_cast<float>(m_window.width);
+        m_cbuffer_data_ui_sprites.screen_dimensions.y = static_cast<float>(m_window.height);
+        DeviceContext()->UpdateSubresource(m_cbuffer_ui_sprites.Get(), 0, nullptr, &m_cbuffer_data_ui_sprites, 0, 0);
+    }
+
+    // Flush the 2D sprites
+    m_sprite_batch.EndFrame(m_shader_ui_sprites,
+                            *static_cast<const TextureImpl *>(m_tex_store.tex_conchars),
+                            m_blend_state_ui_sprites.Get(), m_cbuffer_ui_sprites.Get());
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::DrawHelper(const unsigned num_verts, const ShaderProgram & program, ID3D11Buffer * const vb,
+                          const D3D11_PRIMITIVE_TOPOLOGY topology, const unsigned offset, const unsigned stride)
+{
+    ID3D11DeviceContext * const context = DeviceContext();
+
+    context->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
+    context->IASetPrimitiveTopology(topology);
+    context->IASetInputLayout(program.vertex_layout.Get());
+    context->VSSetShader(program.vs.Get(), nullptr, 0);
+    context->PSSetShader(program.ps.Get(), nullptr, 0);
+    context->Draw(num_verts, 0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::CompileShaderFromFile(const wchar_t * const filename, const char * const entry_point,
+                                     const char * const shader_model, ID3DBlob ** out_blob) const
 {
     UINT shaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 
@@ -316,19 +532,14 @@ void Renderer::CompileShaderFromFile(const wchar_t * filename, const char * entr
         shaderFlags |= D3DCOMPILE_DEBUG;
     }
 
-    ID3DBlob * error_blob = nullptr;
+    ComPtr<ID3DBlob> error_blob;
     HRESULT hr = D3DCompileFromFile(filename, nullptr, nullptr, entry_point, shader_model,
-                                    shaderFlags, 0, out_blob, &error_blob);
+                                    shaderFlags, 0, out_blob, error_blob.GetAddressOf());
 
     if (FAILED(hr))
     {
         auto * details = (error_blob ? static_cast<const char *>(error_blob->GetBufferPointer()) : "<no info>");
         GameInterface::Errorf("Failed to compile shader: %s.\n\nError info: %s", OSWindow::ErrorToString(hr).c_str(), details);
-    }
-
-    if (error_blob != nullptr)
-    {
-        error_blob->Release();
     }
 }
 
@@ -336,22 +547,22 @@ void Renderer::CompileShaderFromFile(const wchar_t * filename, const char * entr
 // Global Renderer instance
 ///////////////////////////////////////////////////////////////////////////////
 
-Renderer * renderer = nullptr;
+Renderer * g_Renderer = nullptr;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void CreateRendererInstance()
 {
-    FASTASSERT(renderer == nullptr);
-    renderer = new Renderer{};
+    FASTASSERT(g_Renderer == nullptr);
+    g_Renderer = new(MemTag::kRenderer) Renderer{};
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void DestroyRendererInstance()
 {
-    delete renderer;
-    renderer = nullptr;
+    DeleteObject(g_Renderer, MemTag::kRenderer);
+    g_Renderer = nullptr;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

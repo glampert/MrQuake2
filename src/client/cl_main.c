@@ -1559,6 +1559,7 @@ void CL_InitLocal(void)
     Cmd_AddCommand("stop", CL_Stop_f);
 
     Cmd_AddCommand("quit", CL_Quit_f);
+    Cmd_AddCommand("exit", CL_Quit_f); // LAMPERT - I like "exit" better :)
 
     Cmd_AddCommand("connect", CL_Connect_f);
     Cmd_AddCommand("reconnect", CL_Reconnect_f);

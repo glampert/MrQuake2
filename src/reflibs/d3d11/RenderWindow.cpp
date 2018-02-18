@@ -6,11 +6,9 @@
 #include "RenderWindow.hpp"
 #include "reflibs/shared/RefShared.hpp"
 
-#ifdef _MSC_VER
-    #pragma comment(lib, "d3d11")
-    #pragma comment(lib, "dxguid")
-    #pragma comment(lib, "d3dcompiler")
-#endif // _MSC_VER
+#pragma comment(lib, "d3d11")
+#pragma comment(lib, "dxguid")
+#pragma comment(lib, "d3dcompiler")
 
 namespace D3D11
 {

@@ -5,6 +5,9 @@
 #pragma once
 
 #include "RenderWindow.hpp"
+#include "reflibs/shared/Pool.hpp"
+#include "reflibs/shared/Memory.hpp"
+#include "reflibs/shared/TextureStore.hpp"
 
 #include <array>
 #include <tuple>
@@ -14,6 +17,8 @@
 
 namespace D3D11
 {
+
+// ============================================================================
 
 using InputLayoutDesc = std::tuple<const D3D11_INPUT_ELEMENT_DESC *, int>;
 
@@ -54,28 +59,70 @@ public:
 /*
 ===============================================================================
 
+    D3D11 TextureImpl / TextureStoreImpl
+
+===============================================================================
+*/
+class TextureImpl final
+    : public TextureImage
+{
+public:
+    using TextureImage::TextureImage;
+
+    ComPtr<ID3D11Texture2D>          tex_resource;
+    ComPtr<ID3D11SamplerState>       sampler;
+    ComPtr<ID3D11ShaderResourceView> srv;
+
+    void InitD3DSpecific();
+    void InitScrap(const TextureImpl * scrap_tex);
+
+    static D3D11_FILTER FilterForTextureType(TextureType tt);
+};
+
+// ============================================================================
+
+class TextureStoreImpl final
+    : public TextureStore
+{
+public:
+
+    TextureStoreImpl() : m_teximages_pool{ MemTag::kRenderer } { }
+    ~TextureStoreImpl() { DestroyAllLoadedTextures(); }
+
+    void Init();
+    unsigned MultisampleQualityLevel(DXGI_FORMAT fmt) const;
+    const TextureImpl * GetScrapImpl() const { return static_cast<const TextureImpl *>(tex_scrap); }
+
+protected:
+
+    /*virtual*/ TextureImage * CreateScrap(int size, const ColorRGBA32 * pix) override;
+    /*virtual*/ TextureImage * CreateTexture(const ColorRGBA32 * pix, std::uint32_t regn, TextureType tt, bool use_scrap,
+                                             int w, int h, Vec2u16 scrap0, Vec2u16 scrap1, const char * name) override;
+    /*virtual*/ void DestroyTexture(TextureImage * tex) override;
+
+private:
+
+    Pool<TextureImpl, 1024> m_teximages_pool;
+    unsigned m_multisample_quality_levels_rgba = 0;
+};
+
+/*
+===============================================================================
+
     D3D11 SpriteBatch
 
 ===============================================================================
 */
 class SpriteBatch final
 {
-private:
-
-    int num_verts    = 0;
-    int used_verts   = 0;
-    int buffer_index = 0;
-
-    std::array<ComPtr<ID3D11Buffer>,     2> vertex_buffers;
-    std::array<D3D11_MAPPED_SUBRESOURCE, 2> mapping_info;
-
 public:
 
     SpriteBatch() = default;
     void Init(int max_verts);
 
     void BeginFrame();
-    void EndFrame(const ShaderProgram & program);
+    void EndFrame(const ShaderProgram & program, const TextureImpl & tex,
+                  ID3D11BlendState * const blend_state, ID3D11Buffer * const cbuffer);
 
     Vertex2D * Increment(int count);
     void PushTriVerts(const Vertex2D tri[3]);
@@ -87,6 +134,15 @@ public:
     // Disallow copy.
     SpriteBatch(const SpriteBatch &) = delete;
     SpriteBatch & operator=(const SpriteBatch &) = delete;
+
+private:
+
+    int m_num_verts    = 0;
+    int m_used_verts   = 0;
+    int m_buffer_index = 0;
+
+    std::array<ComPtr<ID3D11Buffer>,     2> m_vertex_buffers;
+    std::array<D3D11_MAPPED_SUBRESOURCE, 2> m_mapping_info;
 };
 
 /*
@@ -98,29 +154,21 @@ public:
 */
 class Renderer final
 {
-private:
-
-    RenderWindow window;
-    SpriteBatch sprite_batch;
-    bool frame_started = false;
-
-    // Shader programs
-    ShaderProgram shader_ui_sprites;
-
 public:
 
     // Color used to wipe the screen at the start of a frame
     static const DirectX::XMVECTORF32 kClearColor;
 
     // Convenience getters
-    SpriteBatch            * SpriteBatch()           { return &sprite_batch;                    }
-    ID3D11Device           * Device()          const { return window.device.Get();              }
-    ID3D11DeviceContext    * DeviceContext()   const { return window.device_context.Get();      }
-    IDXGISwapChain         * SwapChain()       const { return window.swap_chain.Get();          }
-    ID3D11Texture2D        * FramebufferTex()  const { return window.framebuffer_texture.Get(); }
-    ID3D11RenderTargetView * FramebufferRTV()  const { return window.framebuffer_rtv.Get();     }
-    bool                     DebugValidation() const { return window.debug_validation;          }
-    bool                     FrameStarted()    const { return frame_started;                    }
+    SpriteBatch            * SBatch()                { return &m_sprite_batch;                    }
+    TextureStoreImpl       * TexStore()              { return &m_tex_store;                       }
+    ID3D11Device           * Device()          const { return m_window.device.Get();              }
+    ID3D11DeviceContext    * DeviceContext()   const { return m_window.device_context.Get();      }
+    IDXGISwapChain         * SwapChain()       const { return m_window.swap_chain.Get();          }
+    ID3D11Texture2D        * FramebufferTex()  const { return m_window.framebuffer_texture.Get(); }
+    ID3D11RenderTargetView * FramebufferRTV()  const { return m_window.framebuffer_rtv.Get();     }
+    bool                     DebugValidation() const { return m_window.debug_validation;          }
+    bool                     FrameStarted()    const { return m_frame_started;                    }
 
     Renderer();
     ~Renderer();
@@ -131,18 +179,44 @@ public:
 
     void BeginFrame();
     void EndFrame();
+    void Flush2D();
+
+    void DrawHelper(unsigned num_verts, const ShaderProgram & program, ID3D11Buffer * const vb,
+                    D3D11_PRIMITIVE_TOPOLOGY topology, unsigned offset, unsigned stride);
 
     void CompileShaderFromFile(const wchar_t * filename, const char * entry_point,
                                const char * shader_model, ID3DBlob ** out_blob) const;
 
 private:
 
+    struct ConstantBufferDataUI
+    {
+        DirectX::XMFLOAT4 screen_dimensions = { 0.0f, 0.0f, 0.0f, 0.0f };
+    };
+
     void LoadShaders();
+
+    // Renderer main data:
+    RenderWindow     m_window;
+    SpriteBatch      m_sprite_batch;
+    TextureStoreImpl m_tex_store;
+    bool             m_frame_started;
+    bool             m_window_resized;
+
+    // Shader programs / render states:
+    ShaderProgram            m_shader_ui_sprites;
+    ComPtr<ID3D11BlendState> m_blend_state_ui_sprites;
+    ComPtr<ID3D11Buffer>     m_cbuffer_ui_sprites;
+    ConstantBufferDataUI     m_cbuffer_data_ui_sprites;
 };
 
-// Global Renderer instance
-extern Renderer * renderer;
+// ============================================================================
+
+// Global Renderer instance:
+extern Renderer * g_Renderer;
 void CreateRendererInstance();
 void DestroyRendererInstance();
+
+// ============================================================================
 
 } // D3D11
