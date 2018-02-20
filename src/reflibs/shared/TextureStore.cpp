@@ -118,10 +118,25 @@ void TextureStore::TouchResidentTextures()
         m_scrap_inited = true;
     }
 
+    // This texture is generated at runtime
+    if (tex_white2x2 == nullptr)
+    {
+        auto * pixels = new(MemTag::kTextures) ColorRGBA32[2 * 2];
+        std::memset(pixels, 0xFF, sizeof(ColorRGBA32) * (2 * 2));
+
+        TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic,
+                                           false, 2, 2, {0,0}, {0,0}, "pics/white2x2.pcx");
+
+        m_teximages_cache.push_back(tex);
+        tex_white2x2 = tex;
+    }
+
+    // Update the registration count for these:
     tex_scrap    = FindOrLoad("scrap",    TextureType::kPic);
     tex_conchars = FindOrLoad("conchars", TextureType::kPic);
     tex_conback  = FindOrLoad("conback",  TextureType::kPic);
     tex_backtile = FindOrLoad("backtile", TextureType::kPic);
+    tex_white2x2 = FindOrLoad("white2x2", TextureType::kPic);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -347,12 +362,7 @@ TextureImage * TextureStore::ScrapTryAlloc8Bit(const Color8 * const pic8, const 
                                                const char * const name, const TextureType tt)
 {
     FASTASSERT(width > 0 && height > 0);
-
-    if (!m_scrap_inited)
-    {
-        m_teximages_cache.push_back(CreateScrap(m_scrap.Size(), m_scrap.pixels.get()));
-        m_scrap_inited = true;
-    }
+    FASTASSERT(m_scrap_inited);
 
     int sx = 0;
     int sy = 0;

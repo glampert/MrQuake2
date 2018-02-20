@@ -336,7 +336,7 @@ void Sys_SetMemoryHooks(void (*allocHook)(void *, size_t, game_memtag_t),
 
 static char findbase[MAX_OSPATH];
 static char findpath[MAX_OSPATH];
-static int findhandle;
+static intptr_t findhandle = 0;
 
 static qboolean CompareAttributes(unsigned found, unsigned musthave, unsigned canthave)
 {
@@ -384,9 +384,13 @@ char * Sys_FindFirst(const char * path, unsigned musthave, unsigned canthave)
     findhandle = _findfirst(path, &findinfo);
 
     if (findhandle == -1)
+    {
         return NULL;
+    }
     if (!CompareAttributes(findinfo.attrib, musthave, canthave))
+    {
         return NULL;
+    }
 
     Com_sprintf(findpath, sizeof(findpath), "%s/%s", findbase, findinfo.name);
     return findpath;
@@ -402,11 +406,17 @@ char * Sys_FindNext(unsigned musthave, unsigned canthave)
     struct _finddata_t findinfo;
 
     if (findhandle == -1)
+    {
         return NULL;
+    }
     if (_findnext(findhandle, &findinfo) == -1)
+    {
         return NULL;
+    }
     if (!CompareAttributes(findinfo.attrib, musthave, canthave))
+    {
         return NULL;
+    }
 
     Com_sprintf(findpath, sizeof(findpath), "%s/%s", findbase, findinfo.name);
     return findpath;
@@ -420,6 +430,8 @@ Sys_FindClose
 void Sys_FindClose(void)
 {
     if (findhandle != -1)
+    {
         _findclose(findhandle);
+    }
     findhandle = 0;
 }

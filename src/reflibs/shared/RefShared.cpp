@@ -69,17 +69,18 @@ constexpr int MAXPRINTMSG = 4096;
 static void InstallGameMemoryHooks()
 {
     // Direct game allocations through the Ref lib so they are accounted for.
-    auto allocHook = [](void *, std::size_t size_bytes, game_memtag_t tag)
+    auto AllocHookFn = [](void *, std::size_t size_bytes, game_memtag_t tag)
     {
         MemTagsTrackAlloc(size_bytes, MemTag(tag));
     };
-    auto freeHook = [](void *, std::size_t size_bytes, game_memtag_t tag)
+    auto FreeHookFn = [](void *, std::size_t size_bytes, game_memtag_t tag)
     {
         MemTagsTrackFree(size_bytes, MemTag(tag));
     };
+    g_Refimport.Sys_SetMemoryHooks(AllocHookFn, FreeHookFn);
 
     MemTagsClearAll();
-    g_Refimport.Sys_SetMemoryHooks(allocHook, freeHook);
+    Cmd::RegisterCommand("memtags", MemTagsPrintAll);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -87,6 +88,7 @@ static void InstallGameMemoryHooks()
 static void RemoveGameMemoryHooks()
 {
     g_Refimport.Sys_SetMemoryHooks(nullptr, nullptr);
+    Cmd::RemoveCommand("memtags");
 }
 
 ///////////////////////////////////////////////////////////////////////////////

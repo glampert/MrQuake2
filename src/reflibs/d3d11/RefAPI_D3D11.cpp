@@ -28,7 +28,6 @@ static int InitRefresh(void * hInstance, void * wndproc, int fullscreen)
     auto vid_mode   = GameInterface::Cvar::Get("vid_mode", "6", CvarWrapper::kFlagArchive);
     auto vid_width  = GameInterface::Cvar::Get("vid_width", "1024", CvarWrapper::kFlagArchive);
     auto vid_height = GameInterface::Cvar::Get("vid_height", "768", CvarWrapper::kFlagArchive);
-    auto sb_size    = GameInterface::Cvar::Get("r_spritebatch_size", "40000", CvarWrapper::kFlagArchive);
 
     int w, h;
     if (!GameInterface::Video::GetModeInfo(w, h, vid_mode.AsInt()))
@@ -45,10 +44,7 @@ static int InitRefresh(void * hInstance, void * wndproc, int fullscreen)
     #endif // DEBUG
 
     CreateRendererInstance();
-    g_Renderer->Init("MrQuake2 (D3D11)", (HINSTANCE)hInstance, (WNDPROC)wndproc,
-                     w, h, !!fullscreen, debug_validation, sb_size.AsInt());
-
-    MemTagsPrintAll();
+    g_Renderer->Init("MrQuake2 (D3D11)", (HINSTANCE)hInstance, (WNDPROC)wndproc, w, h, !!fullscreen, debug_validation);
     return true;
 }
 
@@ -148,8 +144,11 @@ static void DrawPic(int x, int y, const char * name)
         return;
     }
 
-    //TODO
-    //DrawTexImage(x, y, tex);
+    g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
+        float(x), float(y),
+        float(tex->width), float(tex->height),
+        static_cast<const TextureImpl *>(tex),
+        Renderer::kColorWhite);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -165,8 +164,11 @@ static void DrawStretchPic(int x, int y, int w, int h, const char * name)
         return;
     }
 
-    //TODO
-    //DrawScaledTexImage(x, y, w, h, tex);
+    g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
+        float(x), float(y),
+        float(w), float(h), 
+        static_cast<const TextureImpl *>(tex),
+        Renderer::kColorWhite);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -197,24 +199,24 @@ static void DrawChar(int x, int y, int c)
     const int col = c & 15;
     const float frow = row * kGlyphUVScale;
     const float fcol = col * kGlyphUVScale;
-    const auto fill_color = DirectX::XMFLOAT4A(DirectX::Colors::White);
 
-    g_Renderer->SBatch()->PushQuad(
-        x,
-        y,
+    g_Renderer->SBatch(SpriteBatch::kDrawChar)->PushQuad(
+        float(x),
+        float(y),
         kGlyphSize,
         kGlyphSize,
         fcol,
         frow,
         fcol + kGlyphUVScale,
         frow + kGlyphUVScale,
-        fill_color);
+        Renderer::kColorWhite);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void DrawTileClear(int x, int y, int w, int h, const char * name)
 {
+    FASTASSERT(g_Renderer->FrameStarted());
     // TODO
 }
 
@@ -223,21 +225,45 @@ static void DrawTileClear(int x, int y, int w, int h, const char * name)
 static void DrawFill(int x, int y, int w, int h, int c)
 {
     FASTASSERT(g_Renderer->FrameStarted());
-    // TODO
+
+    const ColorRGBA32 color = TextureStore::ColorForIndex(c & 0xFF);
+    const std::uint8_t r = (color & 0xFF);
+    const std::uint8_t g = (color >> 8)  & 0xFF;
+    const std::uint8_t b = (color >> 16) & 0xFF;
+
+    constexpr float scale = 1.0f / 255.0f;
+    const DirectX::XMFLOAT4A normalized_color{ r * scale, g * scale, b * scale, 1.0f };
+
+    auto * dummy_tex = static_cast<const TextureImpl *>(g_Renderer->TexStore()->tex_white2x2);
+
+    g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
+        float(x), float(y),
+        float(w), float(h),
+        dummy_tex,
+        normalized_color);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void DrawFadeScreen(void)
+static void DrawFadeScreen()
 {
-    // TODO
+    FASTASSERT(g_Renderer->FrameStarted());
+
+    // Use a dummy white texture as base
+    auto * dummy_tex = static_cast<const TextureImpl *>(g_Renderer->TexStore()->tex_white2x2);
+
+    // Full screen quad with 0.5 alpha
+    g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
+        0.0f, 0.0f, g_Renderer->Width(), g_Renderer->Height(), 
+        dummy_tex, DirectX::XMFLOAT4A{ 0.0f, 0.0f, 0.0f, 0.5f });
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const qbyte * data)
 {
-    // TODO
+    FASTASSERT(g_Renderer->FrameStarted());
+    // TODO - cinematics
 }
 
 ///////////////////////////////////////////////////////////////////////////////

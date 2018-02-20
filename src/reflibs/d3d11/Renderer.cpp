@@ -237,7 +237,7 @@ void SpriteBatch::Init(const int max_verts)
     }
 
     MemTagsTrackAlloc(bd.ByteWidth, MemTag::kVertIndexBuffer);
-    GameInterface::Printf("SpriteBatch used %u KB", (bd.ByteWidth / 1024));
+    GameInterface::Printf("SpriteBatch used %s", FormatMemoryUnit(bd.ByteWidth));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -254,7 +254,7 @@ void SpriteBatch::BeginFrame()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImpl & tex,
+void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImpl * const tex,
                            ID3D11BlendState * const blend_state, ID3D11Buffer * const cbuffer)
 {
     ID3D11DeviceContext * const context = g_Renderer->DeviceContext();
@@ -264,18 +264,40 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImpl & te
     context->Unmap(current_buffer, 0);
     m_mapping_info[m_buffer_index] = {};
 
-    // Bind texture & sampler (t0, s0):
-    context->PSSetShaderResources(0, 1, tex.srv.GetAddressOf());
-    context->PSSetSamplers(0, 1, tex.sampler.GetAddressOf());
-    context->VSSetConstantBuffers(0, 1, &cbuffer); // b0
+    // Constant buffer at register(b0)
+    context->VSSetConstantBuffers(0, 1, &cbuffer);
 
     // Set blending for transparency:
     const float blend_factor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
     context->OMSetBlendState(blend_state, blend_factor, 0xFFFFFFFF);
 
-    // Draw with the current buffer:
-    g_Renderer->DrawHelper(m_used_verts, program, current_buffer,
-                           D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(Vertex2D));
+    // Fast path - one texture for the whole batch:
+    if (tex != nullptr)
+    {
+        // Bind texture & sampler (t0, s0):
+        context->PSSetShaderResources(0, 1, tex->srv.GetAddressOf());
+        context->PSSetSamplers(0, 1, tex->sampler.GetAddressOf());
+
+        // Draw with the current vertex buffer:
+        g_Renderer->DrawHelper(m_used_verts, 0, program, current_buffer,
+                               D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(Vertex2D));
+    }
+    else // Handle small unique textured draws:
+    {
+        const TextureImpl * previous_tex = nullptr;
+        for (const auto & d : m_deferred_textured_quads)
+        {
+            if (previous_tex != d.tex)
+            {
+                context->PSSetShaderResources(0, 1, d.tex->srv.GetAddressOf());
+                context->PSSetSamplers(0, 1, d.tex->sampler.GetAddressOf());
+                previous_tex = d.tex;
+            }
+
+            g_Renderer->DrawHelper(/*num_verts=*/ 6, d.quad_start_vtx, program, current_buffer,
+                                   D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(Vertex2D));
+        }
+    }
 
     // Restore default blend state.
     context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
@@ -283,6 +305,11 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImpl & te
     // Move to the next buffer:
     m_buffer_index = !m_buffer_index;
     m_used_verts = 0;
+
+    if (!m_deferred_textured_quads.empty())
+    {
+        m_deferred_textured_quads.clear();
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -357,16 +384,29 @@ void SpriteBatch::PushQuad(const float x, const float y, const float w, const fl
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+void SpriteBatch::PushQuadTextured(const float x, const float y,
+                                   const float w, const float h,
+                                   const TextureImpl * const tex,
+                                   const DirectX::XMFLOAT4A & color)
+{
+    FASTASSERT(tex != nullptr);
+    const int quad_start_vtx = m_used_verts;
+    PushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color);
+    m_deferred_textured_quads.push_back({ quad_start_vtx, tex });
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // Renderer
 ///////////////////////////////////////////////////////////////////////////////
 
-const DirectX::XMVECTORF32 Renderer::kClearColor = { 0.2f, 0.2f, 0.2f, 1.0f };
+const DirectX::XMFLOAT4A Renderer::kClearColor{ 0.2f, 0.2f, 0.2f, 1.0f };
+const DirectX::XMFLOAT4A Renderer::kColorWhite{ 1.0f, 1.0f, 1.0f, 1.0f };
+const DirectX::XMFLOAT4A Renderer::kColorBlack{ 0.0f, 0.0f, 0.0f, 1.0f };
 
 ///////////////////////////////////////////////////////////////////////////////
 
 Renderer::Renderer()
-    : m_frame_started{ false }
-    , m_window_resized{ true }
 {
     GameInterface::Printf("D3D11 Renderer instance created.");
 }
@@ -376,17 +416,12 @@ Renderer::Renderer()
 Renderer::~Renderer()
 {
     GameInterface::Printf("D3D11 Renderer shutting down.");
-
-    // TEMP
-    m_tex_store.DumpAllLoadedTexturesToFile("dump_imgs", "png");
-    // TEMP
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wndproc,
-                    const int width, const int height, const bool fullscreen,
-                    const bool debug_validation, const int sprite_batch_size)
+                    const int width, const int height, const bool fullscreen, const bool debug_validation)
 {
     GameInterface::Printf("D3D11 Renderer initializing.");
 
@@ -402,7 +437,8 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
     m_window.Init();
 
     // 2D sprite/UI batch setup
-    m_sprite_batch.Init(sprite_batch_size);
+    m_sprite_batches[SpriteBatch::kDrawChar].Init(6 * 5000);
+    m_sprite_batches[SpriteBatch::kDrawPics].Init(6 * 128);
 
     // Texture cache
     m_tex_store.Init();
@@ -443,14 +479,12 @@ void Renderer::LoadShaders()
             GameInterface::Errorf("CreateBlendState failed!");
         }
 
-        // Create the onstant buffer:
-        D3D11_BUFFER_DESC bd;
-        bd                = {};
-        bd.Usage          = D3D11_USAGE_DEFAULT;
-        bd.ByteWidth      = sizeof(ConstantBufferDataUI);
-        bd.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-        bd.CPUAccessFlags = 0;
-        if (FAILED(Device()->CreateBuffer(&bd, nullptr, m_cbuffer_ui_sprites.GetAddressOf())))
+        // Create the constant buffer:
+        D3D11_BUFFER_DESC buf_desc = {};
+        buf_desc.Usage             = D3D11_USAGE_DEFAULT;
+        buf_desc.ByteWidth         = sizeof(ConstantBufferDataUI);
+        buf_desc.BindFlags         = D3D11_BIND_CONSTANT_BUFFER;
+        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_ui_sprites.GetAddressOf())))
         {
             GameInterface::Errorf("Failed to create shader constant buffer!");
         }
@@ -464,9 +498,10 @@ void Renderer::LoadShaders()
 void Renderer::BeginFrame()
 {
     m_frame_started = true;
-    m_window.device_context->ClearRenderTargetView(m_window.framebuffer_rtv.Get(), kClearColor);
+    m_window.device_context->ClearRenderTargetView(m_window.framebuffer_rtv.Get(), &kClearColor.x);
 
-    m_sprite_batch.BeginFrame();
+    m_sprite_batches[SpriteBatch::kDrawChar].BeginFrame();
+    m_sprite_batches[SpriteBatch::kDrawPics].BeginFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -487,6 +522,7 @@ void Renderer::Flush2D()
 {
     FASTASSERT(m_tex_store.tex_conchars != nullptr);
     FASTASSERT(m_blend_state_ui_sprites != nullptr);
+    FASTASSERT(m_cbuffer_ui_sprites != nullptr);
 
     if (m_window_resized)
     {
@@ -495,16 +531,21 @@ void Renderer::Flush2D()
         DeviceContext()->UpdateSubresource(m_cbuffer_ui_sprites.Get(), 0, nullptr, &m_cbuffer_data_ui_sprites, 0, 0);
     }
 
-    // Flush the 2D sprites
-    m_sprite_batch.EndFrame(m_shader_ui_sprites,
-                            *static_cast<const TextureImpl *>(m_tex_store.tex_conchars),
-                            m_blend_state_ui_sprites.Get(), m_cbuffer_ui_sprites.Get());
+    // Remaining 2D geometry:
+    m_sprite_batches[SpriteBatch::kDrawPics].EndFrame(m_shader_ui_sprites, nullptr,
+            m_blend_state_ui_sprites.Get(), m_cbuffer_ui_sprites.Get());
+
+    // Flush 2D text:
+    m_sprite_batches[SpriteBatch::kDrawChar].EndFrame(m_shader_ui_sprites,
+            static_cast<const TextureImpl *>(m_tex_store.tex_conchars),
+            m_blend_state_ui_sprites.Get(), m_cbuffer_ui_sprites.Get());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Renderer::DrawHelper(const unsigned num_verts, const ShaderProgram & program, ID3D11Buffer * const vb,
-                          const D3D11_PRIMITIVE_TOPOLOGY topology, const unsigned offset, const unsigned stride)
+void Renderer::DrawHelper(const unsigned num_verts, const unsigned first_vert, const ShaderProgram & program,
+                          ID3D11Buffer * const vb, const D3D11_PRIMITIVE_TOPOLOGY topology,
+                          const unsigned offset, const unsigned stride)
 {
     ID3D11DeviceContext * const context = DeviceContext();
 
@@ -513,7 +554,7 @@ void Renderer::DrawHelper(const unsigned num_verts, const ShaderProgram & progra
     context->IASetInputLayout(program.vertex_layout.Get());
     context->VSSetShader(program.vs.Get(), nullptr, 0);
     context->PSSetShader(program.ps.Get(), nullptr, 0);
-    context->Draw(num_verts, 0);
+    context->Draw(num_verts, first_vert);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -521,7 +562,7 @@ void Renderer::DrawHelper(const unsigned num_verts, const ShaderProgram & progra
 void Renderer::CompileShaderFromFile(const wchar_t * const filename, const char * const entry_point,
                                      const char * const shader_model, ID3DBlob ** out_blob) const
 {
-    UINT shaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+    UINT shader_flags = D3DCOMPILE_ENABLE_STRICTNESS;
 
     // Set the D3DCOMPILE_DEBUG flag to embed debug information in the shaders.
     // Setting this flag improves the shader debugging experience, but still allows
@@ -529,12 +570,12 @@ void Renderer::CompileShaderFromFile(const wchar_t * const filename, const char 
     // the release configuration.
     if (DebugValidation())
     {
-        shaderFlags |= D3DCOMPILE_DEBUG;
+        shader_flags |= D3DCOMPILE_DEBUG;
     }
 
     ComPtr<ID3DBlob> error_blob;
     HRESULT hr = D3DCompileFromFile(filename, nullptr, nullptr, entry_point, shader_model,
-                                    shaderFlags, 0, out_blob, error_blob.GetAddressOf());
+                                    shader_flags, 0, out_blob, error_blob.GetAddressOf());
 
     if (FAILED(hr))
     {

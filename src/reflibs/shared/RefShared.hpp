@@ -119,8 +119,10 @@ private:
 ===============================================================================
 */
 
-struct refimport_s;
 struct cvar_s;
+struct model_s;
+struct image_s;
+struct refimport_s;
 
 /*
 ===============================================================================
@@ -134,7 +136,8 @@ class CvarWrapper final
 public:
 
     // These mirror the flags in q_shared.h
-    enum {
+    enum VarFlags 
+    {
         kFlagArchive    = 1,
         kFlagUserInfo   = 2,
         kFlagServerInfo = 4,

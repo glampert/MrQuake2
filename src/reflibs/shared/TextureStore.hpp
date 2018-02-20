@@ -117,6 +117,10 @@ public:
     const TextureImage * tex_conchars = nullptr;
     const TextureImage * tex_conback  = nullptr;
     const TextureImage * tex_backtile = nullptr;
+    const TextureImage * tex_white2x2 = nullptr;
+
+    // Global palette access.
+    static ColorRGBA32 ColorForIndex(const Color8 c) { return sm_global_palette[c]; }
 
 protected:
 

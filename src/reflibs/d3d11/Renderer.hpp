@@ -11,9 +11,7 @@
 
 #include <array>
 #include <tuple>
-
 #include <DirectXMath.h>
-#include <DirectXColors.h>
 
 namespace D3D11
 {
@@ -93,6 +91,9 @@ public:
     unsigned MultisampleQualityLevel(DXGI_FORMAT fmt) const;
     const TextureImpl * GetScrapImpl() const { return static_cast<const TextureImpl *>(tex_scrap); }
 
+// TODO Scrap texture needs to be updated when something is written to it!!!
+// Also have to handle UVs correctly when drawing a pic from the scrap atlas
+
 protected:
 
     /*virtual*/ TextureImage * CreateScrap(int size, const ColorRGBA32 * pix) override;
@@ -117,19 +118,33 @@ class SpriteBatch final
 {
 public:
 
+    enum BatchId
+    {
+        kDrawChar, // Only used to draw console chars
+        kDrawPics, // Used by DrawPic, DrawStretchPic, etc
+
+        // Number of items in the enum - not a valid id.
+        kCount,
+    };
+
     SpriteBatch() = default;
     void Init(int max_verts);
 
     void BeginFrame();
-    void EndFrame(const ShaderProgram & program, const TextureImpl & tex,
+    void EndFrame(const ShaderProgram & program, const TextureImpl * const tex,
                   ID3D11BlendState * const blend_state, ID3D11Buffer * const cbuffer);
 
     Vertex2D * Increment(int count);
+
     void PushTriVerts(const Vertex2D tri[3]);
     void PushQuadVerts(const Vertex2D quad[4]);
+
     void PushQuad(float x, float y, float w, float h,
                   float u0, float v0, float u1, float v1,
                   const DirectX::XMFLOAT4A & color);
+
+    void PushQuadTextured(float x, float y, float w, float h,
+                          const TextureImpl * tex, const DirectX::XMFLOAT4A & color);
 
     // Disallow copy.
     SpriteBatch(const SpriteBatch &) = delete;
@@ -143,7 +158,16 @@ private:
 
     std::array<ComPtr<ID3D11Buffer>,     2> m_vertex_buffers;
     std::array<D3D11_MAPPED_SUBRESOURCE, 2> m_mapping_info;
+
+    struct DeferredTexQuad
+    {
+        int quad_start_vtx;
+        const TextureImpl * tex;
+    };
+    std::vector<DeferredTexQuad> m_deferred_textured_quads;
 };
+
+using SpriteBatchSet = std::array<SpriteBatch, SpriteBatch::kCount>;
 
 /*
 ===============================================================================
@@ -156,33 +180,36 @@ class Renderer final
 {
 public:
 
-    // Color used to wipe the screen at the start of a frame
-    static const DirectX::XMVECTORF32 kClearColor;
+    static const DirectX::XMFLOAT4A kClearColor; // Color used to wipe the screen at the start of a frame
+    static const DirectX::XMFLOAT4A kColorWhite;
+    static const DirectX::XMFLOAT4A kColorBlack;
 
     // Convenience getters
-    SpriteBatch            * SBatch()                { return &m_sprite_batch;                    }
-    TextureStoreImpl       * TexStore()              { return &m_tex_store;                       }
-    ID3D11Device           * Device()          const { return m_window.device.Get();              }
-    ID3D11DeviceContext    * DeviceContext()   const { return m_window.device_context.Get();      }
-    IDXGISwapChain         * SwapChain()       const { return m_window.swap_chain.Get();          }
-    ID3D11Texture2D        * FramebufferTex()  const { return m_window.framebuffer_texture.Get(); }
-    ID3D11RenderTargetView * FramebufferRTV()  const { return m_window.framebuffer_rtv.Get();     }
-    bool                     DebugValidation() const { return m_window.debug_validation;          }
-    bool                     FrameStarted()    const { return m_frame_started;                    }
+    SpriteBatch            * SBatch(SpriteBatch::BatchId id) { return &m_sprite_batches[id];              }
+    TextureStoreImpl       * TexStore()                      { return &m_tex_store;                       }
+    ID3D11Device           * Device()          const         { return m_window.device.Get();              }
+    ID3D11DeviceContext    * DeviceContext()   const         { return m_window.device_context.Get();      }
+    IDXGISwapChain         * SwapChain()       const         { return m_window.swap_chain.Get();          }
+    ID3D11Texture2D        * FramebufferTex()  const         { return m_window.framebuffer_texture.Get(); }
+    ID3D11RenderTargetView * FramebufferRTV()  const         { return m_window.framebuffer_rtv.Get();     }
+    bool                     DebugValidation() const         { return m_window.debug_validation;          }
+    bool                     FrameStarted()    const         { return m_frame_started;                    }
+    int                      Width()           const         { return m_window.width;                     }
+    int                      Height()          const         { return m_window.height;                    }
 
     Renderer();
     ~Renderer();
 
     void Init(const char * window_name, HINSTANCE hinst, WNDPROC wndproc,
-              int width, int height, bool fullscreen, bool debug_validation,
-              int sprite_batch_size);
+              int width, int height, bool fullscreen, bool debug_validation);
 
     void BeginFrame();
     void EndFrame();
     void Flush2D();
 
-    void DrawHelper(unsigned num_verts, const ShaderProgram & program, ID3D11Buffer * const vb,
-                    D3D11_PRIMITIVE_TOPOLOGY topology, unsigned offset, unsigned stride);
+    void DrawHelper(unsigned num_verts, unsigned first_vert, const ShaderProgram & program,
+                    ID3D11Buffer * const vb, D3D11_PRIMITIVE_TOPOLOGY topology,
+                    unsigned offset, unsigned stride);
 
     void CompileShaderFromFile(const wchar_t * filename, const char * entry_point,
                                const char * shader_model, ID3DBlob ** out_blob) const;
@@ -198,10 +225,10 @@ private:
 
     // Renderer main data:
     RenderWindow     m_window;
-    SpriteBatch      m_sprite_batch;
+    SpriteBatchSet   m_sprite_batches;
     TextureStoreImpl m_tex_store;
-    bool             m_frame_started;
-    bool             m_window_resized;
+    bool             m_frame_started  = false;
+    bool             m_window_resized = true;
 
     // Shader programs / render states:
     ShaderProgram            m_shader_ui_sprites;
