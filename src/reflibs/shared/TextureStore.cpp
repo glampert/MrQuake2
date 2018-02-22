@@ -38,6 +38,10 @@ static_assert(ArrayLength(TextureType_Strings) == unsigned(TextureType::kCount),
 // TextureStore
 ///////////////////////////////////////////////////////////////////////////////
 
+ColorRGBA32 TextureStore::sm_cinematic_palette[256];
+
+///////////////////////////////////////////////////////////////////////////////
+
 TextureStore::TextureStore()
 {
     m_teximages_cache.reserve(1024);
@@ -121,14 +125,29 @@ void TextureStore::TouchResidentTextures()
     // This texture is generated at runtime
     if (tex_white2x2 == nullptr)
     {
-        auto * pixels = new(MemTag::kTextures) ColorRGBA32[2 * 2];
-        std::memset(pixels, 0xFF, sizeof(ColorRGBA32) * (2 * 2));
+        constexpr int Dim = 2;
 
-        TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic,
-                                           false, 2, 2, {0,0}, {0,0}, "pics/white2x2.pcx");
+        auto * pixels = new(MemTag::kTextures) ColorRGBA32[Dim * Dim];
+        std::memset(pixels, 0xFF, sizeof(ColorRGBA32) * (Dim * Dim));
 
+        TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic, false,
+                                           Dim, Dim, {0,0}, {0,0}, "pics/white2x2.pcx"); // with a fake filename
         m_teximages_cache.push_back(tex);
         tex_white2x2 = tex;
+    }
+
+    // Cinematic frame texture is also a resident buffer
+    if (tex_cinframe == nullptr)
+    {
+        constexpr int Dim = kQuakeCinematicImgSize;
+
+        auto * pixels = new (MemTag::kTextures) ColorRGBA32[Dim * Dim];
+        std::memset(pixels, 0, sizeof(ColorRGBA32) * (Dim * Dim));
+
+        TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic, false,
+                                           Dim, Dim, {0,0}, {0,0}, "pics/cinframe.pcx"); // with a fake filename
+        m_teximages_cache.push_back(tex);
+        tex_cinframe = tex;
     }
 
     // Update the registration count for these:
@@ -137,6 +156,7 @@ void TextureStore::TouchResidentTextures()
     tex_conback  = FindOrLoad("conback",  TextureType::kPic);
     tex_backtile = FindOrLoad("backtile", TextureType::kPic);
     tex_white2x2 = FindOrLoad("white2x2", TextureType::kPic);
+    tex_cinframe = FindOrLoad("cinframe", TextureType::kPic);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

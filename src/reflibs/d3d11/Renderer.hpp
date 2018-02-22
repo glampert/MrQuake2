@@ -89,7 +89,7 @@ public:
 
     void Init();
     unsigned MultisampleQualityLevel(DXGI_FORMAT fmt) const;
-    const TextureImpl * GetScrapImpl() const { return static_cast<const TextureImpl *>(tex_scrap); }
+    const TextureImpl * ScrapImpl() const { return static_cast<const TextureImpl *>(tex_scrap); }
 
 // TODO Scrap texture needs to be updated when something is written to it!!!
 // Also have to handle UVs correctly when drawing a pic from the scrap atlas
@@ -213,6 +213,8 @@ public:
 
     void CompileShaderFromFile(const wchar_t * filename, const char * entry_point,
                                const char * shader_model, ID3DBlob ** out_blob) const;
+
+    void UploadTexture(const TextureImpl * tex);
 
 private:
 

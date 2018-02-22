@@ -54,6 +54,7 @@ void OSWindow::Init()
     int x = 0, y = 0;
     const int w = int(r.right  - r.left);
     const int h = int(r.bottom - r.top);
+    GameInterface::Printf("Creating window %ix%i ...", w, h);
 
     if (!fullscreen)
     {

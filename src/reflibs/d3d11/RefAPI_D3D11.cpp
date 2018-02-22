@@ -60,7 +60,7 @@ static void ShutdownRefresh()
 
 static void BeginRegistration(const char * map_name)
 {
-    GameInterface::Printf("*** D3D11::BeginRegistration ***");
+    GameInterface::Printf("**** D3D11::BeginRegistration ****");
 
     g_Renderer->TexStore()->BeginRegistration();
 
@@ -71,7 +71,7 @@ static void BeginRegistration(const char * map_name)
 
 static void EndRegistration()
 {
-    GameInterface::Printf("*** D3D11::EndRegistration ***");
+    GameInterface::Printf("**** D3D11::EndRegistration ****");
 
     g_Renderer->TexStore()->EndRegistration();
 
@@ -124,9 +124,11 @@ static void DrawGetPicSize(int * w, int * h, const char * name)
     const TextureImage * tex = g_Renderer->TexStore()->FindOrLoad(name, TextureType::kPic);
     if (tex == nullptr)
     {
+        GameInterface::Printf("WARNING: Can't find or load pic: '%s'", name);
         *w = *h = -1;
         return;
     }
+
     *w = tex->width;
     *h = tex->height;
 }
@@ -247,15 +249,18 @@ static void DrawFill(int x, int y, int w, int h, int c)
 
 static void DrawFadeScreen()
 {
+    // was 0.8 on ref_gl Draw_FadeScreen
+    constexpr float fade_alpha = 0.5f;
+
     FASTASSERT(g_Renderer->FrameStarted());
 
     // Use a dummy white texture as base
     auto * dummy_tex = static_cast<const TextureImpl *>(g_Renderer->TexStore()->tex_white2x2);
 
-    // Full screen quad with 0.5 alpha
+    // Full screen quad with alpha
     g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
         0.0f, 0.0f, g_Renderer->Width(), g_Renderer->Height(), 
-        dummy_tex, DirectX::XMFLOAT4A{ 0.0f, 0.0f, 0.0f, 0.5f });
+        dummy_tex, DirectX::XMFLOAT4A{ 0.0f, 0.0f, 0.0f, fade_alpha });
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -263,14 +268,103 @@ static void DrawFadeScreen()
 static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const qbyte * data)
 {
     FASTASSERT(g_Renderer->FrameStarted());
-    // TODO - cinematics
+
+    //
+    // This function is only used by Quake2 to draw the cinematic frames, nothing else,
+    // so it could have a better name... We'll optimize for that and assume this is not
+    // a generic "draw pixels" kind of function.
+    //
+
+    const TextureImage * const cin_tex = g_Renderer->TexStore()->tex_cinframe;
+    FASTASSERT(cin_tex != nullptr);
+
+    ColorRGBA32 * const cinematic_buffer = const_cast<ColorRGBA32 *>(cin_tex->pixels);
+    FASTASSERT(cinematic_buffer != nullptr);
+
+    const ColorRGBA32 * const cinematic_palette = TextureStore::CinematicPalette();
+    float hscale;
+    int trows;
+
+    if (rows <= kQuakeCinematicImgSize)
+    {
+        hscale = 1.0f;
+        trows  = rows;
+    }
+    else
+    {
+        hscale = float(rows) / float(kQuakeCinematicImgSize);
+        trows  = kQuakeCinematicImgSize;
+    }
+
+    // Good idea to clear the buffer first, in case the
+    // following upsampling doesn't fill the whole thing.
+    for (int p = 0; p < (kQuakeCinematicImgSize * kQuakeCinematicImgSize); ++p)
+    {
+        const ColorRGBA32 black = 0xFF000000;
+        cinematic_buffer[p] = black;
+    }
+
+    // Upsample to fill our 256*256 cinematic buffer.
+    // This is based on the algorithm applied by ref_gl.
+    for (int i = 0; i < trows; ++i)
+    {
+        const int row = int(i * hscale);
+        if (row > rows)
+        {
+            break;
+        }
+
+        const qbyte * source = &data[cols * row];
+        ColorRGBA32 * dest = &cinematic_buffer[i * kQuakeCinematicImgSize];
+
+        const int fracstep = (cols * 0x10000 / kQuakeCinematicImgSize);
+        int frac = fracstep >> 1;
+
+        for (int j = 0; j < kQuakeCinematicImgSize; ++j)
+        {
+            const ColorRGBA32 color = cinematic_palette[source[frac >> 16]];
+            dest[j] = color;
+            frac += fracstep;
+        }
+    }
+
+    h += 45; // HACK - Image scaling is probably broken.
+             // Cinematics are not filling up the buffer as they should...
+
+    // Update the cinematic GPU texture from our CPU buffer
+    g_Renderer->UploadTexture(static_cast<const TextureImpl *>(cin_tex));
+
+    // Draw a fullscreen quadrilateral with the cinematic texture applied to it
+    g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
+        float(x), float(y),
+        float(w), float(h), 
+        static_cast<const TextureImpl *>(cin_tex),
+        Renderer::kColorWhite);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void CinematicSetPalette(const qbyte * palette)
 {
-    // TODO
+    ColorRGBA32 * cinematic_palette = TextureStore::CinematicPalette();
+
+    // Set default game palette:
+    if (palette == nullptr)
+    {
+        const ColorRGBA32 * global_palette = TextureStore::GlobalPalette();
+        std::memcpy(cinematic_palette, global_palette, sizeof(ColorRGBA32) * kQuakePaletteSize);
+        return;
+    }
+
+    // Copy custom palette with alpha override:
+    qbyte * dest = reinterpret_cast<qbyte *>(cinematic_palette);
+    for (int i = 0; i < kQuakePaletteSize; i++)
+    {
+        dest[(i * 4) + 0] = palette[(i * 3) + 0];
+        dest[(i * 4) + 1] = palette[(i * 3) + 1];
+        dest[(i * 4) + 2] = palette[(i * 3) + 2];
+        dest[(i * 4) + 3] = 0xFF;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

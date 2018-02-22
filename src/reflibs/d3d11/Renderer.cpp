@@ -80,6 +80,7 @@ D3D11_FILTER TextureImpl::FilterForTextureType(const TextureType tt)
     {
     // TODO: Maybe have a Cvar to select between different filter modes?
     // Should also generate mipmaps for the non-UI textures!!!
+    // Bi/Tri-linear filtering for cinematics? In that case, need a new type for them...
     case TextureType::kSkin   : return D3D11_FILTER_MIN_MAG_MIP_POINT;
     case TextureType::kSprite : return D3D11_FILTER_MIN_MAG_MIP_POINT;
     case TextureType::kWall   : return D3D11_FILTER_MIN_MAG_MIP_POINT;
@@ -135,7 +136,7 @@ TextureImage * TextureStoreImpl::CreateTexture(const ColorRGBA32 * pix, std::uin
 
     if (use_scrap)
     {
-        impl->InitScrap(GetScrapImpl());
+        impl->InitScrap(ScrapImpl());
     }
     else
     {
@@ -582,6 +583,16 @@ void Renderer::CompileShaderFromFile(const wchar_t * const filename, const char 
         auto * details = (error_blob ? static_cast<const char *>(error_blob->GetBufferPointer()) : "<no info>");
         GameInterface::Errorf("Failed to compile shader: %s.\n\nError info: %s", OSWindow::ErrorToString(hr).c_str(), details);
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::UploadTexture(const TextureImpl * const tex)
+{
+    FASTASSERT(tex != nullptr);
+    const UINT subRsrc  = 0; // no mips/slices
+    const UINT rowPitch = tex->width * 4; // RGBA
+    DeviceContext()->UpdateSubresource(tex->tex_resource.Get(), subRsrc, nullptr, tex->pixels, rowPitch, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

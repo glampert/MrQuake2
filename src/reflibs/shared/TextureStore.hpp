@@ -10,6 +10,12 @@
 #include <vector>
 #include <memory>
 
+// Real width/height of a cinematic frame.
+constexpr int kQuakeCinematicImgSize = 256;
+
+// Size in entries (u32s) of the game palettes.
+constexpr int kQuakePaletteSize = 256;
+
 /*
 ===============================================================================
 
@@ -118,8 +124,11 @@ public:
     const TextureImage * tex_conback  = nullptr;
     const TextureImage * tex_backtile = nullptr;
     const TextureImage * tex_white2x2 = nullptr;
+    const TextureImage * tex_cinframe = nullptr;
 
     // Global palette access.
+    static ColorRGBA32 * CinematicPalette()          { return sm_cinematic_palette; }
+    static const ColorRGBA32 * GlobalPalette()       { return sm_global_palette;    }
     static ColorRGBA32 ColorForIndex(const Color8 c) { return sm_global_palette[c]; }
 
 protected:
@@ -158,6 +167,9 @@ private:
     // Palette used to expand the 8bits textures to RGBA32.
     // Imported from the colormap.pcx file with imgdump.
     static const ColorRGBA32 sm_global_palette[256];
+
+    // Palette provided by the game to expand 8bit cinematic frames.
+    static ColorRGBA32 sm_cinematic_palette[256];
 
     // Scrap allocation - AKA texture atlas.
     // Useful to group small textures into a larger one,
