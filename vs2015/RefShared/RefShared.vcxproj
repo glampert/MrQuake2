@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\reflibs\shared\Memory.cpp" />
+    <ClCompile Include="..\..\src\reflibs\shared\ModelStore.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\OSWindow.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\Palette.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\RefShared.cpp" />
@@ -28,6 +29,8 @@
   <ItemGroup>
     <ClInclude Include="..\..\src\external\stb\stb_image_write.h" />
     <ClInclude Include="..\..\src\reflibs\shared\Memory.hpp" />
+    <ClInclude Include="..\..\src\reflibs\shared\ModelStore.hpp" />
+    <ClInclude Include="..\..\src\reflibs\shared\ModelStructs.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\OSWindow.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\Pool.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\RefShared.hpp" />

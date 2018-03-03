@@ -90,8 +90,8 @@ inline void DeleteArray(T * const first, const std::size_t count, const MemTag t
 struct MemHunk final
 {
     std::uint8_t * base_ptr  = nullptr;
-    std::size_t    max_size  = 0;
-    std::size_t    curr_size = 0;
+    unsigned       max_size  = 0;
+    unsigned       curr_size = 0;
     MemTag         mem_tag;
 
     // Destructor frees the whole memory hunk.
@@ -99,13 +99,13 @@ struct MemHunk final
     ~MemHunk();
 
     // Allocate a new hunk of memory (allocation is zero filled).
-    void Init(std::size_t size, MemTag tag);
+    void Init(unsigned size, MemTag tag);
 
     // Fetch a new slice from the hunk's end.
-    void * AllocBlock(std::size_t block_size);
+    void * AllocBlock(unsigned block_size);
 
     // Get the offset to the end of the allocated region.
-    std::size_t Tail() const { return curr_size; }
+    unsigned Tail() const { return curr_size; }
 };
 
 // ============================================================================

@@ -29,6 +29,9 @@
     <ClCompile Include="..\..\src\reflibs\shared\Memory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\shared\ModelStore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\reflibs\shared\RefShared.hpp">
@@ -47,6 +50,12 @@
       <Filter>External</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\reflibs\shared\Memory.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\shared\ModelStructs.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\shared\ModelStore.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

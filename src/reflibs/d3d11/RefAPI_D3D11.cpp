@@ -308,7 +308,7 @@ static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const
     // This is based on the algorithm applied by ref_gl.
     for (int i = 0; i < trows; ++i)
     {
-        const int row = int(i * hscale);
+        const int row = static_cast<int>(i * hscale);
         if (row > rows)
         {
             break;
@@ -328,7 +328,7 @@ static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const
         }
     }
 
-    h += 45; // HACK - Image scaling is probably broken.
+    h += 45; // FIXME HACK - Image scaling is probably broken.
              // Cinematics are not filling up the buffer as they should...
 
     // Update the cinematic GPU texture from our CPU buffer
@@ -346,25 +346,7 @@ static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const
 
 static void CinematicSetPalette(const qbyte * palette)
 {
-    ColorRGBA32 * cinematic_palette = TextureStore::CinematicPalette();
-
-    // Set default game palette:
-    if (palette == nullptr)
-    {
-        const ColorRGBA32 * global_palette = TextureStore::GlobalPalette();
-        std::memcpy(cinematic_palette, global_palette, sizeof(ColorRGBA32) * kQuakePaletteSize);
-        return;
-    }
-
-    // Copy custom palette with alpha override:
-    qbyte * dest = reinterpret_cast<qbyte *>(cinematic_palette);
-    for (int i = 0; i < kQuakePaletteSize; i++)
-    {
-        dest[(i * 4) + 0] = palette[(i * 3) + 0];
-        dest[(i * 4) + 1] = palette[(i * 3) + 1];
-        dest[(i * 4) + 2] = palette[(i * 3) + 2];
-        dest[(i * 4) + 3] = 0xFF;
-    }
+    TextureStore::SetCinematicPaletteFromRaw(palette);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

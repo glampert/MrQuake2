@@ -103,7 +103,7 @@ protected:
 
 private:
 
-    Pool<TextureImpl, 1024> m_teximages_pool;
+    Pool<TextureImpl, kTexturePoolSize> m_teximages_pool;
     unsigned m_multisample_quality_levels_rgba = 0;
 };
 

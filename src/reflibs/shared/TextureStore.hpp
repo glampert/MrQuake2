@@ -70,11 +70,6 @@ public:
     {
     }
 
-    bool IsLoaded() const
-    {
-        return pixels != nullptr;
-    }
-
     // Disallow copy.
     TextureImage(const TextureImage &) = delete;
     TextureImage & operator=(const TextureImage &) = delete;
@@ -101,6 +96,8 @@ protected:
 class TextureStore
 {
 public:
+
+    static constexpr int kTexturePoolSize = 1024;
 
     TextureStore();
     virtual ~TextureStore();
@@ -130,6 +127,9 @@ public:
     static ColorRGBA32 * CinematicPalette()          { return sm_cinematic_palette; }
     static const ColorRGBA32 * GlobalPalette()       { return sm_global_palette;    }
     static ColorRGBA32 ColorForIndex(const Color8 c) { return sm_global_palette[c]; }
+
+    // Nullptr sets the global palette.
+    static void SetCinematicPaletteFromRaw(const std::uint8_t * palette);
 
 protected:
 

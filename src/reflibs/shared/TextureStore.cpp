@@ -44,7 +44,9 @@ ColorRGBA32 TextureStore::sm_cinematic_palette[256];
 
 TextureStore::TextureStore()
 {
-    m_teximages_cache.reserve(1024);
+    m_teximages_cache.reserve(kTexturePoolSize);
+    MemTagsTrackAlloc(m_teximages_cache.capacity() * sizeof(TextureImage *), MemTag::kTextures);
+
     GameInterface::Printf("TextureStore instance created.");
 }
 
@@ -96,6 +98,28 @@ void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const ch
     else
     {
         GameInterface::Printf("Invalid file type '%s'", file_type);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void TextureStore::SetCinematicPaletteFromRaw(const std::uint8_t * const palette)
+{
+    // Set default game palette:
+    if (palette == nullptr)
+    {
+        std::memcpy(sm_cinematic_palette, sm_global_palette, sizeof(ColorRGBA32) * kQuakePaletteSize);
+    }
+    else // Copy custom palette with alpha override:
+    {
+        std::uint8_t * dest = reinterpret_cast<std::uint8_t *>(sm_cinematic_palette);
+        for (int i = 0; i < kQuakePaletteSize; ++i)
+        {
+            dest[(i * 4) + 0] = palette[(i * 3) + 0];
+            dest[(i * 4) + 1] = palette[(i * 3) + 1];
+            dest[(i * 4) + 2] = palette[(i * 3) + 2];
+            dest[(i * 4) + 3] = 0xFF;
+        }
     }
 }
 

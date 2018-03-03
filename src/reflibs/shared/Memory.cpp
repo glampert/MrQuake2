@@ -238,7 +238,7 @@ void MemFreeTracked(const void * ptr, const size_t size_bytes, const MemTag tag)
 // MemHunk
 ///////////////////////////////////////////////////////////////////////////////
 
-constexpr std::size_t HUNK_SIZE_ROUND = 31;
+constexpr unsigned HUNK_SIZE_ROUND = 31;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -253,11 +253,11 @@ MemHunk::~MemHunk()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void MemHunk::Init(const std::size_t size, const MemTag tag)
+void MemHunk::Init(const unsigned size, const MemTag tag)
 {
     FASTASSERT(base_ptr == nullptr); // Trap invalid reinitialization
 
-    const std::size_t rounded_size = (size + HUNK_SIZE_ROUND) & ~HUNK_SIZE_ROUND;
+    const unsigned rounded_size = (size + HUNK_SIZE_ROUND) & ~HUNK_SIZE_ROUND;
     FASTASSERT(rounded_size >= size);
 
     curr_size = 0;
@@ -269,18 +269,18 @@ void MemHunk::Init(const std::size_t size, const MemTag tag)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void * MemHunk::AllocBlock(const std::size_t block_size)
+void * MemHunk::AllocBlock(const unsigned block_size)
 {
     FASTASSERT(base_ptr != nullptr); // Uninitialized?
 
-    const std::size_t rounded_size = (block_size + HUNK_SIZE_ROUND) & ~HUNK_SIZE_ROUND;
+    const unsigned rounded_size = (block_size + HUNK_SIZE_ROUND) & ~HUNK_SIZE_ROUND;
     FASTASSERT(rounded_size >= block_size);
 
     // The hunk stack doesn't resize.
     curr_size += rounded_size;
     if (curr_size > max_size)
     {
-        GameInterface::Errorf("MemHunk::AllocBlock: Overflowed with %zu bytes request!", rounded_size);
+        GameInterface::Errorf("MemHunk::AllocBlock: Overflowed with %u bytes request!", rounded_size);
     }
 
     return base_ptr + curr_size - rounded_size;

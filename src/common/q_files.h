@@ -432,7 +432,7 @@ typedef struct
 #define DVIS_PVS 0
 #define DVIS_PHS 1
 
-typedef struct
+typedef struct dvis_s
 {
     int numclusters;
     int bitofs[8][2]; // bitofs[numclusters][2]
