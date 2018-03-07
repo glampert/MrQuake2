@@ -12,6 +12,8 @@
 #include <d3d11_1.h>
 #include <d3dcompiler.h>
 
+namespace MrQ2
+{
 namespace D3D11
 {
 
@@ -43,3 +45,4 @@ private:
 };
 
 } // D3D11
+} // MrQ2

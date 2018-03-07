@@ -10,6 +10,9 @@
 #include <vector>
 #include <memory>
 
+namespace MrQ2
+{
+
 // Real width/height of a cinematic frame.
 constexpr int kQuakeCinematicImgSize = 256;
 
@@ -202,3 +205,5 @@ bool TGALoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int
 bool PCXLoadFromFile(const char * filename, Color8 ** pic, int * width, int * height, ColorRGBA32 * palette);
 
 // ============================================================================
+
+} // MrQ2

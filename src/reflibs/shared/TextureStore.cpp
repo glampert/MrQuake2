@@ -18,6 +18,9 @@ extern "C"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "external/stb/stb_image_write.h"
 
+namespace MrQ2
+{
+
 ///////////////////////////////////////////////////////////////////////////////
 
 // Verbose debugging
@@ -252,6 +255,7 @@ const char * TextureStore::NameFixup(const char * const in, const TextureType tt
 
 const TextureImage * TextureStore::Find(const char * const name, const TextureType tt)
 {
+    FASTASSERT(tt != TextureType::kCount);
     const char * tex_name = NameFixup(name, tt);
 
     if (kLogFindTextures)
@@ -898,3 +902,5 @@ bool TGALoadFromFile(const char * const filename, ColorRGBA32 ** pic, int * widt
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+} // MrQ2

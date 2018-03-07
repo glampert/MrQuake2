@@ -10,6 +10,8 @@
 #pragma comment(lib, "dxguid")
 #pragma comment(lib, "d3dcompiler")
 
+namespace MrQ2
+{
 namespace D3D11
 {
 
@@ -123,3 +125,4 @@ void RenderWindow::InitRenderWindow()
 ///////////////////////////////////////////////////////////////////////////////
 
 } // D3D11
+} // MrQ2

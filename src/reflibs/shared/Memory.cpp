@@ -10,6 +10,9 @@
 #include <cstring> // memset/cpy
 #include <cstdio>
 
+namespace MrQ2
+{
+
 ///////////////////////////////////////////////////////////////////////////////
 
 // Verbose debugging
@@ -194,34 +197,6 @@ const char * FormatMemoryUnit(const std::size_t size_bytes, const bool abbreviat
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Global new/delete operator overrides
-///////////////////////////////////////////////////////////////////////////////
-
-void * operator new(const std::size_t size_bytes, const MemTag tag)
-{
-    if (kLogNewDeleteCalls)
-    {
-        GameInterface::Printf("operator new(%zu, %s)", size_bytes, MemTag_Strings[unsigned(tag)]);
-    }
-
-    MemTagsTrackAlloc(size_bytes, tag);
-    return std::malloc(size_bytes);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void * operator new[](const std::size_t size_bytes, const MemTag tag)
-{
-    if (kLogNewDeleteCalls)
-    {
-        GameInterface::Printf("operator new[](%zu, %s)", size_bytes, MemTag_Strings[unsigned(tag)]);
-    }
-
-    MemTagsTrackAlloc(size_bytes, tag);
-    return std::malloc(size_bytes);
-}
-
-///////////////////////////////////////////////////////////////////////////////
 
 void MemFreeTracked(const void * ptr, const size_t size_bytes, const MemTag tag)
 {
@@ -284,6 +259,38 @@ void * MemHunk::AllocBlock(const unsigned block_size)
     }
 
     return base_ptr + curr_size - rounded_size;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+} // MrQ2
+
+///////////////////////////////////////////////////////////////////////////////
+// Global new/delete operator overrides
+///////////////////////////////////////////////////////////////////////////////
+
+void * operator new(const std::size_t size_bytes, const MrQ2::MemTag tag)
+{
+    if (MrQ2::kLogNewDeleteCalls)
+    {
+        MrQ2::GameInterface::Printf("operator new(%zu, %s)", size_bytes, MrQ2::MemTag_Strings[unsigned(tag)]);
+    }
+
+    MrQ2::MemTagsTrackAlloc(size_bytes, tag);
+    return std::malloc(size_bytes);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void * operator new[](const std::size_t size_bytes, const MrQ2::MemTag tag)
+{
+    if (MrQ2::kLogNewDeleteCalls)
+    {
+        MrQ2::GameInterface::Printf("operator new[](%zu, %s)", size_bytes, MrQ2::MemTag_Strings[unsigned(tag)]);
+    }
+
+    MrQ2::MemTagsTrackAlloc(size_bytes, tag);
+    return std::malloc(size_bytes);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

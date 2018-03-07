@@ -1,6 +1,9 @@
 
 #include "TextureStore.hpp"
 
+namespace MrQ2
+{
+
 // Extracted from game data with the imgdump cmdline tool.
 const ColorRGBA32 TextureStore::sm_global_palette[256] = {
     0xFF000000, 0xFF0F0F0F, 0xFF1F1F1F, 0xFF2F2F2F, 0xFF3F3F3F,
@@ -56,3 +59,5 @@ const ColorRGBA32 TextureStore::sm_global_palette[256] = {
     0xFF1B3F7B, 0xFFC7D3EB, 0xFF9BABC7, 0xFF778BA7, 0xFF576B87,
     0x00535B9F
 };
+
+} // MrQ2

@@ -9,6 +9,9 @@
 #include <memory>
 #include <utility>
 
+namespace MrQ2
+{
+
 //
 // Pool of fixed-size memory blocks (similar to a list of arrays).
 //
@@ -248,3 +251,5 @@ inline void Destroy(T * obj)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+} // MrQ2

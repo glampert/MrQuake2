@@ -7,12 +7,15 @@
 #include "RenderWindow.hpp"
 #include "reflibs/shared/Pool.hpp"
 #include "reflibs/shared/Memory.hpp"
+#include "reflibs/shared/ModelStore.hpp"
 #include "reflibs/shared/TextureStore.hpp"
 
 #include <array>
 #include <tuple>
 #include <DirectXMath.h>
 
+namespace MrQ2
+{
 namespace D3D11
 {
 
@@ -57,11 +60,11 @@ public:
 /*
 ===============================================================================
 
-    D3D11 TextureImpl / TextureStoreImpl
+    D3D11 TextureImageImpl / TextureStoreImpl
 
 ===============================================================================
 */
-class TextureImpl final
+class TextureImageImpl final
     : public TextureImage
 {
 public:
@@ -72,7 +75,7 @@ public:
     ComPtr<ID3D11ShaderResourceView> srv;
 
     void InitD3DSpecific();
-    void InitScrap(const TextureImpl * scrap_tex);
+    void InitFromScrap(const TextureImageImpl * scrap_tex);
 
     static D3D11_FILTER FilterForTextureType(TextureType tt);
 };
@@ -84,15 +87,23 @@ class TextureStoreImpl final
 {
 public:
 
-    TextureStoreImpl() : m_teximages_pool{ MemTag::kRenderer } { }
-    ~TextureStoreImpl() { DestroyAllLoadedTextures(); }
+    TextureStoreImpl()
+        : m_teximages_pool{ MemTag::kRenderer }
+    {
+    }
+
+    ~TextureStoreImpl()
+    {
+        DestroyAllLoadedTextures();
+    }
 
     void Init();
-    unsigned MultisampleQualityLevel(DXGI_FORMAT fmt) const;
-    const TextureImpl * ScrapImpl() const { return static_cast<const TextureImpl *>(tex_scrap); }
 
-// TODO Scrap texture needs to be updated when something is written to it!!!
-// Also have to handle UVs correctly when drawing a pic from the scrap atlas
+    unsigned MultisampleQualityLevel(DXGI_FORMAT fmt) const;
+    const TextureImageImpl * ScrapImpl() const { return static_cast<const TextureImageImpl *>(tex_scrap); }
+
+    // TODO Scrap texture needs to be updated when something is written to it!!!
+    // Also have to handle UVs correctly when drawing a pic from the scrap atlas
 
 protected:
 
@@ -103,8 +114,55 @@ protected:
 
 private:
 
-    Pool<TextureImpl, kTexturePoolSize> m_teximages_pool;
+    Pool<TextureImageImpl, kTexturePoolSize> m_teximages_pool;
     unsigned m_multisample_quality_levels_rgba = 0;
+};
+
+/*
+===============================================================================
+
+    D3D11 ModelInstanceImpl / ModelStoreImpl
+
+===============================================================================
+*/
+class ModelInstanceImpl final
+    : public ModelInstance
+{
+public:
+    using ModelInstance::ModelInstance;
+
+    // TODO
+
+    void InitD3DSpecific();
+};
+
+// ============================================================================
+
+class ModelStoreImpl final
+    : public ModelStore
+{
+public:
+
+    explicit ModelStoreImpl(TextureStore & tex_store)
+        : ModelStore{ tex_store }, m_models_pool{ MemTag::kRenderer }
+    {
+    }
+
+    ~ModelStoreImpl()
+    {
+        DestroyAllLoadedModels();
+    }
+
+    void Init();
+
+protected:
+
+    /*virtual*/ ModelInstance * CreateModel(const char * name, ModelType mt, std::uint32_t regn) override;
+    /*virtual*/ void DestroyModel(ModelInstance * mdl) override;
+
+private:
+
+    Pool<ModelInstanceImpl, kModelPoolSize> m_models_pool;
 };
 
 /*
@@ -131,7 +189,7 @@ public:
     void Init(int max_verts);
 
     void BeginFrame();
-    void EndFrame(const ShaderProgram & program, const TextureImpl * const tex,
+    void EndFrame(const ShaderProgram & program, const TextureImageImpl * const tex,
                   ID3D11BlendState * const blend_state, ID3D11Buffer * const cbuffer);
 
     Vertex2D * Increment(int count);
@@ -144,7 +202,7 @@ public:
                   const DirectX::XMFLOAT4A & color);
 
     void PushQuadTextured(float x, float y, float w, float h,
-                          const TextureImpl * tex, const DirectX::XMFLOAT4A & color);
+                          const TextureImageImpl * tex, const DirectX::XMFLOAT4A & color);
 
     // Disallow copy.
     SpriteBatch(const SpriteBatch &) = delete;
@@ -162,7 +220,7 @@ private:
     struct DeferredTexQuad
     {
         int quad_start_vtx;
-        const TextureImpl * tex;
+        const TextureImageImpl * tex;
     };
     std::vector<DeferredTexQuad> m_deferred_textured_quads;
 };
@@ -187,6 +245,7 @@ public:
     // Convenience getters
     SpriteBatch            * SBatch(SpriteBatch::BatchId id) { return &m_sprite_batches[id];              }
     TextureStoreImpl       * TexStore()                      { return &m_tex_store;                       }
+    ModelStoreImpl         * MdlStore()                      { return &m_mdl_store;                       }
     ID3D11Device           * Device()          const         { return m_window.device.Get();              }
     ID3D11DeviceContext    * DeviceContext()   const         { return m_window.device_context.Get();      }
     IDXGISwapChain         * SwapChain()       const         { return m_window.swap_chain.Get();          }
@@ -214,7 +273,7 @@ public:
     void CompileShaderFromFile(const wchar_t * filename, const char * entry_point,
                                const char * shader_model, ID3DBlob ** out_blob) const;
 
-    void UploadTexture(const TextureImpl * tex);
+    void UploadTexture(const TextureImageImpl * tex);
 
 private:
 
@@ -229,6 +288,7 @@ private:
     RenderWindow     m_window;
     SpriteBatchSet   m_sprite_batches;
     TextureStoreImpl m_tex_store;
+    ModelStoreImpl   m_mdl_store;
     bool             m_frame_started  = false;
     bool             m_window_resized = true;
 
@@ -249,3 +309,4 @@ void DestroyRendererInstance();
 // ============================================================================
 
 } // D3D11
+} // MrQ2

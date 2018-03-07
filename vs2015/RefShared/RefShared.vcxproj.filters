@@ -32,6 +32,9 @@
     <ClCompile Include="..\..\src\reflibs\shared\ModelStore.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\shared\ModelLoad.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\reflibs\shared\RefShared.hpp">

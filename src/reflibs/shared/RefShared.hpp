@@ -11,6 +11,21 @@
 /*
 ===============================================================================
 
+    Quake forward declarations
+
+===============================================================================
+*/
+struct cplane_s;
+struct cvar_s;
+struct dvis_s;
+struct image_s;
+struct model_s;
+struct refimport_s;
+using vec3_t = float[3];
+
+/*
+===============================================================================
+
     Helper macros & common definitions
 
 ===============================================================================
@@ -30,7 +45,16 @@
     #define FASTASSERT(expr) /* nothing */
 #endif // NDEBUG
 
-// ============================================================================
+namespace MrQ2
+{
+
+/*
+===============================================================================
+
+    Miscellaneous utility functions
+
+===============================================================================
+*/
 
 std::uint64_t FnvHash64(const std::uint8_t * bytes, std::size_t len);
 std::uint32_t FnvHash32(const std::uint8_t * bytes, std::size_t len);
@@ -50,13 +74,18 @@ constexpr std::size_t ArrayLength(const T (&)[Size])
     return Size;
 }
 
-// ============================================================================
+/*
+===============================================================================
 
+    PathName
+
+===============================================================================
+*/
 class PathName final
 {
 public:
 
-    static constexpr unsigned kNameMaxLen = 64; // MAX_QPATH
+    static constexpr int kNameMaxLen = 64; // MAX_QPATH
 
     PathName(const char * const path)
     {
@@ -110,19 +139,6 @@ private:
     std::uint32_t m_length;     // Cached length of string not including terminator.
     char m_string[kNameMaxLen]; // File name with game path including extension.
 };
-
-/*
-===============================================================================
-
-    Quake forward declarations
-
-===============================================================================
-*/
-
-struct cvar_s;
-struct model_s;
-struct image_s;
-struct refimport_s;
 
 /*
 ===============================================================================
@@ -243,3 +259,5 @@ namespace FS
 } // FS
 
 } // GameInterface
+
+} // MrQ2

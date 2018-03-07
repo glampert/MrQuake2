@@ -8,6 +8,9 @@
 #include <cstdint>
 #include <type_traits>
 
+namespace MrQ2
+{
+
 /*
 ===============================================================================
 
@@ -43,18 +46,10 @@ void MemTagsPrintAll();
 // Note: Returns a pointer to a static buffer - copy if you need to hold on to it.
 const char * FormatMemoryUnit(std::size_t size_bytes, bool abbreviated = true);
 
-/*
-===============================================================================
-
-    Global new/delete operator overrides
-
-===============================================================================
-*/
-
-void * operator new(std::size_t size_bytes, MemTag tag);
-void * operator new[](std::size_t size_bytes, MemTag tag);
+// Internal memory deallocation function with tag tracking.
 void MemFreeTracked(const void * ptr, size_t size_bytes, MemTag tag);
 
+// Destroys a single object pointer and frees it - passes along the tag for tracking.
 template<typename T>
 inline void DeleteObject(T * const obj, const MemTag tag)
 {
@@ -66,6 +61,7 @@ inline void DeleteObject(T * const obj, const MemTag tag)
     MemFreeTracked(obj, sizeof(T), tag);
 }
 
+// Destroys a array of objects and frees it - passes along the tag for tracking.
 template<typename T>
 inline void DeleteArray(T * const first, const std::size_t count, const MemTag tag)
 {
@@ -108,4 +104,14 @@ struct MemHunk final
     unsigned Tail() const { return curr_size; }
 };
 
-// ============================================================================
+} // MrQ2
+
+/*
+===============================================================================
+
+    Global new/delete operator overrides
+
+===============================================================================
+*/
+void * operator new(std::size_t size_bytes, MrQ2::MemTag tag);
+void * operator new[](std::size_t size_bytes, MrQ2::MemTag tag);

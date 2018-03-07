@@ -12,6 +12,9 @@
 #include <windows.h>
 #include <wrl.h>
 
+namespace MrQ2
+{
+
 /*
 ===============================================================================
 
@@ -51,3 +54,5 @@ protected:
     // Implemented by the renderer.
     virtual void InitRenderWindow() { }
 };
+
+} // MrQ2

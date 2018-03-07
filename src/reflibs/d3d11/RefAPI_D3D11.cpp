@@ -20,6 +20,8 @@ extern "C"
 // Game => Renderer interface
 ///////////////////////////////////////////////////////////////////////////////
 
+namespace MrQ2
+{
 namespace D3D11
 {
 
@@ -63,6 +65,7 @@ static void BeginRegistration(const char * map_name)
     GameInterface::Printf("**** D3D11::BeginRegistration ****");
 
     g_Renderer->TexStore()->BeginRegistration();
+    g_Renderer->MdlStore()->BeginRegistration(map_name);
 
     MemTagsPrintAll();
 }
@@ -73,6 +76,7 @@ static void EndRegistration()
 {
     GameInterface::Printf("**** D3D11::EndRegistration ****");
 
+    g_Renderer->MdlStore()->EndRegistration();
     g_Renderer->TexStore()->EndRegistration();
 
     MemTagsPrintAll();
@@ -82,8 +86,8 @@ static void EndRegistration()
 
 static model_s * RegisterModel(const char * name)
 {
-    // TODO
-    return nullptr;
+    // Returned as an opaque handle.
+    return (model_s *)g_Renderer->MdlStore()->FindOrLoad(name, ModelType::kAny);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -149,7 +153,7 @@ static void DrawPic(int x, int y, const char * name)
     g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
         float(x), float(y),
         float(tex->width), float(tex->height),
-        static_cast<const TextureImpl *>(tex),
+        static_cast<const TextureImageImpl *>(tex),
         Renderer::kColorWhite);
 }
 
@@ -169,7 +173,7 @@ static void DrawStretchPic(int x, int y, int w, int h, const char * name)
     g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
         float(x), float(y),
         float(w), float(h), 
-        static_cast<const TextureImpl *>(tex),
+        static_cast<const TextureImageImpl *>(tex),
         Renderer::kColorWhite);
 }
 
@@ -236,7 +240,7 @@ static void DrawFill(int x, int y, int w, int h, int c)
     constexpr float scale = 1.0f / 255.0f;
     const DirectX::XMFLOAT4A normalized_color{ r * scale, g * scale, b * scale, 1.0f };
 
-    auto * dummy_tex = static_cast<const TextureImpl *>(g_Renderer->TexStore()->tex_white2x2);
+    auto * dummy_tex = static_cast<const TextureImageImpl *>(g_Renderer->TexStore()->tex_white2x2);
 
     g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
         float(x), float(y),
@@ -255,7 +259,7 @@ static void DrawFadeScreen()
     FASTASSERT(g_Renderer->FrameStarted());
 
     // Use a dummy white texture as base
-    auto * dummy_tex = static_cast<const TextureImpl *>(g_Renderer->TexStore()->tex_white2x2);
+    auto * dummy_tex = static_cast<const TextureImageImpl *>(g_Renderer->TexStore()->tex_white2x2);
 
     // Full screen quad with alpha
     g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
@@ -332,13 +336,13 @@ static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const
              // Cinematics are not filling up the buffer as they should...
 
     // Update the cinematic GPU texture from our CPU buffer
-    g_Renderer->UploadTexture(static_cast<const TextureImpl *>(cin_tex));
+    g_Renderer->UploadTexture(static_cast<const TextureImageImpl *>(cin_tex));
 
     // Draw a fullscreen quadrilateral with the cinematic texture applied to it
     g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
         float(x), float(y),
         float(w), float(h), 
-        static_cast<const TextureImpl *>(cin_tex),
+        static_cast<const TextureImageImpl *>(cin_tex),
         Renderer::kColorWhite);
 }
 
@@ -373,37 +377,38 @@ static void AppActivate(int activate)
 }
 
 } // D3D11
+} // MrQ2
 
 ///////////////////////////////////////////////////////////////////////////////
 
 extern "C" REFLIB_DLL_EXPORT refexport_t GetRefAPI(refimport_t ri)
 {
-    GameInterface::Initialize(ri, "D3D11");
+    MrQ2::GameInterface::Initialize(ri, "D3D11");
 
     refexport_t re;
     re.api_version         = REF_API_VERSION;
     re.vidref              = VIDREF_D3D11;
-    re.Init                = D3D11::InitRefresh;
-    re.Shutdown            = D3D11::ShutdownRefresh;
-    re.BeginRegistration   = D3D11::BeginRegistration;
-    re.RegisterModel       = D3D11::RegisterModel;
-    re.RegisterSkin        = D3D11::RegisterSkin;
-    re.RegisterPic         = D3D11::RegisterPic;
-    re.SetSky              = D3D11::SetSky;
-    re.EndRegistration     = D3D11::EndRegistration;
-    re.RenderFrame         = D3D11::RenderFrame;
-    re.DrawGetPicSize      = D3D11::DrawGetPicSize;
-    re.DrawPic             = D3D11::DrawPic;
-    re.DrawStretchPic      = D3D11::DrawStretchPic;
-    re.DrawChar            = D3D11::DrawChar;
-    re.DrawTileClear       = D3D11::DrawTileClear;
-    re.DrawFill            = D3D11::DrawFill;
-    re.DrawFadeScreen      = D3D11::DrawFadeScreen;
-    re.DrawStretchRaw      = D3D11::DrawStretchRaw;
-    re.CinematicSetPalette = D3D11::CinematicSetPalette;
-    re.BeginFrame          = D3D11::BeginFrame;
-    re.EndFrame            = D3D11::EndFrame;
-    re.AppActivate         = D3D11::AppActivate;
+    re.Init                = MrQ2::D3D11::InitRefresh;
+    re.Shutdown            = MrQ2::D3D11::ShutdownRefresh;
+    re.BeginRegistration   = MrQ2::D3D11::BeginRegistration;
+    re.RegisterModel       = MrQ2::D3D11::RegisterModel;
+    re.RegisterSkin        = MrQ2::D3D11::RegisterSkin;
+    re.RegisterPic         = MrQ2::D3D11::RegisterPic;
+    re.SetSky              = MrQ2::D3D11::SetSky;
+    re.EndRegistration     = MrQ2::D3D11::EndRegistration;
+    re.RenderFrame         = MrQ2::D3D11::RenderFrame;
+    re.DrawGetPicSize      = MrQ2::D3D11::DrawGetPicSize;
+    re.DrawPic             = MrQ2::D3D11::DrawPic;
+    re.DrawStretchPic      = MrQ2::D3D11::DrawStretchPic;
+    re.DrawChar            = MrQ2::D3D11::DrawChar;
+    re.DrawTileClear       = MrQ2::D3D11::DrawTileClear;
+    re.DrawFill            = MrQ2::D3D11::DrawFill;
+    re.DrawFadeScreen      = MrQ2::D3D11::DrawFadeScreen;
+    re.DrawStretchRaw      = MrQ2::D3D11::DrawStretchRaw;
+    re.CinematicSetPalette = MrQ2::D3D11::CinematicSetPalette;
+    re.BeginFrame          = MrQ2::D3D11::BeginFrame;
+    re.EndFrame            = MrQ2::D3D11::EndFrame;
+    re.AppActivate         = MrQ2::D3D11::AppActivate;
     return re;
 }
 

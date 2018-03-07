@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\reflibs\shared\Memory.cpp" />
+    <ClCompile Include="..\..\src\reflibs\shared\ModelLoad.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\ModelStore.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\OSWindow.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\Palette.cpp" />

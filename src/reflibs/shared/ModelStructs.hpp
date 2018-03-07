@@ -8,11 +8,11 @@
 #include "RefShared.hpp"
 #include "Memory.hpp"
 
-// Forward decls:
-typedef float vec3_t[3];
-struct cplane_s;
-struct dvis_s;
+namespace MrQ2
+{
+
 class TextureImage;
+class TextureStore;
 
 /*
 ===============================================================================
@@ -46,7 +46,10 @@ enum class ModelType : std::uint8_t
     kAliasMD2, // MD2/Entity model.
 
     // Number of items in the enum - not a valid model type.
-    kCount
+    kCount,
+
+    // Special flag for ModelStore::Find - not a valid type
+    kAny = 0xFF,
 };
 
 // Size in pixels of the lightmap atlases.
@@ -56,7 +59,7 @@ constexpr int kLightmapBlockHeight = 128;
 // Max height in pixels of MD2 model skins.
 constexpr int kMaxMD2SkinHeight = 480;
 
-// From g_files.h
+// From q_files.h
 constexpr int kMaxMD2Skins  = 32;
 constexpr int kMaxLightmaps = 4;
 
@@ -119,8 +122,8 @@ struct ModelTexInfo
     float vecs[2][4];
     int flags;
     int num_frames;
-    TextureImage * teximage;
-    ModelTexInfo * next; // Texture animation chain
+    const TextureImage * teximage;
+    const ModelTexInfo * next; // Texture animation chain
 };
 
 //
@@ -143,7 +146,7 @@ struct ModelSurface
 
     cplane_s * plane;
     int flags;
-    int debug_color;
+    ColorRGBA32 debug_color;
 
     int first_edge; // look up in model->surf_edges[], negative numbers are backwards edges
     int num_edges;
@@ -290,7 +293,7 @@ public:
         dvis_s * vis;
         std::uint8_t * light_data;
 
-        TextureImage * skins[kMaxMD2Skins]; // For alias models and skins.
+        const TextureImage * skins[kMaxMD2Skins]; // For alias models and skins.
     };
 
     // POD data that we can memset to zeros on construction.
@@ -320,6 +323,13 @@ public:
     // Disallow copy.
     ModelInstance(const ModelInstance &) = delete;
     ModelInstance & operator=(const ModelInstance &) = delete;
+
+protected:
+
+    // Back-end renderer implements the model instance non-virtually.
+    ~ModelInstance() = default;
 };
 
 // ============================================================================
+
+} // MrQ2

@@ -8,14 +8,16 @@
 // Path from the project root where to find shaders for this renderer (wchar_t)
 #define REFD3D11_SHADER_PATH_WIDE L"src\\reflibs\\d3d11\\shaders\\"
 
+namespace MrQ2
+{
 namespace D3D11
 {
 
 ///////////////////////////////////////////////////////////////////////////////
-// TextureImpl
+// TextureImageImpl
 ///////////////////////////////////////////////////////////////////////////////
 
-void TextureImpl::InitD3DSpecific()
+void TextureImageImpl::InitD3DSpecific()
 {
     ID3D11Device* const device = g_Renderer->Device();
     const unsigned numQualityLevels = g_Renderer->TexStore()->MultisampleQualityLevel(DXGI_FORMAT_R8G8B8A8_UNORM);
@@ -62,7 +64,7 @@ void TextureImpl::InitD3DSpecific()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void TextureImpl::InitScrap(const TextureImpl * const scrap_tex)
+void TextureImageImpl::InitFromScrap(const TextureImageImpl * const scrap_tex)
 {
     FASTASSERT(scrap_tex != nullptr);
 
@@ -74,7 +76,7 @@ void TextureImpl::InitScrap(const TextureImpl * const scrap_tex)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-D3D11_FILTER TextureImpl::FilterForTextureType(const TextureType tt)
+D3D11_FILTER TextureImageImpl::FilterForTextureType(const TextureType tt)
 {
     switch (tt)
     {
@@ -118,7 +120,7 @@ unsigned TextureStoreImpl::MultisampleQualityLevel(const DXGI_FORMAT fmt) const
 
 TextureImage * TextureStoreImpl::CreateScrap(int size, const ColorRGBA32 * pix)
 {
-    TextureImpl * scrap_impl = m_teximages_pool.Allocate();
+    TextureImageImpl * scrap_impl = m_teximages_pool.Allocate();
     Construct(scrap_impl, pix, RegistrationNum(), TextureType::kPic, /*use_scrap =*/true,
               size, size, Vec2u16{0,0}, Vec2u16{std::uint16_t(size), std::uint16_t(size)}, "pics/scrap.pcx");
 
@@ -131,12 +133,12 @@ TextureImage * TextureStoreImpl::CreateScrap(int size, const ColorRGBA32 * pix)
 TextureImage * TextureStoreImpl::CreateTexture(const ColorRGBA32 * pix, std::uint32_t regn, TextureType tt, bool use_scrap,
                                                int w, int h, Vec2u16 scrap0, Vec2u16 scrap1, const char * name)
 {
-    TextureImpl * impl = m_teximages_pool.Allocate();
+    TextureImageImpl * impl = m_teximages_pool.Allocate();
     Construct(impl, pix, regn, tt, use_scrap, w, h, scrap0, scrap1, name);
 
     if (use_scrap)
     {
-        impl->InitScrap(ScrapImpl());
+        impl->InitFromScrap(ScrapImpl());
     }
     else
     {
@@ -150,9 +152,46 @@ TextureImage * TextureStoreImpl::CreateTexture(const ColorRGBA32 * pix, std::uin
 
 void TextureStoreImpl::DestroyTexture(TextureImage * tex)
 {
-    TextureImpl * impl = static_cast<TextureImpl *>(tex);
+    auto * impl = static_cast<TextureImageImpl *>(tex);
     Destroy(impl);
     m_teximages_pool.Deallocate(impl);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// ModelInstanceImpl
+///////////////////////////////////////////////////////////////////////////////
+
+void ModelInstanceImpl::InitD3DSpecific()
+{
+    // TODO
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// ModelStoreImpl
+///////////////////////////////////////////////////////////////////////////////
+
+void ModelStoreImpl::Init()
+{
+    // Nothing at the moment.
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+ModelInstance * ModelStoreImpl::CreateModel(const char * name, ModelType mt, std::uint32_t regn)
+{
+    ModelInstanceImpl * impl = m_models_pool.Allocate();
+    Construct(impl, name, mt, regn);
+    impl->InitD3DSpecific();
+    return impl;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ModelStoreImpl::DestroyModel(ModelInstance * mdl)
+{
+    auto * impl = static_cast<ModelInstanceImpl *>(mdl);
+    Destroy(impl);
+    m_models_pool.Deallocate(impl);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -255,7 +294,7 @@ void SpriteBatch::BeginFrame()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImpl * const tex,
+void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl * const tex,
                            ID3D11BlendState * const blend_state, ID3D11Buffer * const cbuffer)
 {
     ID3D11DeviceContext * const context = g_Renderer->DeviceContext();
@@ -285,7 +324,7 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImpl * co
     }
     else // Handle small unique textured draws:
     {
-        const TextureImpl * previous_tex = nullptr;
+        const TextureImageImpl * previous_tex = nullptr;
         for (const auto & d : m_deferred_textured_quads)
         {
             if (previous_tex != d.tex)
@@ -388,7 +427,7 @@ void SpriteBatch::PushQuad(const float x, const float y, const float w, const fl
 
 void SpriteBatch::PushQuadTextured(const float x, const float y,
                                    const float w, const float h,
-                                   const TextureImpl * const tex,
+                                   const TextureImageImpl * const tex,
                                    const DirectX::XMFLOAT4A & color)
 {
     FASTASSERT(tex != nullptr);
@@ -407,7 +446,9 @@ const DirectX::XMFLOAT4A Renderer::kColorBlack{ 0.0f, 0.0f, 0.0f, 1.0f };
 
 ///////////////////////////////////////////////////////////////////////////////
 
-Renderer::Renderer()
+Renderer::Renderer() 
+    : m_tex_store{ }
+    , m_mdl_store{ m_tex_store }
 {
     GameInterface::Printf("D3D11 Renderer instance created.");
 }
@@ -441,8 +482,9 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
     m_sprite_batches[SpriteBatch::kDrawChar].Init(6 * 5000);
     m_sprite_batches[SpriteBatch::kDrawPics].Init(6 * 128);
 
-    // Texture cache
+    // Initialize the stores/caches
     m_tex_store.Init();
+    m_mdl_store.Init();
 
     // Load shader progs
     LoadShaders();
@@ -538,7 +580,7 @@ void Renderer::Flush2D()
 
     // Flush 2D text:
     m_sprite_batches[SpriteBatch::kDrawChar].EndFrame(m_shader_ui_sprites,
-            static_cast<const TextureImpl *>(m_tex_store.tex_conchars),
+            static_cast<const TextureImageImpl *>(m_tex_store.tex_conchars),
             m_blend_state_ui_sprites.Get(), m_cbuffer_ui_sprites.Get());
 }
 
@@ -587,7 +629,7 @@ void Renderer::CompileShaderFromFile(const wchar_t * const filename, const char 
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Renderer::UploadTexture(const TextureImpl * const tex)
+void Renderer::UploadTexture(const TextureImageImpl * const tex)
 {
     FASTASSERT(tex != nullptr);
     const UINT subRsrc  = 0; // no mips/slices
@@ -620,3 +662,4 @@ void DestroyRendererInstance()
 ///////////////////////////////////////////////////////////////////////////////
 
 } // D3D11
+} // MrQ2
