@@ -21,9 +21,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef Q_CRC_H
 #define Q_CRC_H
 
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
+typedef uint8_t qbyte;
+
 void CRC_Init(unsigned short * crcvalue);
 void CRC_ProcessByte(unsigned short * crcvalue, qbyte data);
 unsigned short CRC_Value(unsigned short crcvalue);
 unsigned short CRC_Block(qbyte * start, int count);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // Q_CRC_H

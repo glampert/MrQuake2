@@ -23,6 +23,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "common/q_common.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 #define REF_API_VERSION       3
 #define ENTITY_FLAGS          68
 #define POWERSUIT_SCALE       4.0f
@@ -226,5 +230,9 @@ typedef struct refimport_s
 
 // This is the only function actually exported at the linker level
 typedef refexport_t (*GetRefAPI_t)(refimport_t);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // CL_REF_H

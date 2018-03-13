@@ -21,6 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef CL_CONSOLE_H
 #define CL_CONSOLE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 //
 // console
 //
@@ -49,7 +53,6 @@ typedef struct
 
 extern console_t con;
 
-void Con_DrawCharacter(int cx, int line, int num);
 void Con_CheckResize(void);
 void Con_Init(void);
 void Con_DrawConsole(float frac);
@@ -59,5 +62,9 @@ void Con_Clear_f(void);
 void Con_DrawNotify(void);
 void Con_ClearNotify(void);
 void Con_ToggleConsole_f(void);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // CL_CONSOLE_H

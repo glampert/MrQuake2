@@ -21,6 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef CL_VID_H
 #define CL_VID_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 // vid.h -- video driver defs
 
 typedef struct vrect_s
@@ -44,5 +48,9 @@ void VID_MenuInit(void);
 void VID_MenuDraw(void);
 void VID_CheckChanges(void);
 const char * VID_MenuKey(int);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // CL_VID_H

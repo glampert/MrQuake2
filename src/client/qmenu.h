@@ -21,6 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef CL_QMENU_H
 #define CL_QMENU_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 #define MAXMENUITEMS 64
 
 #define MTYPE_SLIDER      0
@@ -132,5 +136,9 @@ void Menu_DrawString(int, int, const char *);
 void Menu_DrawStringDark(int, int, const char *);
 void Menu_DrawStringR2L(int, int, const char *);
 void Menu_DrawStringR2LDark(int, int, const char *);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // CL_QMENU_H

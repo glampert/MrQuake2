@@ -21,6 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef CL_SND_LOC_H
 #define CL_SND_LOC_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 // snd_loc.h -- private sound functions
 
 // !!! if this is changed, the asm code must change !!!
@@ -154,5 +158,9 @@ channel_t * S_PickChannel(int entnum, int entchannel);
 
 // spatializes a channel
 void S_Spatialize(channel_t * ch);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // CL_SND_LOC_H

@@ -9,11 +9,8 @@
 #include <algorithm>
 
 // Quake includes
-extern "C"
-{
 #include "common/q_common.h"
 #include "common/q_files.h"
-} // extern "C"
 
 namespace MrQ2
 {

@@ -17,10 +17,18 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
+
+#ifndef SV_SERVER_H
+#define SV_SERVER_H
+
 // server.h
 
 #include "common/q_common.h"
 #include "game/game.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
 
 //#define PARANOID // speed sapping error checking
 
@@ -333,3 +341,9 @@ trace_t SV_Trace(vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, edict_t * p
 // to an open area
 
 // passedict is explicitly excluded from clipping checks (normally NULL)
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
+
+#endif // SV_SERVER_H

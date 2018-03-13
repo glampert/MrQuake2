@@ -7,11 +7,8 @@
 #include <algorithm>
 
 // Quake includes
-extern "C"
-{
 #include "common/q_common.h"
 #include "common/q_files.h"
-} // extern "C"
 
 // STB Image Write (stbiw)
 #define STBIW_ASSERT(expr) FASTASSERT(expr)

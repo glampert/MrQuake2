@@ -17,6 +17,10 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
+
+#ifndef QUAKE_GAME_LOCAL_H
+#define QUAKE_GAME_LOCAL_H
+
 // g_local.h -- local definitions for game module
 
 #include "q_shared.h"
@@ -26,6 +30,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // because we define the full size ones in this file
 #define GAME_INCLUDE
 #include "game.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
+//==================================================================
 
 // the "gameversion" client command will print this plus compile date
 #define GAMEVERSION "baseq2"
@@ -1074,3 +1084,9 @@ struct edict_s
     moveinfo_t moveinfo;
     monsterinfo_t monsterinfo;
 };
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
+
+#endif // QUAKE_GAME_LOCAL_H

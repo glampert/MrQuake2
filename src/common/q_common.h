@@ -23,10 +23,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "game/q_shared.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
+//============================================================================
 //
 // Definitions common between client and server, but not game
 //
-
 //============================================================================
 
 #define VERSION 3.19
@@ -779,5 +783,9 @@ void SCR_BeginLoadingPlaque(void);
 void SV_Init(void);
 void SV_Shutdown(char * finalmsg, qboolean reconnect);
 void SV_Frame(int msec);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // Q_COMMON_H

@@ -7,11 +7,8 @@
 #include "Renderer.hpp"
 
 // Quake includes
-extern "C"
-{
 #include "client/ref.h"
 #include "client/vid.h"
-} // extern "C"
 
 // Refresh common lib
 #pragma comment(lib, "RefShared.lib")

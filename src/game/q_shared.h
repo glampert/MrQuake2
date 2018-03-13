@@ -42,6 +42,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #pragma warning(disable: 4996) // "the POSIX name for this item is deprecated"
 #endif // _MSC_VER
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 /*
 ==============================================================
 
@@ -1158,7 +1162,7 @@ typedef struct
 } player_state_t;
 
 //==============================================
-// PGM
+
 typedef enum
 {
     VIDREF_GL,
@@ -1167,7 +1171,11 @@ typedef enum
 } vidref_type_t;
 
 extern vidref_type_t vidref_val;
-// PGM
+
 //==============================================
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // Q_SHARED_H

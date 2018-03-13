@@ -11,11 +11,8 @@
 #include <cstdio>
 
 // Quake includes
-extern "C"
-{
 #include "common/q_common.h"
 #include "client/ref.h"
-} // extern "C"
 
 namespace MrQ2
 {

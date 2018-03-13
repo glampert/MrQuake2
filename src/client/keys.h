@@ -21,6 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef CL_KEYS_H
 #define CL_KEYS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 //
 // these are the key numbers that should be passed to Key_Event
 //
@@ -145,5 +149,9 @@ void Key_WriteBindings(FILE * f);
 void Key_SetBinding(int keynum, char * binding);
 void Key_ClearStates(void);
 int Key_GetKey(void);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // CL_KEYS_H

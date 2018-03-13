@@ -37,6 +37,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
+#ifndef QUAKE_GAME_H
+#define QUAKE_GAME_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 // game.h -- game dll information visible to server
 
 #define GAME_API_VERSION 3
@@ -249,3 +256,9 @@ typedef struct
 } game_export_t;
 
 game_export_t * GetGameAPI(game_import_t * import);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
+
+#endif // QUAKE_GAME_H

@@ -21,6 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef CL_SCREEN_H
 #define CL_SCREEN_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 // screen.h
 
 extern vrect_t scr_vrect;  // position of render window
@@ -37,8 +41,6 @@ extern int crosshair_height;
 
 void SCR_Init(void);
 void SCR_UpdateScreen(void);
-void SCR_SizeUp(void);
-void SCR_SizeDown(void);
 void SCR_CenterPrint(const char * str);
 void SCR_BeginLoadingPlaque(void);
 void SCR_EndLoadingPlaque(void);
@@ -60,5 +62,9 @@ qboolean SCR_DrawCinematic(void);
 // LAMPERT: Added for testing.
 qboolean CinematicTest_PlayDirect(const char * filename);
 qboolean CinematicTest_RunFrame(void);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // CL_SCREEN_H

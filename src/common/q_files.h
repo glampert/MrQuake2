@@ -21,6 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef Q_FILES_H
 #define Q_FILES_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 /*
 ========================================================================
 
@@ -458,5 +462,9 @@ typedef struct
     int numareaportals;
     int firstareaportal;
 } darea_t;
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // Q_FILES_H

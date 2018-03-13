@@ -17,6 +17,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
+
 // winquake.h: Win32-specific Quake header file
 
 #ifndef WINQUAKE_H
@@ -26,6 +27,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define NOMINMAX
 #include <windows.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
 
 enum { WINQUAKE_MAX_NUM_ARGVS = 128 };
 
@@ -49,5 +54,9 @@ extern winquake_t winquake;
 void WIN_Init();
 void IN_MouseEvent(int mstate);
 void Sys_DebugOutput(const char * message);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // WINQUAKE_H
