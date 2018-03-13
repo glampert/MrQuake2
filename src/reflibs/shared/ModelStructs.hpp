@@ -151,8 +151,8 @@ struct ModelSurface
     int first_edge; // look up in model->surf_edges[], negative numbers are backwards edges
     int num_edges;
 
-    std::uint16_t texture_mins[2];
-    std::uint16_t extents[2];
+    std::int16_t texture_mins[2];
+    std::int16_t extents[2];
 
     int light_s, light_t;   // lightmap tex coordinates
     int dlight_s, dlight_t; // lightmap tex coordinates for dynamic lightmaps

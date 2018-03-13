@@ -70,9 +70,9 @@ private:
 // ============================================================================
 
 // Defined in ModelLoad.cpp
-void LoadBrushModel(ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
-void LoadSpriteModel(ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
-void LoadAliasMD2Model(ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
+void LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
+void LoadSpriteModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
+void LoadAliasMD2Model(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
 
 // ============================================================================
 

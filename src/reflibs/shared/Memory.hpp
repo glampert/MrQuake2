@@ -46,7 +46,8 @@ void MemTagsPrintAll();
 // Note: Returns a pointer to a static buffer - copy if you need to hold on to it.
 const char * FormatMemoryUnit(std::size_t size_bytes, bool abbreviated = true);
 
-// Internal memory deallocation function with tag tracking.
+// Internal memory allocation/deallocation functions with tag tracking.
+void * MemAllocTracked(size_t size_bytes, MemTag tag);
 void MemFreeTracked(const void * ptr, size_t size_bytes, MemTag tag);
 
 // Destroys a single object pointer and frees it - passes along the tag for tracking.
@@ -99,6 +100,18 @@ struct MemHunk final
 
     // Fetch a new slice from the hunk's end.
     void * AllocBlock(unsigned block_size);
+
+    // Allocate 'count' instances of struct/type T at the hunk's end.
+    template<typename T> T * AllocBlockOfType(unsigned count)
+    {
+        return static_cast<T *>(AllocBlock(count * sizeof(T)));
+    }
+
+    // Get pointer to start of the hunk with cast to the given type.
+    template<typename T> T * ViewBaseAs() const
+    {
+        return reinterpret_cast<T *>(base_ptr);
+    }
 
     // Get the offset to the end of the allocated region.
     unsigned Tail() const { return curr_size; }

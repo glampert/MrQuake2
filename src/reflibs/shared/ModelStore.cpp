@@ -219,13 +219,13 @@ ModelInstance * ModelStore::LoadNewModel(const char * const name)
     switch (id)
     {
     case IDBSPHEADER :
-        LoadBrushModel(*new_model, file.data_ptr, file.length);
+        LoadBrushModel(m_tex_store, *new_model, file.data_ptr, file.length);
         break;
     case IDSPRITEHEADER :
-        LoadSpriteModel(*new_model, file.data_ptr, file.length);
+        LoadSpriteModel(m_tex_store, *new_model, file.data_ptr, file.length);
         break;
     case IDALIASHEADER :
-        LoadAliasMD2Model(*new_model, file.data_ptr, file.length);
+        LoadAliasMD2Model(m_tex_store, *new_model, file.data_ptr, file.length);
         break;
     } // switch
 
@@ -253,7 +253,7 @@ void ModelStore::ReferenceAllTextures(ModelInstance & mdl)
         }
     case ModelType::kSprite :
         {
-            auto * p_sprite = reinterpret_cast<dsprite_t *>(mdl.hunk.base_ptr);
+            auto * p_sprite = mdl.hunk.ViewBaseAs<dsprite_t>();
             FASTASSERT(p_sprite != nullptr);
             for (int i = 0; i < p_sprite->numframes; ++i)
             {
@@ -263,7 +263,7 @@ void ModelStore::ReferenceAllTextures(ModelInstance & mdl)
         }
     case ModelType::kAliasMD2 :
         {
-            auto * p_md2 = reinterpret_cast<dmdl_t *>(mdl.hunk.base_ptr);
+            auto * p_md2 = mdl.hunk.ViewBaseAs<dmdl_t>();
             FASTASSERT(p_md2 != nullptr);
             for (int i = 0; i < p_md2->num_skins; ++i)
             {

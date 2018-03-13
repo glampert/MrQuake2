@@ -4,6 +4,7 @@
 //
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <intrin.h>
@@ -72,6 +73,66 @@ template<typename T, std::size_t Size>
 constexpr std::size_t ArrayLength(const T (&)[Size])
 {
     return Size;
+}
+
+inline void Vec3Zero(vec3_t v)
+{
+    v[0] = v[1] = v[2] = 0.0f;
+}
+
+inline float Vec3Dot(const vec3_t x, const vec3_t y)
+{
+    return (x[0] * y[0]) + (x[1] * y[1]) + (x[2] * y[2]);
+}
+
+inline float Vec3Length(const vec3_t v)
+{
+    float length = 0.0f;
+    for (int i = 0; i < 3; ++i)
+    {
+        length += v[i] * v[i];
+    }
+    return std::sqrt(length);
+}
+
+inline void Vec3Cross(const vec3_t v1, const vec3_t v2, vec3_t cross)
+{
+    cross[0] = (v1[1] * v2[2]) - (v1[2] * v2[1]);
+    cross[1] = (v1[2] * v2[0]) - (v1[0] * v2[2]);
+    cross[2] = (v1[0] * v2[1]) - (v1[1] * v2[0]);
+}
+
+inline void Vec3Add(const vec3_t a, const vec3_t b, vec3_t out)
+{
+    out[0] = a[0] + b[0];
+    out[1] = a[1] + b[1];
+    out[2] = a[2] + b[2];
+}
+
+inline void Vec3Sub(const vec3_t a, const vec3_t b, vec3_t out)
+{
+    out[0] = a[0] - b[0];
+    out[1] = a[1] - b[1];
+    out[2] = a[2] - b[2];
+}
+
+inline void Vec3Copy(const vec3_t in, vec3_t out)
+{
+    out[0] = in[0];
+    out[1] = in[1];
+    out[2] = in[2];
+}
+
+inline void Vec3Normalize(vec3_t v)
+{
+    const float length = std::sqrt((v[0] * v[0]) + (v[1] * v[1]) + (v[2] * v[2]));
+    if (length != 0.0f)
+    {
+        const float invlength = 1.0f / length;
+        v[0] *= invlength;
+        v[1] *= invlength;
+        v[2] *= invlength;
+    }
 }
 
 /*

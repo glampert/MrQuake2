@@ -188,7 +188,7 @@ static void DrawChar(int x, int y, int c)
     // to be smoothly scrolled off. Based on Draw_Char() from ref_gl.
     constexpr int kGlyphSize = 8;
     constexpr int kGlyphTextureSize = 128;
-	constexpr float kGlyphUVScale = float(kGlyphSize) / float(kGlyphTextureSize);
+    constexpr float kGlyphUVScale = float(kGlyphSize) / float(kGlyphTextureSize);
 
     c &= 255;
 

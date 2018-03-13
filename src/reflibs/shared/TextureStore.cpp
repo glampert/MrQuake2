@@ -399,7 +399,7 @@ TextureImage * TextureStore::LoadWALImpl(const char * const name)
     const int width  = wall->width;
     const int height = wall->height;
     const int offset = wall->offsets[0];
-    auto * pic8 = reinterpret_cast<const Color8 *>(wall + offset);
+    auto * pic8 = reinterpret_cast<const Color8 *>(wall) + offset;
 
     return Common8BitTexSetup(pic8, width, height, name, TextureType::kWall);
 }

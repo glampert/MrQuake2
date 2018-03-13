@@ -17,6 +17,7 @@ namespace MrQ2
 
 // Verbose debugging
 constexpr bool kLogNewDeleteCalls = false;
+constexpr bool kHunkAllocVerbose  = false;
 
 static const char * const MemTag_Strings[] = {
     "kGame",
@@ -198,6 +199,14 @@ const char * FormatMemoryUnit(const std::size_t size_bytes, const bool abbreviat
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void * MemAllocTracked(const size_t size_bytes, const MemTag tag)
+{
+    MemTagsTrackAlloc(size_bytes, tag);
+    return std::malloc(size_bytes);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void MemFreeTracked(const void * ptr, const size_t size_bytes, const MemTag tag)
 {
     if (kLogNewDeleteCalls)
@@ -240,6 +249,11 @@ void MemHunk::Init(const unsigned size, const MemTag tag)
     mem_tag   = tag;
     base_ptr  = new(tag) std::uint8_t[rounded_size];
     std::memset(base_ptr, 0, rounded_size);
+
+    if (kHunkAllocVerbose)
+    {
+        GameInterface::Printf("MemHunk::Init(%s, %s)", FormatMemoryUnit(rounded_size), MemTag_Strings[unsigned(tag)]);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -256,6 +270,13 @@ void * MemHunk::AllocBlock(const unsigned block_size)
     if (curr_size > max_size)
     {
         GameInterface::Errorf("MemHunk::AllocBlock: Overflowed with %u bytes request!", rounded_size);
+    }
+
+    if (kHunkAllocVerbose)
+    {
+        GameInterface::Printf("MemHunk::AllocBlock(%s) -> left %s",
+                              FormatMemoryUnit(rounded_size),
+                              FormatMemoryUnit(max_size - curr_size));
     }
 
     return base_ptr + curr_size - rounded_size;
@@ -275,9 +296,7 @@ void * operator new(const std::size_t size_bytes, const MrQ2::MemTag tag)
     {
         MrQ2::GameInterface::Printf("operator new(%zu, %s)", size_bytes, MrQ2::MemTag_Strings[unsigned(tag)]);
     }
-
-    MrQ2::MemTagsTrackAlloc(size_bytes, tag);
-    return std::malloc(size_bytes);
+    return MrQ2::MemAllocTracked(size_bytes, tag);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -288,9 +307,7 @@ void * operator new[](const std::size_t size_bytes, const MrQ2::MemTag tag)
     {
         MrQ2::GameInterface::Printf("operator new[](%zu, %s)", size_bytes, MrQ2::MemTag_Strings[unsigned(tag)]);
     }
-
-    MrQ2::MemTagsTrackAlloc(size_bytes, tag);
-    return std::malloc(size_bytes);
+    return MrQ2::MemAllocTracked(size_bytes, tag);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

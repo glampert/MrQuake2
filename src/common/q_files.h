@@ -239,32 +239,35 @@ typedef struct miptex_s
 
 //=============================================================================
 
+enum bsp_lump_ids
+{
+    LUMP_ENTITIES    = 0,
+    LUMP_PLANES      = 1,
+    LUMP_VERTEXES    = 2,
+    LUMP_VISIBILITY  = 3,
+    LUMP_NODES       = 4,
+    LUMP_TEXINFO     = 5,
+    LUMP_FACES       = 6,
+    LUMP_LIGHTING    = 7,
+    LUMP_LEAFS       = 8,
+    LUMP_LEAFFACES   = 9,
+    LUMP_LEAFBRUSHES = 10,
+    LUMP_EDGES       = 11,
+    LUMP_SURFEDGES   = 12,
+    LUMP_MODELS      = 13,
+    LUMP_BRUSHES     = 14,
+    LUMP_BRUSHSIDES  = 15,
+    LUMP_POP         = 16,
+    LUMP_AREAS       = 17,
+    LUMP_AREAPORTALS = 18,
+    HEADER_LUMPS     = 19,
+};
+
 typedef struct
 {
     int fileofs;
     int filelen;
 } lump_t;
-
-#define LUMP_ENTITIES    0
-#define LUMP_PLANES      1
-#define LUMP_VERTEXES    2
-#define LUMP_VISIBILITY  3
-#define LUMP_NODES       4
-#define LUMP_TEXINFO     5
-#define LUMP_FACES       6
-#define LUMP_LIGHTING    7
-#define LUMP_LEAFS       8
-#define LUMP_LEAFFACES   9
-#define LUMP_LEAFBRUSHES 10
-#define LUMP_EDGES       11
-#define LUMP_SURFEDGES   12
-#define LUMP_MODELS      13
-#define LUMP_BRUSHES     14
-#define LUMP_BRUSHSIDES  15
-#define LUMP_POP         16
-#define LUMP_AREAS       17
-#define LUMP_AREAPORTALS 18
-#define HEADER_LUMPS     19
 
 typedef struct
 {
@@ -377,7 +380,7 @@ typedef struct
     unsigned short v[2]; // vertex numbers
 } dedge_t;
 
-#define MAXLIGHTMAPS 4
+enum { MAXLIGHTMAPS = 4 };
 
 typedef struct
 {
@@ -427,10 +430,13 @@ typedef struct
 #define ANGLE_DOWN -2
 
 // the visibility lump consists of a header with a count, then
-// qbyte offsets for the PVS and PHS of each cluster, then the raw
+// byte offsets for the PVS and PHS of each cluster, then the raw
 // compressed bit vectors
-#define DVIS_PVS 0
-#define DVIS_PHS 1
+enum dvis_bitvec_index
+{
+    DVIS_PVS,
+    DVIS_PHS,
+};
 
 typedef struct dvis_s
 {
