@@ -204,6 +204,27 @@ private:
 bool TGALoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height);
 bool PCXLoadFromFile(const char * filename, Color8 ** pic, int * width, int * height, ColorRGBA32 * palette);
 
+// Packed color format is 0xAABBGGRR
+
+inline constexpr ColorRGBA32 BytesToColor(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a)
+{
+    return ((ColorRGBA32(a) << 24) | (ColorRGBA32(b) << 16) | (ColorRGBA32(g) << 8) | r);
+}
+
+inline void ColorBytes(const ColorRGBA32 c, std::uint8_t& r, std::uint8_t& g, std::uint8_t& b, std::uint8_t& a)
+{
+    r = std::uint8_t( c & 0x000000FF);
+    g = std::uint8_t((c & 0x0000FF00) >> 8);
+    b = std::uint8_t((c & 0x00FF0000) >> 16);
+    a = std::uint8_t((c & 0xFF000000) >> 24);
+}
+
+constexpr int kNumDebugColors = 25;
+extern const ColorRGBA32 DebugColorsTable[kNumDebugColors];
+
+ColorRGBA32 NextDebugColor();   // Sequential color from table starting at 0 and wrapping around
+ColorRGBA32 RandomDebugColor(); // Randomized color from table index between 0..kNumDebugColors-1
+
 // ============================================================================
 
 } // MrQ2

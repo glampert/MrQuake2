@@ -685,7 +685,7 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
     {
         out->first_edge  = in->firstedge;
         out->num_edges   = in->numedges;
-        out->debug_color = 0; //RandDebugColor(); TODO
+        out->debug_color = RandomDebugColor();
         out->flags       = 0;
         out->polys       = nullptr;
 

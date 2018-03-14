@@ -5,6 +5,7 @@
 
 #include "TextureStore.hpp"
 #include <algorithm>
+#include <random>
 
 // Quake includes
 #include "common/q_common.h"
@@ -896,6 +897,58 @@ bool TGALoadFromFile(const char * const filename, ColorRGBA32 ** pic, int * widt
     }
 
     return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Debug colors
+///////////////////////////////////////////////////////////////////////////////
+
+// Built-in colors for misc debug rendering.
+const ColorRGBA32 DebugColorsTable[kNumDebugColors] = {
+    //              R     G     B     A
+    BytesToColor(   0,    0,  255,  255 ), // Blue
+    BytesToColor( 165,   42,   42,  255 ), // Brown
+    BytesToColor( 127,   31,    0,  255 ), // Copper
+    BytesToColor(   0,  255,  255,  255 ), // Cyan
+    BytesToColor(   0,    0,  139,  255 ), // DarkBlue
+    BytesToColor( 255,  215,    0,  255 ), // Gold
+    BytesToColor( 128,  128,  128,  255 ), // Gray
+    BytesToColor(   0,  255,    0,  255 ), // Green
+    BytesToColor( 195,  223,  223,  255 ), // Ice
+    BytesToColor( 173,  216,  230,  255 ), // LightBlue
+    BytesToColor( 175,  175,  175,  255 ), // LightGray
+    BytesToColor( 135,  206,  250,  255 ), // LightSkyBlue
+    BytesToColor( 210,  105,   30,  255 ), // Lime
+    BytesToColor( 255,    0,  255,  255 ), // Magenta
+    BytesToColor( 128,    0,    0,  255 ), // Maroon
+    BytesToColor( 128,  128,    0,  255 ), // Olive
+    BytesToColor( 255,  165,    0,  255 ), // Orange
+    BytesToColor( 255,  192,  203,  255 ), // Pink
+    BytesToColor( 128,    0,  128,  255 ), // Purple
+    BytesToColor( 255,    0,    0,  255 ), // Red
+    BytesToColor( 192,  192,  192,  255 ), // Silver
+    BytesToColor(   0,  128,  128,  255 ), // Teal
+    BytesToColor( 238,  130,  238,  255 ), // Violet
+    BytesToColor( 255,  255,  255,  255 ), // White
+    BytesToColor( 255,  255,    0,  255 ), // Yellow
+};
+
+ColorRGBA32 NextDebugColor()
+{
+    static unsigned s_next_color = 0;
+    s_next_color = (s_next_color + 1) % kNumDebugColors;
+    return DebugColorsTable[s_next_color];
+}
+
+ColorRGBA32 RandomDebugColor()
+{
+    static std::default_random_engine s_generator;
+    static std::uniform_int_distribution<int> s_distribution(0, kNumDebugColors - 1);
+
+    const unsigned color_index = s_distribution(s_generator);
+    FASTASSERT(color_index < kNumDebugColors);
+
+    return DebugColorsTable[color_index];
 }
 
 ///////////////////////////////////////////////////////////////////////////////

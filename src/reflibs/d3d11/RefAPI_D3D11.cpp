@@ -301,6 +301,7 @@ static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const
     // following upsampling doesn't fill the whole thing.
     for (int p = 0; p < (kQuakeCinematicImgSize * kQuakeCinematicImgSize); ++p)
     {
+        //                        0xAABBGGRR
         const ColorRGBA32 black = 0xFF000000;
         cinematic_buffer[p] = black;
     }
