@@ -57,10 +57,18 @@ static void ShutdownRefresh()
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static void AppActivate(int activate)
+{
+    // TODO
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 static void BeginRegistration(const char * map_name)
 {
     GameInterface::Printf("**** D3D11::BeginRegistration ****");
 
+    g_Renderer->ViewState()->BeginRegistration();
     g_Renderer->TexStore()->BeginRegistration();
     g_Renderer->MdlStore()->BeginRegistration(map_name);
 
@@ -106,13 +114,6 @@ static image_s * RegisterPic(const char * name)
 ///////////////////////////////////////////////////////////////////////////////
 
 static void SetSky(const char * name, float rotate, vec3_t axis)
-{
-    // TODO
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-static void RenderFrame(refdef_t * fd)
 {
     // TODO
 }
@@ -369,9 +370,18 @@ static void EndFrame()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void AppActivate(int activate)
+static void RenderFrame(refdef_t * view_def)
 {
-    // TODO
+    FASTASSERT(view_def != nullptr);
+    FASTASSERT(g_Renderer->FrameStarted());
+
+    // A world map should have been loaded already by BeginRegistration().
+    if (g_Renderer->MdlStore()->WorldModel() == nullptr && !(view_def->rdflags & RDF_NOWORLDMODEL))
+    {
+        GameInterface::Errorf("RenderFrame: Null world model!");
+    }
+
+    g_Renderer->RenderView(*view_def);
 }
 
 } // D3D11

@@ -97,15 +97,15 @@ void MemTagsPrintAll()
     char * ptr = tags_dump_str;
     std::size_t mem_total = 0;
 
-    ptr += std::sprintf(ptr, "--------------------------- MEMTAGS -------------------------\n");
-    ptr += std::sprintf(ptr, "Tag Name          Bytes      Allocs  Frees   Small   Large\n");
+    ptr += std::sprintf(ptr, "--------------------------- MEMTAGS ---------------------------\n");
+    ptr += std::sprintf(ptr, "Tag Name          Bytes      Allocs  Frees   Small    Large\n");
 
     for (int i = 0; i < int(MemTag::kCount); ++i)
     {
         mem_total += MemTag_Counts[i].total_bytes;
         const char * const total_str = FormatMemoryUnit(MemTag_Counts[i].total_bytes);
 
-        ptr += std::sprintf(ptr, "%-17s %-10s %-7zu %-7zu %-7zu %-7zu\n",
+        ptr += std::sprintf(ptr, "%-17s %-10s %-7zu %-7zu %-8zu %-8zu\n",
                             MemTag_Strings[i], total_str,
                             MemTag_Counts[i].total_allocs,
                             MemTag_Counts[i].total_frees,
@@ -114,7 +114,7 @@ void MemTagsPrintAll()
     }
 
     ptr += std::sprintf(ptr, "\nTOTAL MEM: %s\n", FormatMemoryUnit(mem_total));
-    ptr += std::sprintf(ptr, "--------------------------- MEMTAGS -------------------------");
+    ptr += std::sprintf(ptr, "--------------------------- MEMTAGS ---------------------------");
 
     GameInterface::Printf("\n%s\n", tags_dump_str);
 }

@@ -9,6 +9,7 @@
 #include "reflibs/shared/Memory.hpp"
 #include "reflibs/shared/ModelStore.hpp"
 #include "reflibs/shared/TextureStore.hpp"
+#include "reflibs/shared/ViewDraw.hpp"
 
 #include <array>
 #include <tuple>
@@ -246,6 +247,7 @@ public:
     SpriteBatch            * SBatch(SpriteBatch::BatchId id) { return &m_sprite_batches[id];              }
     TextureStoreImpl       * TexStore()                      { return &m_tex_store;                       }
     ModelStoreImpl         * MdlStore()                      { return &m_mdl_store;                       }
+    ViewDrawState          * ViewState()                     { return &m_view_draw_state;                 }
     ID3D11Device           * Device()          const         { return m_window.device.Get();              }
     ID3D11DeviceContext    * DeviceContext()   const         { return m_window.device_context.Get();      }
     IDXGISwapChain         * SwapChain()       const         { return m_window.swap_chain.Get();          }
@@ -262,6 +264,7 @@ public:
     void Init(const char * window_name, HINSTANCE hinst, WNDPROC wndproc,
               int width, int height, bool fullscreen, bool debug_validation);
 
+    void RenderView(const refdef_s & view_def);
     void BeginFrame();
     void EndFrame();
     void Flush2D();
@@ -289,6 +292,7 @@ private:
     SpriteBatchSet   m_sprite_batches;
     TextureStoreImpl m_tex_store;
     ModelStoreImpl   m_mdl_store;
+    ViewDrawState    m_view_draw_state;
     bool             m_frame_started  = false;
     bool             m_window_resized = true;
 

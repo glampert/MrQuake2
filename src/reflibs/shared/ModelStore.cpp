@@ -168,12 +168,12 @@ void ModelStore::LoadWorldModel(const char * const map_name)
         FASTASSERT(erase_iter != m_models_cache.end());
         m_models_cache.erase(erase_iter);
 
-        DestroyModel(const_cast<ModelInstance *>(m_world_model));
+        DestroyModel(m_world_model);
         m_world_model = nullptr;
     }
 
     // Load/reference the world map:
-    m_world_model = FindOrLoad(fullname, ModelType::kBrush);
+    m_world_model = const_cast<ModelInstance *>(FindOrLoad(fullname, ModelType::kBrush));
     if (m_world_model == nullptr)
     {
         GameInterface::Errorf("ModelStore: Unable to load level map '%s'!", fullname);

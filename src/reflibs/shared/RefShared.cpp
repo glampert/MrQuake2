@@ -52,6 +52,241 @@ std::uint32_t FnvHash32(const std::uint8_t * const bytes, const std::size_t len)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+void VectorsFromAngles(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up)
+{
+    float angle;
+
+    angle = angles[YAW] * (M_PI * 2.0f / 360.0f);
+    const float sy = std::sin(angle);
+    const float cy = std::cos(angle);
+
+    angle = angles[PITCH] * (M_PI * 2.0f / 360.0f);
+    const float sp = std::sin(angle);
+    const float cp = std::cos(angle);
+
+    angle = angles[ROLL] * (M_PI * 2.0f / 360.0f);
+    const float sr = std::sin(angle);
+    const float cr = std::cos(angle);
+
+    forward[0] = cp * cy;
+    forward[1] = cp * sy;
+    forward[2] = -sp;
+
+    right[0] = (-1.0f * sr * sp * cy + -1.0f * cr * -sy);
+    right[1] = (-1.0f * sr * sp * sy + -1.0f * cr * cy);
+    right[2] = (-1.0f * sr * cp);
+
+    up[0] = (cr * sp * cy + -sr * -sy);
+    up[1] = (cr * sp * sy + -sr * cy);
+    up[2] = (cr * cp);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ProjectPointOnPlane(vec3_t dst, const vec3_t p, const vec3_t normal)
+{
+    const float inv_denom = 1.0f / Vec3Dot(normal, normal);
+    const float d = Vec3Dot(normal, p) * inv_denom;
+
+    vec3_t n;
+    n[0] = normal[0] * inv_denom;
+    n[1] = normal[1] * inv_denom;
+    n[2] = normal[2] * inv_denom;
+
+    dst[0] = p[0] - d * n[0];
+    dst[1] = p[1] - d * n[1];
+    dst[2] = p[2] - d * n[2];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void PerpendicularVector(vec3_t dst, const vec3_t src)
+{
+    // Assumes "src" is normalized
+
+    int pos, i;
+    float minelem = 1.0f;
+    vec3_t tempvec;
+
+    // find the smallest magnitude axially aligned vector
+    for (pos = 0, i = 0; i < 3; ++i)
+    {
+        if (std::fabs(src[i]) < minelem)
+        {
+            pos = i;
+            minelem = std::fabs(src[i]);
+        }
+    }
+
+    tempvec[0] = tempvec[1] = tempvec[2] = 0.0f;
+    tempvec[pos] = 1.0f;
+
+    // project the point onto the plane defined by src
+    ProjectPointOnPlane(dst, tempvec, src);
+
+    // normalize the result
+    Vec3Normalize(dst);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ConcatRotations(float in1[3][3], float in2[3][3], float out[3][3])
+{
+    out[0][0] = in1[0][0] * in2[0][0] + in1[0][1] * in2[1][0] +
+                in1[0][2] * in2[2][0];
+    out[0][1] = in1[0][0] * in2[0][1] + in1[0][1] * in2[1][1] +
+                in1[0][2] * in2[2][1];
+    out[0][2] = in1[0][0] * in2[0][2] + in1[0][1] * in2[1][2] +
+                in1[0][2] * in2[2][2];
+    out[1][0] = in1[1][0] * in2[0][0] + in1[1][1] * in2[1][0] +
+                in1[1][2] * in2[2][0];
+    out[1][1] = in1[1][0] * in2[0][1] + in1[1][1] * in2[1][1] +
+                in1[1][2] * in2[2][1];
+    out[1][2] = in1[1][0] * in2[0][2] + in1[1][1] * in2[1][2] +
+                in1[1][2] * in2[2][2];
+    out[2][0] = in1[2][0] * in2[0][0] + in1[2][1] * in2[1][0] +
+                in1[2][2] * in2[2][0];
+    out[2][1] = in1[2][0] * in2[0][1] + in1[2][1] * in2[1][1] +
+                in1[2][2] * in2[2][1];
+    out[2][2] = in1[2][0] * in2[0][2] + in1[2][1] * in2[1][2] +
+                in1[2][2] * in2[2][2];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void RotatePointAroundVector(vec3_t dst, const vec3_t dir, const vec3_t point, const float degrees)
+{
+    float m[3][3];
+    float im[3][3];
+    float zrot[3][3];
+    float tmpmat[3][3];
+    float rot[3][3];
+    vec3_t vr, vup, vf;
+
+    vf[0] = dir[0];
+    vf[1] = dir[1];
+    vf[2] = dir[2];
+
+    PerpendicularVector(vr, dir);
+    Vec3Cross(vr, vf, vup);
+
+    m[0][0] = vr[0];
+    m[1][0] = vr[1];
+    m[2][0] = vr[2];
+
+    m[0][1] = vup[0];
+    m[1][1] = vup[1];
+    m[2][1] = vup[2];
+
+    m[0][2] = vf[0];
+    m[1][2] = vf[1];
+    m[2][2] = vf[2];
+
+    std::memcpy(im, m, sizeof(im));
+
+    im[0][1] = m[1][0];
+    im[0][2] = m[2][0];
+    im[1][0] = m[0][1];
+    im[1][2] = m[2][1];
+    im[2][0] = m[0][2];
+    im[2][1] = m[1][2];
+
+    std::memset(zrot, 0, sizeof(zrot));
+    zrot[0][0] = zrot[1][1] = zrot[2][2] = 1.0f;
+
+    zrot[0][0] =  std::cos(DegToRad(degrees));
+    zrot[0][1] =  std::sin(DegToRad(degrees));
+    zrot[1][0] = -std::sin(DegToRad(degrees));
+    zrot[1][1] =  std::cos(DegToRad(degrees));
+
+    ConcatRotations(m, zrot, tmpmat);
+    ConcatRotations(tmpmat, im, rot);
+
+    for (int i = 0; i < 3; ++i)
+    {
+        dst[i] = rot[i][0] * point[0] + rot[i][1] * point[1] + rot[i][2] * point[2];
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_s * p)
+{
+    // Returns 1, 2, or 1 + 2
+
+    float dist1, dist2;
+
+    // fast axial cases
+    if (p->type < 3)
+    {
+        if (p->dist <= emins[p->type])
+        {
+            return 1;
+        }
+        if (p->dist >= emaxs[p->type])
+        {
+            return 2;
+        }
+        return 3;
+    }
+
+    // general case
+    switch (p->signbits)
+    {
+    case 0:
+        dist1 = p->normal[0] * emaxs[0] + p->normal[1] * emaxs[1] + p->normal[2] * emaxs[2];
+        dist2 = p->normal[0] * emins[0] + p->normal[1] * emins[1] + p->normal[2] * emins[2];
+        break;
+    case 1:
+        dist1 = p->normal[0] * emins[0] + p->normal[1] * emaxs[1] + p->normal[2] * emaxs[2];
+        dist2 = p->normal[0] * emaxs[0] + p->normal[1] * emins[1] + p->normal[2] * emins[2];
+        break;
+    case 2:
+        dist1 = p->normal[0] * emaxs[0] + p->normal[1] * emins[1] + p->normal[2] * emaxs[2];
+        dist2 = p->normal[0] * emins[0] + p->normal[1] * emaxs[1] + p->normal[2] * emins[2];
+        break;
+    case 3:
+        dist1 = p->normal[0] * emins[0] + p->normal[1] * emins[1] + p->normal[2] * emaxs[2];
+        dist2 = p->normal[0] * emaxs[0] + p->normal[1] * emaxs[1] + p->normal[2] * emins[2];
+        break;
+    case 4:
+        dist1 = p->normal[0] * emaxs[0] + p->normal[1] * emaxs[1] + p->normal[2] * emins[2];
+        dist2 = p->normal[0] * emins[0] + p->normal[1] * emins[1] + p->normal[2] * emaxs[2];
+        break;
+    case 5:
+        dist1 = p->normal[0] * emins[0] + p->normal[1] * emaxs[1] + p->normal[2] * emins[2];
+        dist2 = p->normal[0] * emaxs[0] + p->normal[1] * emins[1] + p->normal[2] * emaxs[2];
+        break;
+    case 6:
+        dist1 = p->normal[0] * emaxs[0] + p->normal[1] * emins[1] + p->normal[2] * emins[2];
+        dist2 = p->normal[0] * emins[0] + p->normal[1] * emaxs[1] + p->normal[2] * emaxs[2];
+        break;
+    case 7:
+        dist1 = p->normal[0] * emins[0] + p->normal[1] * emins[1] + p->normal[2] * emins[2];
+        dist2 = p->normal[0] * emaxs[0] + p->normal[1] * emaxs[1] + p->normal[2] * emaxs[2];
+        break;
+    default:
+        dist1 = dist2 = 0.0f; // shut up compiler
+        FASTASSERT(false);
+        break;
+    } // switch
+
+    int sides = 0;
+    if (dist1 >= p->dist)
+    {
+        sides = 1;
+    }
+    if (dist2 < p->dist)
+    {
+        sides |= 2;
+    }
+
+    FASTASSERT(sides != 0);
+    return sides;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // GameInterface
 ///////////////////////////////////////////////////////////////////////////////
 

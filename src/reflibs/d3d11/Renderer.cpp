@@ -538,6 +538,18 @@ void Renderer::LoadShaders()
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void Renderer::RenderView(const refdef_s & view_def)
+{
+    ViewDrawState::FrameData frame_data{ m_tex_store, *m_mdl_store.WorldModel(), view_def };
+
+    m_view_draw_state.Setup(frame_data);
+    m_view_draw_state.RenderWorldModel(frame_data);
+    m_view_draw_state.RenderEntities(frame_data);
+    m_view_draw_state.Finish(frame_data);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void Renderer::BeginFrame()
 {
     m_frame_started = true;

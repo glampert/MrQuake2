@@ -33,7 +33,7 @@ public:
     virtual void EndRegistration();
 
     std::uint32_t RegistrationNum() const { return m_registration_num; }
-    const ModelInstance * WorldModel() const { return m_world_model; }
+    ModelInstance * WorldModel() const { return m_world_model; }
 
     // Models cache:
     const ModelInstance * Find(const char * name, ModelType mt);       // Must be in cache, null otherwise
@@ -64,7 +64,7 @@ private:
     std::vector<ModelInstance *> m_models_cache;
 
     // Cached pointer to currently loaded map
-    const ModelInstance * m_world_model = nullptr;
+    ModelInstance * m_world_model = nullptr;
 };
 
 // ============================================================================

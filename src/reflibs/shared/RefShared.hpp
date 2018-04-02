@@ -21,6 +21,7 @@ struct cvar_s;
 struct dvis_s;
 struct image_s;
 struct model_s;
+struct refdef_s;
 struct refimport_s;
 using vec3_t = float[3];
 
@@ -73,6 +74,11 @@ template<typename T, std::size_t Size>
 constexpr std::size_t ArrayLength(const T (&)[Size])
 {
     return Size;
+}
+
+constexpr float DegToRad(const float degrees)
+{
+    return degrees * (3.14159265358979323846f / 180.0f);
 }
 
 inline void Vec3Zero(vec3_t v)
@@ -134,6 +140,11 @@ inline void Vec3Normalize(vec3_t v)
         v[2] *= invlength;
     }
 }
+
+// Copied from Quake's math library since we compile as a DLL and won't link against the game EXE.
+void VectorsFromAngles(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
+void RotatePointAroundVector(vec3_t dst, const vec3_t dir, const vec3_t point, const float degrees);
+int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_s * p);
 
 /*
 ===============================================================================
