@@ -16,11 +16,6 @@
 #include "client/ref.h"
 #include "common/q_files.h"
 
-#ifdef _MSC_VER
-// "ViewDrawState: structure was padded due to alignment specifier"
-#pragma warning(disable: 4324)
-#endif // _MSC_VER
-
 namespace MrQ2
 {
 
@@ -31,11 +26,11 @@ namespace MrQ2
 
 ===============================================================================
 */
-class ViewDrawState final
+class ViewDrawState
 {
 public:
 
-    struct FrameData
+    struct FrameData final
     {
         FrameData(TextureStore & ts, ModelInstance & world, const refdef_t & view)
             : tex_store{ ts }
@@ -65,16 +60,23 @@ public:
         DirectX::XMMATRIX view_proj_matrix;
     };
 
-    void Setup(FrameData & frame_data);
+    ViewDrawState() = default;
+    virtual ~ViewDrawState() = default;
+
+    void RenderViewSetup(FrameData & frame_data);
     void RenderWorldModel(FrameData & frame_data);
     void RenderEntities(FrameData & frame_data);
-    void Finish(FrameData & frame_data);
+
     void BeginRegistration();
 
-private:
+protected:
 
-    const std::uint8_t * DecompressModelVis(const std::uint8_t * in, const ModelInstance & model);
-    const std::uint8_t * GetClusterPVS(int cluster, const ModelInstance & model);
+    // Implemented by the renderer back-end.
+    virtual void BeginSurfacesBatch(const TextureImage & tex) = 0;
+    virtual void BatchSurfacePolys(const ModelSurface & surf) = 0;
+    virtual void EndSurfacesBatch() = 0;
+
+private:
 
     void SetUpViewClusters(const FrameData & frame_data);
     void SetUpFrustum(FrameData & frame_data) const;
@@ -97,12 +99,6 @@ private:
     int m_view_cluster2     = -1;
     int m_old_view_cluster  = -1;
     int m_old_view_cluster2 = -1;
-
-    // Buffer to decompress a cluster PVS.
-    // Alignment not strictly necessary, but helps the compiler memcpy it with aligned vector ops.
-    alignas(16) std::uint8_t m_dvis_pvs[MAX_MAP_LEAFS / 8] = {};
 };
-
-// ============================================================================
 
 } // MrQ2

@@ -46,7 +46,7 @@ void RenderWindow::InitRenderWindow()
     };
     const UINT num_feature_levels = ARRAYSIZE(feature_levels);
 
-    DXGI_SWAP_CHAIN_DESC sd               = {0};
+    DXGI_SWAP_CHAIN_DESC sd               = {};
     sd.BufferCount                        = 1;
     sd.BufferDesc.Width                   = width;
     sd.BufferDesc.Height                  = height;
@@ -57,7 +57,7 @@ void RenderWindow::InitRenderWindow()
     sd.OutputWindow                       = hwnd;
     sd.SampleDesc.Count                   = 1;
     sd.SampleDesc.Quality                 = 0;
-    sd.Windowed                           = true;
+    sd.Windowed                           = !fullscreen;
 
     HRESULT hr;
     D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL_11_0;
@@ -92,22 +92,60 @@ void RenderWindow::InitRenderWindow()
         GameInterface::Errorf("Failed to create D3D device or swap chain!");
     }
 
+    //
     // Create a render target view for the framebuffer:
-    ID3D11Texture2D * back_buffer = nullptr;
-    hr = swap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back_buffer);
+    //
+
+    ID3D11Texture2D * back_buffer_tex = nullptr;
+    hr = swap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back_buffer_tex);
     if (FAILED(hr))
     {
         GameInterface::Errorf("Failed to get framebuffer from swap chain!");
     }
 
-    hr = device->CreateRenderTargetView(back_buffer, nullptr, framebuffer_rtv.GetAddressOf());
+    hr = device->CreateRenderTargetView(back_buffer_tex, nullptr, framebuffer_rtv.GetAddressOf());
     if (FAILED(hr))
     {
         GameInterface::Errorf("Failed to create RTV for the framebuffer!");
     }
 
-    framebuffer_texture.Attach(back_buffer);
-    device_context->OMSetRenderTargets(1, framebuffer_rtv.GetAddressOf(), nullptr);
+    framebuffer_texture.Attach(back_buffer_tex);
+
+    //
+    // Set up the Depth and Stencil buffer:
+    //
+
+    // Create depth stencil texture:
+    D3D11_TEXTURE2D_DESC desc_depth = {};
+    desc_depth.Width                = width;
+    desc_depth.Height               = height;
+    desc_depth.MipLevels            = 1;
+    desc_depth.ArraySize            = 1;
+    desc_depth.Format               = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    desc_depth.SampleDesc.Count     = 1;
+    desc_depth.SampleDesc.Quality   = 0;
+    desc_depth.Usage                = D3D11_USAGE_DEFAULT;
+    desc_depth.BindFlags            = D3D11_BIND_DEPTH_STENCIL;
+
+    hr = device->CreateTexture2D(&desc_depth, nullptr, depth_stencil_texture.GetAddressOf());
+    if (FAILED(hr))
+    {
+        GameInterface::Errorf("Failed to create depth/stencil buffer!");
+    }
+
+    // Create the depth stencil view:
+    D3D11_DEPTH_STENCIL_VIEW_DESC desc_dsv = {};
+    desc_dsv.Format        = desc_depth.Format;
+    desc_dsv.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMS;
+
+    hr = device->CreateDepthStencilView(depth_stencil_texture.Get(), &desc_dsv, depth_stencil_view.GetAddressOf());
+    if (FAILED(hr))
+    {
+        GameInterface::Errorf("CreateDepthStencilView failed!");
+    }
+
+    // Set the frame/depth buffers as current:
+    device_context->OMSetRenderTargets(1, framebuffer_rtv.GetAddressOf(), depth_stencil_view.Get());
 
     // Setup a default viewport:
     D3D11_VIEWPORT vp;

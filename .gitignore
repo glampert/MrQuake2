@@ -3,8 +3,9 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
-# Don't submit local Q2 data/assets
+# Don't submit local Q2 data/assets or RenderDoc frame capture dumps
 data/
+renderdoc_captures/
 
 # User-specific files
 *.suo

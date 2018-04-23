@@ -24,9 +24,10 @@ namespace D3D11
 
 static int InitRefresh(void * hInstance, void * wndproc, int fullscreen)
 {
-    auto vid_mode   = GameInterface::Cvar::Get("vid_mode", "6", CvarWrapper::kFlagArchive);
-    auto vid_width  = GameInterface::Cvar::Get("vid_width", "1024", CvarWrapper::kFlagArchive);
+    auto vid_mode = GameInterface::Cvar::Get("vid_mode", "6", CvarWrapper::kFlagArchive);
+    auto vid_width = GameInterface::Cvar::Get("vid_width", "1024", CvarWrapper::kFlagArchive);
     auto vid_height = GameInterface::Cvar::Get("vid_height", "768", CvarWrapper::kFlagArchive);
+    auto r_renderdoc = GameInterface::Cvar::Get("r_renderdoc", "0", CvarWrapper::kFlagArchive);
 
     int w, h;
     if (!GameInterface::Video::GetModeInfo(w, h, vid_mode.AsInt()))
@@ -37,10 +38,15 @@ static int InitRefresh(void * hInstance, void * wndproc, int fullscreen)
     }
 
     #if defined(DEBUG) || defined(_DEBUG)
-    const bool debug_validation = true;
+    constexpr bool debug_validation = true;
     #else // DEBUG
-    const bool debug_validation = false;
+    constexpr bool debug_validation = false;
     #endif // DEBUG
+
+    if (r_renderdoc.AsInt() != 0)
+    {
+        RenderDocUtils::Initialize();
+    }
 
     CreateRendererInstance();
     g_Renderer->Init("MrQuake2 (D3D11)", (HINSTANCE)hInstance, (WNDPROC)wndproc, w, h, !!fullscreen, debug_validation);
@@ -52,6 +58,7 @@ static int InitRefresh(void * hInstance, void * wndproc, int fullscreen)
 static void ShutdownRefresh()
 {
     DestroyRendererInstance();
+    RenderDocUtils::Shutdown();
     GameInterface::Shutdown();
 }
 

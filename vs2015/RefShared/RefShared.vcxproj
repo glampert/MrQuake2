@@ -25,10 +25,12 @@
     <ClCompile Include="..\..\src\reflibs\shared\OSWindow.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\Palette.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\RefShared.cpp" />
+    <ClCompile Include="..\..\src\reflibs\shared\RenderDocUtils.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\TextureStore.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\ViewDraw.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\external\renderdoc\renderdoc_app.h" />
     <ClInclude Include="..\..\src\external\stb\stb_image_write.h" />
     <ClInclude Include="..\..\src\reflibs\shared\Memory.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\ModelStore.hpp" />
@@ -36,6 +38,7 @@
     <ClInclude Include="..\..\src\reflibs\shared\OSWindow.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\Pool.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\RefShared.hpp" />
+    <ClInclude Include="..\..\src\reflibs\shared\RenderDocUtils.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\TextureStore.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\ViewDraw.hpp" />
   </ItemGroup>

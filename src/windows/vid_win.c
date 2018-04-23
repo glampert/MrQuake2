@@ -31,7 +31,8 @@ cvar_t * vid_height     = NULL;
 cvar_t * vid_width      = NULL;
 cvar_t * vid_fullscreen = NULL;
 
-static HMODULE reflib_dll = NULL;
+static HMODULE reflib_dll    = NULL;
+static HMODULE renderdoc_dll = NULL; // resident once loaded
 
 typedef struct
 {
@@ -129,10 +130,37 @@ int VID_GetModeInfo(int * width, int * height, int mode)
 
 /*
 ==================
+VID_TryLoadRenderDocDLL
+==================
+*/
+static void VID_TryLoadRenderDocDLL()
+{
+    const cvar_t * r_renderdoc = Cvar_Get("r_renderdoc", "0", CVAR_ARCHIVE);
+
+    // Loading the RenderDoc module has to happen before we load any
+    // system API library like D3D or OpenGL, so that RenderDoc can
+    // inject the DLL detours, so this has to happen before any refresh
+    // DLL is actually loaded. Loaded once then it stays resident.
+    if (!renderdoc_dll && r_renderdoc && r_renderdoc->value)
+    {
+        Com_DPrintf("======== VID_TryLoadRenderDocDLL ========\n");
+
+        renderdoc_dll = LoadLibrary("renderdoc.dll");
+        if (!renderdoc_dll)
+        {
+            Com_DPrintf("VID warning: Failed to load RenderDoc DLL - Error: %#x\n", GetLastError());
+        }
+        
+        Com_DPrintf("=========================================\n");
+    }
+}
+
+/*
+==================
 VID_UnloadRefreshDLL
 ==================
 */
-void VID_UnloadRefreshDLL()
+static void VID_UnloadRefreshDLL()
 {
     if (reflib_dll)
     {
@@ -151,10 +179,12 @@ void VID_UnloadRefreshDLL()
 VID_LoadRefreshDLL
 ==================
 */
-void VID_LoadRefreshDLL(const char * dll_name)
+static void VID_LoadRefreshDLL(const char * dll_name)
 {
     refimport_t ri;
     GetRefAPI_t GetRefAPI;
+
+    VID_TryLoadRenderDocDLL();
 
     VID_Shutdown();
     Com_Printf("---- Loading Refresh DLL %s ----\n", dll_name);

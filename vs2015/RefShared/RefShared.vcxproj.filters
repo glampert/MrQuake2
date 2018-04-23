@@ -38,6 +38,9 @@
     <ClCompile Include="..\..\src\reflibs\shared\ViewDraw.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\shared\RenderDocUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\reflibs\shared\RefShared.hpp">
@@ -66,6 +69,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\reflibs\shared\ViewDraw.hpp">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\shared\RenderDocUtils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\external\renderdoc\renderdoc_app.h">
+      <Filter>External</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -111,7 +111,7 @@ void IN_JoyMove(usercmd_t * cmd);
 
 // mouse variables
 cvar_t * m_filter;
-qboolean mlooking;
+qboolean mlooking = true; // Mouse look ON by default (originally it was OFF on classic Quake2)
 
 int mouse_buttons;
 int mouse_oldbuttonstate;

@@ -31,13 +31,21 @@ class RenderWindow final
 {
 public:
 
+    // Enable D3D-level debug validation?
     bool debug_validation = false;
 
+    // Device/swap-chain:
     ComPtr<ID3D11Device>           device;
     ComPtr<ID3D11DeviceContext>    device_context;
     ComPtr<IDXGISwapChain>         swap_chain;
+
+    // Frame buffer:
     ComPtr<ID3D11Texture2D>        framebuffer_texture;
     ComPtr<ID3D11RenderTargetView> framebuffer_rtv;
+
+    // Depth/stencil buffer:
+    ComPtr<ID3D11Texture2D>        depth_stencil_texture;
+    ComPtr<ID3D11DepthStencilView> depth_stencil_view;
 
 private:
 

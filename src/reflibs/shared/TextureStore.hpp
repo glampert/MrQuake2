@@ -221,12 +221,22 @@ inline constexpr ColorRGBA32 BytesToColor(std::uint8_t r, std::uint8_t g, std::u
     return ((ColorRGBA32(a) << 24) | (ColorRGBA32(b) << 16) | (ColorRGBA32(g) << 8) | r);
 }
 
-inline void ColorBytes(const ColorRGBA32 c, std::uint8_t& r, std::uint8_t& g, std::uint8_t& b, std::uint8_t& a)
+inline void ColorBytes(const ColorRGBA32 c, std::uint8_t & r, std::uint8_t & g, std::uint8_t & b, std::uint8_t & a)
 {
     r = std::uint8_t( c & 0x000000FF);
     g = std::uint8_t((c & 0x0000FF00) >> 8);
     b = std::uint8_t((c & 0x00FF0000) >> 16);
     a = std::uint8_t((c & 0xFF000000) >> 24);
+}
+
+inline void ColorFloats(const ColorRGBA32 c, float & r, float & g, float & b, float & a)
+{
+    std::uint8_t bR, bG, bB, bA;
+    ColorBytes(c, bR, bG, bB, bA);
+    r = bR / 255.0f;
+    g = bG / 255.0f;
+    b = bB / 255.0f;
+    a = bA / 255.0f;
 }
 
 constexpr int kNumDebugColors = 25;

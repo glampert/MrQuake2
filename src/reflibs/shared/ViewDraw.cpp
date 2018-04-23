@@ -9,7 +9,56 @@ namespace MrQ2
 {
 
 ///////////////////////////////////////////////////////////////////////////////
-// ViewDrawState
+// Local helpers:
+///////////////////////////////////////////////////////////////////////////////
+
+// Returns the proper texture for a given time and base texture.
+static TextureImage * TextureAnimation(const ModelTexInfo * const tex)
+{
+    FASTASSERT(tex != nullptr);
+    const TextureImage * out = nullptr;
+
+    // End of animation / not animated
+    if (tex->next == nullptr)
+    {
+        out = tex->teximage;
+    }
+    else // Find next image frame
+    {
+        /* TODO
+        int c = currententity->frame % tex->num_frames;
+        while (c)
+        {
+            tex = tex->next;
+            --c;
+        }
+        */
+        out = tex->teximage;
+    }
+
+    // Ugly, but we need to set the texture_chain ptr for the world model rendering..
+    return const_cast<TextureImage *>(out);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Returns true if the bounding box is completely outside the frustum
+// and should be culled. False if visible and allowed to draw.
+static bool ShouldCullBBox(const cplane_t frustum[4], const vec3_t mins, const vec3_t maxs)
+{
+    //TEMP - disabled for testing
+    /*
+    for (int i = 0; i < 4; ++i)
+    {
+        if (MrQ2::BoxOnPlaneSide(mins, maxs, &frustum[i]) == 2)
+        {
+            return true;
+        }
+    }
+    //*/
+    return false;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 static const ModelLeaf * FindLeafNodeForPoint(const vec3_t p, const ModelInstance & model)
@@ -40,12 +89,14 @@ static const ModelLeaf * FindLeafNodeForPoint(const vec3_t p, const ModelInstanc
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const std::uint8_t * ViewDrawState::DecompressModelVis(const std::uint8_t * in, const ModelInstance & model)
+static const std::uint8_t * DecompressModelVis(std::uint8_t * const out_pvs,
+                                               const std::uint8_t * in_pvs,
+                                               const ModelInstance & model)
 {
     int row = (model.data.vis->numclusters + 7) >> 3;
-    std::uint8_t * out = m_dvis_pvs;
+    std::uint8_t * out = out_pvs;
 
-    if (in == nullptr)
+    if (in_pvs == nullptr)
     {
         // No vis info, so make all visible:
         while (row)
@@ -53,43 +104,62 @@ const std::uint8_t * ViewDrawState::DecompressModelVis(const std::uint8_t * in, 
             *out++ = 0xFF;
             row--;
         }
-        return m_dvis_pvs;
+        return out_pvs;
     }
 
     do
     {
-        if (*in)
+        if (*in_pvs)
         {
-            *out++ = *in++;
+            *out++ = *in_pvs++;
             continue;
         }
 
-        int c = in[1];
-        in += 2;
+        int c = in_pvs[1];
+        in_pvs += 2;
         while (c)
         {
             *out++ = 0;
             c--;
         }
-    } while (out - m_dvis_pvs < row);
+    } while (out - out_pvs < row);
 
-    return m_dvis_pvs;
+    return out_pvs;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const std::uint8_t * ViewDrawState::GetClusterPVS(const int cluster, const ModelInstance & model)
+static const std::uint8_t * GetClusterPVS(std::uint8_t * const out_pvs, const int cluster, const ModelInstance & model)
 {
     if (cluster == -1 || model.data.vis == nullptr)
     {
-        std::memset(m_dvis_pvs, 0xFF, sizeof(m_dvis_pvs)); // All visible.
-        return m_dvis_pvs;
+        std::memset(out_pvs, 0xFF, (MAX_MAP_LEAFS / 8)); // All visible.
+        return out_pvs;
     }
 
     auto * vid_data = reinterpret_cast<const std::uint8_t *>(model.data.vis) + model.data.vis->bitofs[cluster][DVIS_PVS];
-    return DecompressModelVis(vid_data, model);
+    return DecompressModelVis(out_pvs, vid_data, model);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+// Sign bits are used for fast box-on-plane-side tests.
+static std::uint8_t SignBitsForPlane(const cplane_t & plane)
+{
+    std::uint8_t bits = 0;
+    for (int i = 0; i < 3; ++i)
+    {
+        // If the value is negative, set a bit for it.
+        if (plane.normal[i] < 0.0f)
+        {
+            bits |= (1 << i);
+        }
+    }
+    return bits;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// ViewDrawState
 ///////////////////////////////////////////////////////////////////////////////
 
 void ViewDrawState::SetUpViewClusters(const FrameData & frame_data)
@@ -130,23 +200,6 @@ void ViewDrawState::SetUpViewClusters(const FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Sign bits are used for fast box-on-plane-side tests.
-static std::uint8_t SignBitsForPlane(const cplane_t & plane)
-{
-    std::uint8_t bits = 0;
-    for (int i = 0; i < 3; ++i)
-    {
-        // If the value is negative, set a bit for it.
-        if (plane.normal[i] < 0.0f)
-        {
-            bits |= (1 << i);
-        }
-    }
-    return bits;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 void ViewDrawState::SetUpFrustum(FrameData & frame_data) const
 {
     // Rotate VPN right by FOV_X/2 degrees
@@ -183,7 +236,7 @@ void ViewDrawState::SetUpFrustum(FrameData & frame_data) const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::Setup(FrameData & frame_data)
+void ViewDrawState::RenderViewSetup(FrameData & frame_data)
 {
     ++m_frame_count;
 
@@ -197,11 +250,11 @@ void ViewDrawState::Setup(FrameData & frame_data)
     }
 
     // Camera view vectors
-    VectorsFromAngles(frame_data.view_def.viewangles, frame_data.forward_vec, frame_data.right_vec, frame_data.up_vec);
+    MrQ2::VectorsFromAngles(frame_data.view_def.viewangles, frame_data.forward_vec, frame_data.right_vec, frame_data.up_vec);
     Vec3Add(frame_data.camera_origin, frame_data.forward_vec, frame_data.camera_lookat);
 
     // Other camera/lens parameters
-    const float aspect_HbyW = float(frame_data.view_def.height) / float(frame_data.view_def.width);
+    const float aspect_ratio = float(frame_data.view_def.width) / float(frame_data.view_def.height);
     const float fov_y  = frame_data.view_def.fov_y;
     const float z_near = 4.0f;    // From ref_gl
     const float z_far  = 4096.0f; // From ref_gl
@@ -209,15 +262,15 @@ void ViewDrawState::Setup(FrameData & frame_data)
     // Set projection and view matrices for the frame
     const DirectX::XMFLOAT3A eye_position   { frame_data.camera_origin };
     const DirectX::XMFLOAT3A focus_position { frame_data.camera_lookat };
-    const DirectX::XMFLOAT3A up_direction   { frame_data.up_vec        };
+    const DirectX::XMFLOAT3A up_direction   { -frame_data.up_vec[0], -frame_data.up_vec[1], -frame_data.up_vec[2] };
 
-    frame_data.view_matrix = DirectX::XMMatrixLookAtLH(
+    frame_data.view_matrix = DirectX::XMMatrixLookAtRH(
                         DirectX::XMLoadFloat3A(&eye_position),
                         DirectX::XMLoadFloat3A(&focus_position),
                         DirectX::XMLoadFloat3A(&up_direction));
 
-    frame_data.proj_matrix = DirectX::XMMatrixPerspectiveFovLH(
-                        fov_y, aspect_HbyW, z_near, z_far);
+    frame_data.proj_matrix = DirectX::XMMatrixPerspectiveFovRH(
+                        fov_y, aspect_ratio, z_near, z_far);
 
     frame_data.view_proj_matrix = DirectX::XMMatrixMultiply(
                         frame_data.view_matrix,
@@ -225,51 +278,6 @@ void ViewDrawState::Setup(FrameData & frame_data)
 
     // Update the frustum planes
     SetUpFrustum(frame_data);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-// Returns the proper texture for a given time and base texture.
-static TextureImage * TextureAnimation(const ModelTexInfo * tex)
-{
-    FASTASSERT(tex != nullptr);
-    const TextureImage * out = nullptr;
-
-    // End of animation / not animated
-    if (tex->next == nullptr)
-    {
-        out = tex->teximage;
-    }
-    else // Find next image frame
-    {
-        /* TODO
-        int c = currententity->frame % tex->num_frames;
-        while (c)
-        {
-            tex = tex->next;
-            --c;
-        }
-        */
-        out = tex->teximage;
-    }
-
-    return const_cast<TextureImage *>(out);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-// Returns true if the bounding box is completely outside the frustum
-// and should be culled. False if visible and allowed to draw.
-static bool ShouldCullBBox(const cplane_t frustum[4], const vec3_t mins, const vec3_t maxs)
-{
-    for (int i = 0; i < 4; ++i)
-    {
-        if (BoxOnPlaneSide(mins, maxs, &frustum[i]) == 2)
-        {
-            return true;
-        }
-    }
-    return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -436,21 +444,25 @@ void ViewDrawState::MarkLeaves(ModelInstance & world_mdl)
         return;
     }
 
-    const std::uint8_t * vis = GetClusterPVS(m_view_cluster, world_mdl);
-    alignas(16) std::uint8_t fat_vis[MAX_MAP_LEAFS / 8];
+    alignas(16) std::uint8_t temp_vis_pvs[MAX_MAP_LEAFS / 8] = {0};
+    alignas(16) std::uint8_t combined_vis_pvs[MAX_MAP_LEAFS / 8] = {0};
+
+    const std::uint8_t * vis_pvs = GetClusterPVS(temp_vis_pvs, m_view_cluster, world_mdl);
 
     // May have to combine two clusters because of solid water boundaries:
     if (m_view_cluster2 != m_view_cluster)
     {
-        std::memcpy(fat_vis, vis, (world_mdl.data.num_leafs + 7) / 8);
-        vis = GetClusterPVS(m_view_cluster2, world_mdl);
+        std::memcpy(combined_vis_pvs, vis_pvs, (world_mdl.data.num_leafs + 7) / 8);
+        vis_pvs = GetClusterPVS(temp_vis_pvs, m_view_cluster2, world_mdl);
 
         const int c = (world_mdl.data.num_leafs + 31) / 32;
+        FASTASSERT(unsigned(c) < (ArrayLength(combined_vis_pvs) / sizeof(std::uint32_t)));
+
         for (int i = 0; i < c; ++i)
         {
-            reinterpret_cast<std::uint32_t *>(fat_vis)[i] |= reinterpret_cast<const std::uint32_t *>(vis)[i];
+            reinterpret_cast<std::uint32_t *>(combined_vis_pvs)[i] |= reinterpret_cast<const std::uint32_t *>(vis_pvs)[i];
         }
-        vis = fat_vis;
+        vis_pvs = combined_vis_pvs;
     }
 
     ModelLeaf * leaf = world_mdl.data.leafs;
@@ -462,7 +474,7 @@ void ViewDrawState::MarkLeaves(ModelInstance & world_mdl)
             continue;
         }
 
-        if (vis[cluster >> 3] & (1 << (cluster & 7)))
+        if (vis_pvs[cluster >> 3] & (1 << (cluster & 7)))
         {
             auto * node = reinterpret_cast<ModelNode *>(leaf);
             do
@@ -496,22 +508,19 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
             continue;
         }
 
+        BeginSurfacesBatch(*tex);
         for (const ModelSurface * surf = tex->texture_chain; surf; surf = surf->texture_chain)
         {
-            const ModelPoly * const poly = surf->polys;
-
             // Need at least one triangle.
-            if (poly == nullptr || poly->num_verts < 3)
+            if (surf->polys == nullptr || surf->polys->num_verts < 3)
             {
                 continue;
             }
-
-            const int num_triangles = poly->num_verts - 2;
-
-            //TODO draw it!
-            // probably fill up a batch for each texture then flush...
+            BatchSurfacePolys(*surf);
         }
+        EndSurfacesBatch();
 
+        // All world geometry using this texture has been drawn, clear for the next frame.
         tex->texture_chain = nullptr;
     }
 }
@@ -539,15 +548,9 @@ void ViewDrawState::RenderEntities(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::Finish(FrameData & frame_data)
-{
-    // TODO
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 void ViewDrawState::BeginRegistration()
 {
+    // New map loaded, clear the view clusters.
     m_view_cluster      = -1;
     m_view_cluster2     = -1;
     m_old_view_cluster  = -1;

@@ -10,25 +10,44 @@
 #include "reflibs/shared/ModelStore.hpp"
 #include "reflibs/shared/TextureStore.hpp"
 #include "reflibs/shared/ViewDraw.hpp"
+#include "reflibs/shared/RenderDocUtils.hpp"
 
 #include <array>
 #include <tuple>
 #include <DirectXMath.h>
+
+#ifndef NDEBUG
+    #define REFD3D11_WITH_DEBUG_FRAME_EVENTS 1
+#else // NDEBUG
+    #define REFD3D11_WITH_DEBUG_FRAME_EVENTS 0
+#endif // NDEBUG
 
 namespace MrQ2
 {
 namespace D3D11
 {
 
-// ============================================================================
+/*
+===============================================================================
 
-using InputLayoutDesc = std::tuple<const D3D11_INPUT_ELEMENT_DESC *, int>;
+    Helper Types
+
+===============================================================================
+*/
 
 struct Vertex2D
 {
     DirectX::XMFLOAT4A xy_uv;
     DirectX::XMFLOAT4A rgba;
 };
+
+struct Vertex3D
+{
+    DirectX::XMFLOAT4A position;
+    DirectX::XMFLOAT4A rgba;
+};
+
+using InputLayoutDesc = std::tuple<const D3D11_INPUT_ELEMENT_DESC *, int>;
 
 /*
 ===============================================================================
@@ -145,7 +164,8 @@ class ModelStoreImpl final
 public:
 
     explicit ModelStoreImpl(TextureStore & tex_store)
-        : ModelStore{ tex_store }, m_models_pool{ MemTag::kRenderer }
+        : ModelStore{ tex_store }
+        , m_models_pool{ MemTag::kRenderer }
     {
     }
 
@@ -164,6 +184,46 @@ protected:
 private:
 
     Pool<ModelInstanceImpl, kModelPoolSize> m_models_pool;
+};
+
+/*
+===============================================================================
+
+    D3D11 ViewDrawStateImpl
+
+===============================================================================
+*/
+class ViewDrawStateImpl final
+    : public ViewDrawState
+{
+public:
+
+    ViewDrawStateImpl() = default;
+    void Init(int max_verts, const ShaderProgram & sp, ID3D11Buffer * cbuff);
+
+    // Disallow copy.
+    ViewDrawStateImpl(const ViewDrawStateImpl &) = delete;
+    ViewDrawStateImpl & operator=(const ViewDrawStateImpl &) = delete;
+
+protected:
+
+    /*virtual*/ void BeginSurfacesBatch(const TextureImage & tex) override;
+    /*virtual*/ void BatchSurfacePolys(const ModelSurface & surf) override;
+    /*virtual*/ void EndSurfacesBatch() override;
+
+private:
+
+    // World model geometry batching:
+    int m_num_verts    = 0;
+    int m_used_verts   = 0;
+    int m_buffer_index = 0;
+
+    std::array<ComPtr<ID3D11Buffer>,     2> m_vertex_buffers;
+    std::array<D3D11_MAPPED_SUBRESOURCE, 2> m_mapping_info;
+
+    const TextureImageImpl * m_current_texture = nullptr;
+    const ShaderProgram    * m_program         = nullptr;
+    ID3D11Buffer           * m_cbuffer         = nullptr;
 };
 
 /*
@@ -247,7 +307,7 @@ public:
     SpriteBatch            * SBatch(SpriteBatch::BatchId id) { return &m_sprite_batches[id];              }
     TextureStoreImpl       * TexStore()                      { return &m_tex_store;                       }
     ModelStoreImpl         * MdlStore()                      { return &m_mdl_store;                       }
-    ViewDrawState          * ViewState()                     { return &m_view_draw_state;                 }
+    ViewDrawStateImpl      * ViewState()                     { return &m_view_draw_state;                 }
     ID3D11Device           * Device()          const         { return m_window.device.Get();              }
     ID3D11DeviceContext    * DeviceContext()   const         { return m_window.device_context.Get();      }
     IDXGISwapChain         * SwapChain()       const         { return m_window.swap_chain.Get();          }
@@ -278,6 +338,19 @@ public:
 
     void UploadTexture(const TextureImageImpl * tex);
 
+    //
+    // Debug frame annotations/makers
+    //
+#if REFD3D11_WITH_DEBUG_FRAME_EVENTS
+    void PushEventF(const wchar_t * format, ...);
+    void PushEvent(const wchar_t * event_name)   { if (m_annotations) m_annotations->BeginEvent(event_name); }
+    void PopEvent()                              { if (m_annotations) m_annotations->EndEvent(); }
+#else // REFD3D11_WITH_DEBUG_FRAME_EVENTS
+    static void PushEventF(const wchar_t *, ...) {}
+    static void PushEvent(const wchar_t *)       {}
+    static void PopEvent()                       {}
+#endif // REFD3D11_WITH_DEBUG_FRAME_EVENTS
+
 private:
 
     struct ConstantBufferDataUI
@@ -285,22 +358,38 @@ private:
         DirectX::XMFLOAT4 screen_dimensions = { 0.0f, 0.0f, 0.0f, 0.0f };
     };
 
+    struct ConstantBufferDataSGeom
+    {
+        DirectX::XMMATRIX mvp_matrix = DirectX::XMMatrixIdentity();
+    };
+
+    void CreateRSObjects();
     void LoadShaders();
 
+private:
+
     // Renderer main data:
-    RenderWindow     m_window;
-    SpriteBatchSet   m_sprite_batches;
-    TextureStoreImpl m_tex_store;
-    ModelStoreImpl   m_mdl_store;
-    ViewDrawState    m_view_draw_state;
-    bool             m_frame_started  = false;
-    bool             m_window_resized = true;
+    RenderWindow                       m_window;
+    SpriteBatchSet                     m_sprite_batches;
+    TextureStoreImpl                   m_tex_store;
+    ModelStoreImpl                     m_mdl_store;
+    ViewDrawStateImpl                  m_view_draw_state;
+    ComPtr<ID3DUserDefinedAnnotation>  m_annotations;
+    bool                               m_frame_started  = false;
+    bool                               m_window_resized = true;
 
     // Shader programs / render states:
-    ShaderProgram            m_shader_ui_sprites;
-    ComPtr<ID3D11BlendState> m_blend_state_ui_sprites;
-    ComPtr<ID3D11Buffer>     m_cbuffer_ui_sprites;
-    ConstantBufferDataUI     m_cbuffer_data_ui_sprites;
+    ShaderProgram                      m_shader_ui_sprites;
+    ComPtr<ID3D11BlendState>           m_blend_state_ui_sprites;
+    ComPtr<ID3D11Buffer>               m_cbuffer_ui_sprites;
+    ConstantBufferDataUI               m_cbuffer_data_ui_sprites;
+
+    ShaderProgram                      m_shader_solid_geom;
+    ComPtr<ID3D11Buffer>               m_cbuffer_solid_geom;
+    ConstantBufferDataSGeom            m_cbuffer_data_solid_geom;
+
+    ComPtr<ID3D11DepthStencilState>    m_dss_depth_test_enabled;
+    ComPtr<ID3D11DepthStencilState>    m_dss_depth_test_disabled;
 };
 
 // ============================================================================
