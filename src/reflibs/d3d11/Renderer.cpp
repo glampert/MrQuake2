@@ -111,6 +111,17 @@ void TextureStoreImpl::Init()
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void TextureStoreImpl::UploadScrapIfNeeded()
+{
+    if (m_scrap_dirty)
+    {
+        g_Renderer->UploadTexture(ScrapImpl());
+        m_scrap_dirty = false;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 unsigned TextureStoreImpl::MultisampleQualityLevel(const DXGI_FORMAT fmt) const
 {
     FASTASSERT(fmt == DXGI_FORMAT_R8G8B8A8_UNORM); // only format support at the moment
@@ -142,6 +153,7 @@ TextureImage * TextureStoreImpl::CreateTexture(const ColorRGBA32 * pix, std::uin
     if (use_scrap)
     {
         impl->InitFromScrap(ScrapImpl());
+        m_scrap_dirty = true; // Upload the D3D texture on next opportunity
     }
     else
     {
@@ -436,6 +448,21 @@ void SpriteBatch::PushQuadTextured(const float x, const float y,
     FASTASSERT(tex != nullptr);
     const int quad_start_vtx = m_used_verts;
     PushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color);
+    m_deferred_textured_quads.push_back({ quad_start_vtx, tex });
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void SpriteBatch::PushQuadTexturedUVs(const float x, const float y,
+                                      const float w, const float h,
+                                      const float u0, const float v0,
+                                      const float u1, const float v1,
+                                      const TextureImageImpl * const tex,
+                                      const DirectX::XMFLOAT4A & color)
+{
+    FASTASSERT(tex != nullptr);
+    const int quad_start_vtx = m_used_verts;
+    PushQuad(x, y, w, h, u0, v0, u1, v1, color);
     m_deferred_textured_quads.push_back({ quad_start_vtx, tex });
 }
 

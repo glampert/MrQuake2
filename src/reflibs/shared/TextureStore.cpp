@@ -410,15 +410,19 @@ TextureImage * TextureStore::ScrapTryAlloc8Bit(const Color8 * const pic8, const 
     FASTASSERT(width > 0 && height > 0);
     FASTASSERT(m_scrap_inited);
 
+    // Adding a 2 pixels padding border around each side to avoid sampling artifacts.
+    const int padded_width  = width  + 2;
+    const int padded_height = height + 2;
+
     int sx = 0;
     int sy = 0;
     int best = m_scrap.Size();
 
     // Try to find a good fit in the atlas:
-    for (int i = 0; i < m_scrap.Size() - width; ++i)
+    for (int i = 0; i < m_scrap.Size() - padded_width; ++i)
     {
         int j, best2 = 0;
-        for (j = 0; j < width; ++j)
+        for (j = 0; j < padded_width; ++j)
         {
             if (m_scrap.allocated[i + j] >= best)
             {
@@ -430,7 +434,7 @@ TextureImage * TextureStore::ScrapTryAlloc8Bit(const Color8 * const pic8, const 
             }
         }
 
-        if (j == width) // This is a valid spot
+        if (j == padded_width) // This is a valid spot
         {
             sx = i;
             sy = best = best2;
@@ -438,15 +442,15 @@ TextureImage * TextureStore::ScrapTryAlloc8Bit(const Color8 * const pic8, const 
     }
 
     // No more room.
-    if ((best + height) > m_scrap.Size())
+    if ((best + padded_height) > m_scrap.Size())
     {
         return nullptr;
     }
 
     // Managed to allocate, update the scrap:
-    for (int i = 0; i < width; ++i)
+    for (int i = 0; i < padded_width; ++i)
     {
-        m_scrap.allocated[sx + i] = best + height;
+        m_scrap.allocated[sx + i] = best + padded_height;
     }
 
     // Expand pic to RGBA:

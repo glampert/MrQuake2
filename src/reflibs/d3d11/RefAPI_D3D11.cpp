@@ -90,6 +90,7 @@ static void EndRegistration()
 
     g_Renderer->MdlStore()->EndRegistration();
     g_Renderer->TexStore()->EndRegistration();
+    g_Renderer->TexStore()->UploadScrapIfNeeded();
 
     MemTagsPrintAll();
 }
@@ -155,11 +156,26 @@ static void DrawPic(int x, int y, const char * name)
         return;
     }
 
-    g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
-        float(x), float(y),
-        float(tex->width), float(tex->height),
-        static_cast<const TextureImageImpl *>(tex),
-        Renderer::kColorWhite);
+    const auto fx = float(x);
+    const auto fy = float(y);
+    const auto fw = float(tex->width);
+    const auto fh = float(tex->height);
+
+    if (tex->from_scrap)
+    {
+        const auto u0 = float(tex->scrap_uv0.x) / TextureStore::kScrapSize;
+        const auto v0 = float(tex->scrap_uv0.y) / TextureStore::kScrapSize;
+        const auto u1 = float(tex->scrap_uv1.x) / TextureStore::kScrapSize;
+        const auto v1 = float(tex->scrap_uv1.y) / TextureStore::kScrapSize;
+
+        g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTexturedUVs(
+            fx, fy, fw, fh, u0, v0, u1, v1, static_cast<const TextureImageImpl *>(tex), Renderer::kColorWhite);
+    }
+    else
+    {
+        g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
+            fx, fy, fw, fh, static_cast<const TextureImageImpl *>(tex), Renderer::kColorWhite);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -175,11 +191,26 @@ static void DrawStretchPic(int x, int y, int w, int h, const char * name)
         return;
     }
 
-    g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
-        float(x), float(y),
-        float(w), float(h), 
-        static_cast<const TextureImageImpl *>(tex),
-        Renderer::kColorWhite);
+    const auto fx = float(x);
+    const auto fy = float(y);
+    const auto fw = float(w);
+    const auto fh = float(h);
+
+    if (tex->from_scrap)
+    {
+        const auto u0 = float(tex->scrap_uv0.x) / TextureStore::kScrapSize;
+        const auto v0 = float(tex->scrap_uv0.y) / TextureStore::kScrapSize;
+        const auto u1 = float(tex->scrap_uv1.x) / TextureStore::kScrapSize;
+        const auto v1 = float(tex->scrap_uv1.y) / TextureStore::kScrapSize;
+
+        g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTexturedUVs(
+            fx, fy, fw, fh, u0, v0, u1, v1, static_cast<const TextureImageImpl *>(tex), Renderer::kColorWhite);
+    }
+    else
+    {
+        g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
+            fx, fy, fw, fh, static_cast<const TextureImageImpl *>(tex), Renderer::kColorWhite);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

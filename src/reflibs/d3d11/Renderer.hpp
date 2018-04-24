@@ -118,12 +118,10 @@ public:
     }
 
     void Init();
+    void UploadScrapIfNeeded();
 
     unsigned MultisampleQualityLevel(DXGI_FORMAT fmt) const;
     const TextureImageImpl * ScrapImpl() const { return static_cast<const TextureImageImpl *>(tex_scrap); }
-
-    // TODO Scrap texture needs to be updated when something is written to it!!!
-    // Also have to handle UVs correctly when drawing a pic from the scrap atlas
 
 protected:
 
@@ -136,6 +134,7 @@ private:
 
     Pool<TextureImageImpl, kTexturePoolSize> m_teximages_pool;
     unsigned m_multisample_quality_levels_rgba = 0;
+    bool m_scrap_dirty = false;
 };
 
 /*
@@ -264,6 +263,9 @@ public:
 
     void PushQuadTextured(float x, float y, float w, float h,
                           const TextureImageImpl * tex, const DirectX::XMFLOAT4A & color);
+
+    void PushQuadTexturedUVs(float x, float y, float w, float h, float u0, float v0, float u1, float v1,
+                             const TextureImageImpl * tex, const DirectX::XMFLOAT4A & color);
 
     // Disallow copy.
     SpriteBatch(const SpriteBatch &) = delete;
