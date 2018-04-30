@@ -21,7 +21,6 @@ constexpr int kQuakePaletteSize = 256;
 
 // Defined by ModelStructs.hpp, but we only need a forward decl here.
 struct ModelSurface;
-using ModelSurfaceCPtr = const ModelSurface *;
 
 /*
 ===============================================================================
@@ -53,16 +52,16 @@ class TextureImage
 {
 public:
 
-    const ColorRGBA32 * pixels;        // Pointer to heap memory with image pixels (or into scrap atlas).
-    ModelSurfaceCPtr    texture_chain; // For sort-by-texture world drawing.
-    std::uint32_t       reg_num;       // Registration num, so we know if currently referenced by the level being played.
-    const TextureType   type;          // Types of textures used by Quake.
-    const bool          from_scrap;    // True if allocated from the scrap atlas.
-    const int           width;         // Width in pixels.
-    const int           height;        // Height in pixels.
-    const Vec2u16       scrap_uv0;     // Offsets into the scrap if this is allocate from the scrap, zero otherwise.
-    const Vec2u16       scrap_uv1;     // If not zero, this is a scrap image. In such case, use these instead of width & height.
-    const PathName      name;          // Texture filename/unique id.
+    const ColorRGBA32  * pixels;        // Pointer to heap memory with image pixels (or into scrap atlas).
+    const ModelSurface * texture_chain; // For sort-by-texture world drawing.
+    std::uint32_t        reg_num;       // Registration num, so we know if currently referenced by the level being played.
+    const TextureType    type;          // Types of textures used by Quake.
+    const bool           from_scrap;    // True if allocated from the scrap atlas.
+    const int            width;         // Width in pixels.
+    const int            height;        // Height in pixels.
+    const Vec2u16        scrap_uv0;     // Offsets into the scrap if this is allocate from the scrap, zero otherwise.
+    const Vec2u16        scrap_uv1;     // If not zero, this is a scrap image. In such case, use these instead of width & height.
+    const PathName       name;          // Texture filename/unique id.
 
     TextureImage(const ColorRGBA32 * const pix, const std::uint32_t regn, const TextureType tt, const bool use_scrap,
                  const int w, const int h, const Vec2u16 scrap0, const Vec2u16 scrap1, const char * const tex_name)

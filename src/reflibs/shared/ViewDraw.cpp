@@ -543,6 +543,61 @@ void ViewDrawState::RenderWorldModel(FrameData & frame_data)
 
 void ViewDrawState::RenderEntities(FrameData & frame_data)
 {
+    const int num_entities = frame_data.view_def.num_entities;
+    const entity_t * const entities_list = frame_data.view_def.entities;
+
+    //
+    // Draw solid entities first:
+    //
+    for (int e = 0; e < num_entities; ++e)
+    {
+        const entity_t & entity = entities_list[e];
+
+        if (entity.flags & RF_TRANSLUCENT)
+        {
+            continue; // Drawn on the following pass
+            //TODO copy then into a FixedVector for the second pass.
+        }
+
+        if (entity.flags & RF_BEAM)
+        {
+            //DrawBeamModel(entity);
+            continue;
+        }
+
+        // entity_t::model is an opaque pointer outside the Refresh module, so we need the cast.
+        const auto * model = reinterpret_cast<const ModelInstance *>(entity.model);
+
+        if (model == nullptr)
+        {
+            //DrawNullModel(entity);
+            continue;
+        }
+
+        switch (model->type)
+        {
+        case ModelType::kBrush :
+            //DrawBrushModel(entity);
+            break;
+
+        case ModelType::kSprite :
+            //DrawSpriteModel(entity);
+            break;
+
+        case ModelType::kAliasMD2 :
+            //DrawAliasMD2Model(entity);
+            break;
+
+        default:
+            GameInterface::Errorf("ViewDrawState::RenderEntities: Bad model type for '%s'!", model->name.CStr());
+            break;
+        } // switch
+    }
+
+    //
+    // Now draw the translucent/transparent ones:
+    //
+
     // TODO
 }
 

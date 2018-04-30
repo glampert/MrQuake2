@@ -323,17 +323,17 @@ static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const
 
     const ColorRGBA32 * const cinematic_palette = TextureStore::CinematicPalette();
     float hscale;
-    int trows;
+    int num_rows;
 
     if (rows <= kQuakeCinematicImgSize)
     {
         hscale = 1.0f;
-        trows  = rows;
+        num_rows = rows;
     }
     else
     {
         hscale = float(rows) / float(kQuakeCinematicImgSize);
-        trows  = kQuakeCinematicImgSize;
+        num_rows = kQuakeCinematicImgSize;
     }
 
     // Good idea to clear the buffer first, in case the
@@ -347,7 +347,7 @@ static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const
 
     // Upsample to fill our 256*256 cinematic buffer.
     // This is based on the algorithm applied by ref_gl.
-    for (int i = 0; i < trows; ++i)
+    for (int i = 0; i < num_rows; ++i)
     {
         const int row = static_cast<int>(i * hscale);
         if (row > rows)
@@ -358,7 +358,7 @@ static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const
         const qbyte * source = &data[cols * row];
         ColorRGBA32 * dest = &cinematic_buffer[i * kQuakeCinematicImgSize];
 
-        const int fracstep = (cols * 0x10000 / kQuakeCinematicImgSize);
+        const int fracstep = (cols * 65536 / kQuakeCinematicImgSize);
         int frac = fracstep >> 1;
 
         for (int j = 0; j < kQuakeCinematicImgSize; ++j)
@@ -377,8 +377,7 @@ static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const
 
     // Draw a fullscreen quadrilateral with the cinematic texture applied to it
     g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
-        float(x), float(y),
-        float(w), float(h), 
+        float(x), float(y), float(w), float(h), 
         static_cast<const TextureImageImpl *>(cin_tex),
         Renderer::kColorWhite);
 }

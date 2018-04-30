@@ -5,6 +5,7 @@
 
 #include "Renderer.hpp"
 
+// Debug markers need these.
 #include <cstdarg>
 #include <cwchar>
 
@@ -38,9 +39,9 @@ void TextureImageImpl::InitD3DSpecific()
 
     D3D11_SAMPLER_DESC samplerDesc  = {};
     samplerDesc.Filter              = FilterForTextureType(type);
-    samplerDesc.AddressU            = D3D11_TEXTURE_ADDRESS_CLAMP;
-    samplerDesc.AddressV            = D3D11_TEXTURE_ADDRESS_CLAMP;
-    samplerDesc.AddressW            = D3D11_TEXTURE_ADDRESS_CLAMP;
+    samplerDesc.AddressU            = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressV            = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressW            = D3D11_TEXTURE_ADDRESS_WRAP;
     samplerDesc.ComparisonFunc      = D3D11_COMPARISON_ALWAYS;
     samplerDesc.MaxAnisotropy       = 1;
     samplerDesc.MipLODBias          = 0.0f;
@@ -470,11 +471,13 @@ void SpriteBatch::PushQuadTexturedUVs(const float x, const float y,
 // ViewDrawStateImpl
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawStateImpl::Init(const int max_verts, const ShaderProgram & sp, ID3D11Buffer * cbuff)
+void ViewDrawStateImpl::Init(const int max_verts, const ShaderProgram & sp,
+                             ID3D11Buffer * cbuff_vs, ID3D11Buffer * cbuff_ps)
 {
-    m_num_verts = max_verts;
-    m_program   = &sp;
-    m_cbuffer   = cbuff;
+    m_num_verts  = max_verts;
+    m_program    = &sp;
+    m_cbuffer_vs = cbuff_vs;
+    m_cbuffer_ps = cbuff_ps;
 
     D3D11_BUFFER_DESC bd = {0};
     bd.Usage             = D3D11_USAGE_DYNAMIC;
@@ -548,6 +551,11 @@ void ViewDrawStateImpl::BatchSurfacePolys(const ModelSurface & surf)
             verts_iter->position.z = poly_vert.position[2];
             verts_iter->position.w = 1.0f;
 
+            verts_iter->uv.x = poly_vert.texture_s;
+            verts_iter->uv.y = poly_vert.texture_t;
+            verts_iter->uv.z = 0.0f;
+            verts_iter->uv.w = 0.0f;
+
             float r, g, b, a;
             ColorFloats(surf.debug_color, r, g, b, a);
             verts_iter->rgba = { r, g, b, a };
@@ -564,7 +572,7 @@ void ViewDrawStateImpl::BatchSurfacePolys(const ModelSurface & surf)
 void ViewDrawStateImpl::EndSurfacesBatch()
 {
     FASTASSERT(m_current_texture != nullptr);
-    FASTASSERT(m_program != nullptr && m_cbuffer != nullptr);
+    FASTASSERT(m_program != nullptr && m_cbuffer_vs != nullptr && m_cbuffer_ps != nullptr);
 
     ID3D11DeviceContext * const context = g_Renderer->DeviceContext();
     ID3D11Buffer * const current_buffer = m_vertex_buffers[m_buffer_index].Get();
@@ -573,8 +581,9 @@ void ViewDrawStateImpl::EndSurfacesBatch()
     context->Unmap(current_buffer, 0);
     m_mapping_info[m_buffer_index] = {};
 
-    // Constant buffer at register(b0)
-    context->VSSetConstantBuffers(0, 1, &m_cbuffer);
+    // Constant buffer at register(b0) (VS) and register(b1) (PS)
+    context->VSSetConstantBuffers(0, 1, &m_cbuffer_vs);
+    context->PSSetConstantBuffers(1, 1, &m_cbuffer_ps);
 
     // Bind texture & sampler (t0, s0):
     context->PSSetShaderResources(0, 1, m_current_texture->srv.GetAddressOf());
@@ -622,6 +631,9 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
 {
     GameInterface::Printf("D3D11 Renderer initializing.");
 
+    m_disable_texturing = GameInterface::Cvar::Get("r_disable_texturing", "0", 0);
+    m_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
+
     // RenderWindow setup
     m_window.window_name      = window_name;
     m_window.class_name       = window_name;
@@ -646,24 +658,12 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
     LoadShaders();
 
     // World geometry rendering helper
-    m_view_draw_state.Init(2048, m_shader_solid_geom, m_cbuffer_solid_geom.Get());
+    m_view_draw_state.Init(2048, m_shader_solid_geom,
+                           m_cbuffer_solid_geom_vs.Get(),
+                           m_cbuffer_solid_geom_ps.Get());
 
     // So we can annotate our RenderDoc captures
-#if REFD3D11_WITH_DEBUG_FRAME_EVENTS
-    if (GameInterface::Cvar::Get("r_debug_frame_events", "0", CvarWrapper::kFlagArchive).AsInt() != 0)
-    {
-        ID3DUserDefinedAnnotation * annotations = nullptr;
-        if (SUCCEEDED(DeviceContext()->QueryInterface(__uuidof(annotations), (void **)&annotations)))
-        {
-            m_annotations.Attach(annotations);
-            GameInterface::Printf("Successfully created ID3DUserDefinedAnnotation.");
-        }
-        else
-        {
-            GameInterface::Printf("Unable to create ID3DUserDefinedAnnotation.");
-        }
-    }
-#endif // REFD3D11_WITH_DEBUG_FRAME_EVENTS
+    InitDebugEvents();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -744,7 +744,7 @@ void Renderer::LoadShaders()
         // Create the constant buffer:
         D3D11_BUFFER_DESC buf_desc = {};
         buf_desc.Usage             = D3D11_USAGE_DEFAULT;
-        buf_desc.ByteWidth         = sizeof(ConstantBufferDataUI);
+        buf_desc.ByteWidth         = sizeof(ConstantBufferDataUIVS);
         buf_desc.BindFlags         = D3D11_BIND_CONSTANT_BUFFER;
         if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_ui_sprites.GetAddressOf())))
         {
@@ -756,20 +756,27 @@ void Renderer::LoadShaders()
     {
         const D3D11_INPUT_ELEMENT_DESC layout[] = { // Vertex3D
             { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 32, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
         const int num_elements = ARRAYSIZE(layout);
         m_shader_solid_geom.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"SolidGeom.fx",
                                            "VS_main", "PS_main", { layout, num_elements });
 
-        // Create the constant buffer:
+        // Create the constant buffers:
         D3D11_BUFFER_DESC buf_desc = {};
         buf_desc.Usage             = D3D11_USAGE_DEFAULT;
-        buf_desc.ByteWidth         = sizeof(ConstantBufferDataSGeom);
+        buf_desc.ByteWidth         = sizeof(ConstantBufferDataSGeomVS);
         buf_desc.BindFlags         = D3D11_BIND_CONSTANT_BUFFER;
-        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_solid_geom.GetAddressOf())))
+        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_solid_geom_vs.GetAddressOf())))
         {
-            GameInterface::Errorf("Failed to create shader constant buffer!");
+            GameInterface::Errorf("Failed to create VS shader constant buffer!");
+        }
+
+        buf_desc.ByteWidth = sizeof(ConstantBufferDataSGeomPS);
+        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_solid_geom_ps.GetAddressOf())))
+        {
+            GameInterface::Errorf("Failed to create PS shader constant buffer!");
         }
     }
 
@@ -783,23 +790,33 @@ void Renderer::RenderView(const refdef_s & view_def)
     PushEvent(L"Renderer::RenderView");
 
     ViewDrawStateImpl::FrameData frame_data{ m_tex_store, *m_mdl_store.WorldModel(), view_def };
+    auto * deviceContex = DeviceContext();
 
     // Enter 3D mode (depth test ON)
-    DeviceContext()->OMSetDepthStencilState(m_dss_depth_test_enabled.Get(), 0);
+    deviceContex->OMSetDepthStencilState(m_dss_depth_test_enabled.Get(), 0);
 
     // Set up camera/view:
     m_view_draw_state.RenderViewSetup(frame_data);
 
-    // Update constant buffer:
-    m_cbuffer_data_solid_geom.mvp_matrix = frame_data.view_proj_matrix;
-    DeviceContext()->UpdateSubresource(m_cbuffer_solid_geom.Get(), 0, nullptr, &m_cbuffer_data_solid_geom, 0, 0);
+    // Update the constant buffers:
+    {
+        ConstantBufferDataSGeomVS cbuffer_data_solid_geom_vs;
+        cbuffer_data_solid_geom_vs.mvp_matrix = frame_data.view_proj_matrix;
+
+        ConstantBufferDataSGeomPS cbuffer_data_solid_geom_ps;
+        cbuffer_data_solid_geom_ps.disable_texturing = m_disable_texturing.AsInt();
+        cbuffer_data_solid_geom_ps.blend_debug_color = m_blend_debug_color.AsInt();
+
+        deviceContex->UpdateSubresource(m_cbuffer_solid_geom_vs.Get(), 0, nullptr, &cbuffer_data_solid_geom_vs, 0, 0);
+        deviceContex->UpdateSubresource(m_cbuffer_solid_geom_ps.Get(), 0, nullptr, &cbuffer_data_solid_geom_ps, 0, 0);
+    }
 
     // Now render the geometries:
     m_view_draw_state.RenderWorldModel(frame_data);
     m_view_draw_state.RenderEntities(frame_data);
 
     // Back to 2D rendering mode (depth test OFF)
-    DeviceContext()->OMSetDepthStencilState(m_dss_depth_test_disabled.Get(), 0);
+    deviceContex->OMSetDepthStencilState(m_dss_depth_test_disabled.Get(), 0);
 
     PopEvent(); // "Renderer::RenderView"
 }
@@ -853,9 +870,10 @@ void Renderer::Flush2D()
 
     if (m_window_resized)
     {
-        m_cbuffer_data_ui_sprites.screen_dimensions.x = static_cast<float>(m_window.width);
-        m_cbuffer_data_ui_sprites.screen_dimensions.y = static_cast<float>(m_window.height);
-        DeviceContext()->UpdateSubresource(m_cbuffer_ui_sprites.Get(), 0, nullptr, &m_cbuffer_data_ui_sprites, 0, 0);
+        ConstantBufferDataUIVS cbuffer_data_ui;
+        cbuffer_data_ui.screen_dimensions.x = static_cast<float>(m_window.width);
+        cbuffer_data_ui.screen_dimensions.y = static_cast<float>(m_window.height);
+        DeviceContext()->UpdateSubresource(m_cbuffer_ui_sprites.Get(), 0, nullptr, &cbuffer_data_ui, 0, 0);
     }
 
     // Remaining 2D geometry:
@@ -926,6 +944,26 @@ void Renderer::UploadTexture(const TextureImageImpl * const tex)
 ///////////////////////////////////////////////////////////////////////////////
 
 #if REFD3D11_WITH_DEBUG_FRAME_EVENTS
+void Renderer::InitDebugEvents()
+{
+    auto r_debug_frame_events = GameInterface::Cvar::Get("r_debug_frame_events", "0", CvarWrapper::kFlagArchive);
+    if (r_debug_frame_events.AsInt() != 0)
+    {
+        ID3DUserDefinedAnnotation * annotations = nullptr;
+        if (SUCCEEDED(DeviceContext()->QueryInterface(__uuidof(annotations), (void **)&annotations)))
+        {
+            m_annotations.Attach(annotations);
+            GameInterface::Printf("Successfully created ID3DUserDefinedAnnotation.");
+        }
+        else
+        {
+            GameInterface::Printf("Unable to create ID3DUserDefinedAnnotation.");
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void Renderer::PushEventF(const wchar_t * format, ...)
 {
     if (m_annotations)

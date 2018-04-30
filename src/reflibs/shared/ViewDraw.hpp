@@ -80,7 +80,6 @@ private:
 
     void SetUpViewClusters(const FrameData & frame_data);
     void SetUpFrustum(FrameData & frame_data) const;
-
     void RecursiveWorldNode(const FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node) const;
     void MarkLeaves(ModelInstance & world_mdl);
     void DrawTextureChains(FrameData & frame_data);

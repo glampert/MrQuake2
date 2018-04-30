@@ -44,6 +44,7 @@ struct Vertex2D
 struct Vertex3D
 {
     DirectX::XMFLOAT4A position;
+    DirectX::XMFLOAT4A uv; // z,w unused
     DirectX::XMFLOAT4A rgba;
 };
 
@@ -198,7 +199,7 @@ class ViewDrawStateImpl final
 public:
 
     ViewDrawStateImpl() = default;
-    void Init(int max_verts, const ShaderProgram & sp, ID3D11Buffer * cbuff);
+    void Init(int max_verts, const ShaderProgram & sp, ID3D11Buffer * cbuff_vs, ID3D11Buffer * cbuff_ps);
 
     // Disallow copy.
     ViewDrawStateImpl(const ViewDrawStateImpl &) = delete;
@@ -222,7 +223,8 @@ private:
 
     const TextureImageImpl * m_current_texture = nullptr;
     const ShaderProgram    * m_program         = nullptr;
-    ID3D11Buffer           * m_cbuffer         = nullptr;
+    ID3D11Buffer           * m_cbuffer_vs      = nullptr;
+    ID3D11Buffer           * m_cbuffer_ps      = nullptr;
 };
 
 /*
@@ -344,10 +346,12 @@ public:
     // Debug frame annotations/makers
     //
 #if REFD3D11_WITH_DEBUG_FRAME_EVENTS
+    void InitDebugEvents();
     void PushEventF(const wchar_t * format, ...);
     void PushEvent(const wchar_t * event_name)   { if (m_annotations) m_annotations->BeginEvent(event_name); }
     void PopEvent()                              { if (m_annotations) m_annotations->EndEvent(); }
 #else // REFD3D11_WITH_DEBUG_FRAME_EVENTS
+    static void InitDebugEvents()                {}
     static void PushEventF(const wchar_t *, ...) {}
     static void PushEvent(const wchar_t *)       {}
     static void PopEvent()                       {}
@@ -355,14 +359,23 @@ public:
 
 private:
 
-    struct ConstantBufferDataUI
+    using HlslBool = std::uint32_t; // HLSL booleans are 4 bytes.
+
+    struct alignas(16) ConstantBufferDataUIVS
     {
-        DirectX::XMFLOAT4 screen_dimensions = { 0.0f, 0.0f, 0.0f, 0.0f };
+        DirectX::XMFLOAT4 screen_dimensions;
     };
 
-    struct ConstantBufferDataSGeom
+    struct alignas(16) ConstantBufferDataSGeomVS
     {
-        DirectX::XMMATRIX mvp_matrix = DirectX::XMMatrixIdentity();
+        DirectX::XMMATRIX mvp_matrix;
+    };
+
+    struct alignas(16) ConstantBufferDataSGeomPS
+    {
+        HlslBool disable_texturing;
+        HlslBool blend_debug_color;
+        std::uint8_t padding[8] = {}; // unused
     };
 
     void CreateRSObjects();
@@ -382,16 +395,17 @@ private:
 
     // Shader programs / render states:
     ShaderProgram                      m_shader_ui_sprites;
-    ComPtr<ID3D11BlendState>           m_blend_state_ui_sprites;
-    ComPtr<ID3D11Buffer>               m_cbuffer_ui_sprites;
-    ConstantBufferDataUI               m_cbuffer_data_ui_sprites;
-
     ShaderProgram                      m_shader_solid_geom;
-    ComPtr<ID3D11Buffer>               m_cbuffer_solid_geom;
-    ConstantBufferDataSGeom            m_cbuffer_data_solid_geom;
-
+    ComPtr<ID3D11BlendState>           m_blend_state_ui_sprites;
     ComPtr<ID3D11DepthStencilState>    m_dss_depth_test_enabled;
     ComPtr<ID3D11DepthStencilState>    m_dss_depth_test_disabled;
+    ComPtr<ID3D11Buffer>               m_cbuffer_ui_sprites;
+    ComPtr<ID3D11Buffer>               m_cbuffer_solid_geom_vs;
+    ComPtr<ID3D11Buffer>               m_cbuffer_solid_geom_ps;
+
+    // Cached Cvars:
+    CvarWrapper                        m_disable_texturing;
+    CvarWrapper                        m_blend_debug_color;
 };
 
 // ============================================================================

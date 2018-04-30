@@ -4,7 +4,7 @@
 Texture2D    g_glyphs_texture : register(t0);
 SamplerState g_glyphs_sampler : register(s0);
 
-cbuffer ConstantBufferDataUI : register(b0)
+cbuffer ConstantBufferDataUIVS : register(b0)
 {
     float4 g_screen_dimensions;
 };
