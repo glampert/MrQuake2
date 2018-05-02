@@ -16,6 +16,7 @@
 
 ===============================================================================
 */
+
 struct cplane_s;
 struct cvar_s;
 struct dvis_s;
@@ -23,7 +24,10 @@ struct image_s;
 struct model_s;
 struct refdef_s;
 struct refimport_s;
+
+using vec2_t = float[2];
 using vec3_t = float[3];
+using vec4_t = float[4];
 
 /*
 ===============================================================================
@@ -259,6 +263,7 @@ public:
 
     // Metadata
     const char * Name() const;
+    bool IsSet() const { return AsInt() != 0; }
     bool IsNotNull() const { return m_wrapped_var != nullptr; }
 
 private:

@@ -22,6 +22,78 @@ namespace MrQ2
 /*
 ===============================================================================
 
+    DrawVertex3D / DrawVertex2D
+
+===============================================================================
+*/
+
+struct alignas(16) DrawVertex3D
+{
+    vec3_t position;
+    vec3_t normal;
+    vec2_t uv;
+    vec4_t rgba;
+};
+
+struct alignas(16) DrawVertex2D
+{
+    vec4_t xy_uv;
+    vec4_t rgba;
+};
+
+/*
+===============================================================================
+
+    MiniImBatch
+
+===============================================================================
+*/
+class MiniImBatch final
+{
+public:
+
+    MiniImBatch(DrawVertex3D * const verts_ptr, const int num_verts)
+        : m_verts_ptr{ verts_ptr }
+        , m_num_verts{ num_verts }
+        , m_used_verts{ 0 }
+    { }
+
+    int  NumVerts()  const { return m_num_verts;  }
+    int  UsedVerts() const { return m_used_verts; }
+    bool IsValid()   const { return m_verts_ptr != nullptr; }
+
+    DrawVertex3D * Increment(const int num_verts)
+    {
+        auto * first_vert = (m_verts_ptr + m_used_verts);
+        m_used_verts += num_verts;
+        if (m_used_verts > m_num_verts)
+        {
+            GameInterface::Errorf("MiniImBatch overflowed! used_verts=%i, num_verts=%i. "
+                                  "Increase vertex batch size.", m_used_verts, m_num_verts);
+        }
+        return first_vert;
+    }
+
+    void Clear()
+    {
+        m_verts_ptr  = nullptr;
+        m_num_verts  = 0;
+        m_used_verts = 0;
+    }
+
+    void PushVertex(const DrawVertex3D & vert);
+    void PushModelSurface(const ModelSurface & surf);
+
+private:
+
+    DrawVertex3D * m_verts_ptr;
+    int m_num_verts;
+    int m_used_verts;
+};
+
+/*
+===============================================================================
+
     ViewDrawState
 
 ===============================================================================
@@ -72,17 +144,26 @@ public:
 protected:
 
     // Implemented by the renderer back-end.
-    virtual void BeginSurfacesBatch(const TextureImage & tex) = 0;
-    virtual void BatchSurfacePolys(const ModelSurface & surf) = 0;
-    virtual void EndSurfacesBatch() = 0;
+    virtual MiniImBatch BeginSurfacesBatch(const TextureImage & tex) = 0;
+    virtual void EndSurfacesBatch(MiniImBatch & batch) = 0;
 
 private:
 
+    // Frame setup:
     void SetUpViewClusters(const FrameData & frame_data);
     void SetUpFrustum(FrameData & frame_data) const;
+
+    // World rendering:
     void RecursiveWorldNode(const FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node) const;
     void MarkLeaves(ModelInstance & world_mdl);
     void DrawTextureChains(FrameData & frame_data);
+
+    // Entity rendering:
+    void DrawBrushModel(const entity_t & entity);
+    void DrawSpriteModel(const entity_t & entity);
+    void DrawAliasMD2Model(const entity_t & entity);
+    void DrawBeamModel(const entity_t & entity);
+    void DrawNullModel(const entity_t & entity);
 
 private:
 

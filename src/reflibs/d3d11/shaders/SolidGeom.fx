@@ -11,21 +11,22 @@ cbuffer ConstantBufferDataSGeomVS : register(b0)
 
 cbuffer ConstantBufferDataSGeomPS : register(b1)
 {
-    bool g_disable_texturing;
-    bool g_blend_debug_color;
+    float4 g_texture_color_scaling;
+    float4 g_vertex_color_scaling;
 };
 
 struct VertexInput
 {
-    float4 position : POSITION;
-    float4 uv       : TEXCOORD;
+    float3 position : POSITION;
+    float3 normal   : NORMAL;
+    float2 uv       : TEXCOORD;
     float4 rgba     : COLOR;
 };
 
 struct VertexOutput
 {
     float4 vpos : SV_POSITION;
-    float4 uv   : TEXCOORD;
+    float2 uv   : TEXCOORD;
     float4 rgba : COLOR;
 };
 
@@ -34,7 +35,7 @@ struct VertexOutput
 VertexOutput VS_main(VertexInput input)
 {
     VertexOutput output;
-    output.vpos = mul(g_mvp_matrix, input.position);
+    output.vpos = mul(g_mvp_matrix, float4(input.position, 1.0f));
     output.uv   = input.uv;
     output.rgba = input.rgba;
     return output;
@@ -44,23 +45,13 @@ VertexOutput VS_main(VertexInput input)
 
 float4 PS_main(VertexOutput input) : SV_TARGET
 {
-    float4 pixel_color;
-    float4 tex_color = g_diffuse_texture.Sample(g_diffuse_sampler, input.uv.xy);
+    float4 tex_color = g_diffuse_texture.Sample(g_diffuse_sampler, input.uv);
+    tex_color *= g_texture_color_scaling;
 
-    if (g_disable_texturing) 
-    {
-        pixel_color = input.rgba;
-    }
-    else if (g_blend_debug_color)
-    {
-        pixel_color = tex_color * input.rgba;
-    }
-    else
-    {
-        pixel_color = tex_color;
-    }
+    float4 vert_color = input.rgba;
+    vert_color *= g_vertex_color_scaling;
 
-    return pixel_color;
+    return saturate(tex_color + vert_color);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

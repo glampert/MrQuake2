@@ -30,24 +30,16 @@ namespace D3D11
 /*
 ===============================================================================
 
-    Helper Types
+    Typedefs / Global Constants
 
 ===============================================================================
 */
 
-struct Vertex2D
-{
-    DirectX::XMFLOAT4A xy_uv;
-    DirectX::XMFLOAT4A rgba;
-};
+// Toggle the use of multiple/single buffer(s) for the geometry batches.
+constexpr int kNumViewDrawVertexBuffers    = 2;
+constexpr int kNumSpriteBatchVertexBuffers = 2;
 
-struct Vertex3D
-{
-    DirectX::XMFLOAT4A position;
-    DirectX::XMFLOAT4A uv; // z,w unused
-    DirectX::XMFLOAT4A rgba;
-};
-
+// Input element desc array + count
 using InputLayoutDesc = std::tuple<const D3D11_INPUT_ELEMENT_DESC *, int>;
 
 /*
@@ -207,20 +199,19 @@ public:
 
 protected:
 
-    /*virtual*/ void BeginSurfacesBatch(const TextureImage & tex) override;
-    /*virtual*/ void BatchSurfacePolys(const ModelSurface & surf) override;
-    /*virtual*/ void EndSurfacesBatch() override;
+    /*virtual*/ MiniImBatch BeginSurfacesBatch(const TextureImage & tex) override;
+    /*virtual*/ void EndSurfacesBatch(MiniImBatch & batch) override;
 
 private:
 
-    // World model geometry batching:
-    int m_num_verts    = 0;
-    int m_used_verts   = 0;
-    int m_buffer_index = 0;
+    int  m_num_verts    = 0;
+    int  m_buffer_index = 0;
+    bool m_batch_open   = false;
 
-    std::array<ComPtr<ID3D11Buffer>,     2> m_vertex_buffers;
-    std::array<D3D11_MAPPED_SUBRESOURCE, 2> m_mapping_info;
+    std::array<ComPtr<ID3D11Buffer>,     kNumViewDrawVertexBuffers> m_vertex_buffers;
+    std::array<D3D11_MAPPED_SUBRESOURCE, kNumViewDrawVertexBuffers> m_mapping_info;
 
+    // Refs are owned by the parent Renderer.
     const TextureImageImpl * m_current_texture = nullptr;
     const ShaderProgram    * m_program         = nullptr;
     ID3D11Buffer           * m_cbuffer_vs      = nullptr;
@@ -254,10 +245,10 @@ public:
     void EndFrame(const ShaderProgram & program, const TextureImageImpl * const tex,
                   ID3D11BlendState * const blend_state, ID3D11Buffer * const cbuffer);
 
-    Vertex2D * Increment(int count);
+    DrawVertex2D * Increment(int count);
 
-    void PushTriVerts(const Vertex2D tri[3]);
-    void PushQuadVerts(const Vertex2D quad[4]);
+    void PushTriVerts(const DrawVertex2D tri[3]);
+    void PushQuadVerts(const DrawVertex2D quad[4]);
 
     void PushQuad(float x, float y, float w, float h,
                   float u0, float v0, float u1, float v1,
@@ -279,8 +270,8 @@ private:
     int m_used_verts   = 0;
     int m_buffer_index = 0;
 
-    std::array<ComPtr<ID3D11Buffer>,     2> m_vertex_buffers;
-    std::array<D3D11_MAPPED_SUBRESOURCE, 2> m_mapping_info;
+    std::array<ComPtr<ID3D11Buffer>,     kNumSpriteBatchVertexBuffers> m_vertex_buffers;
+    std::array<D3D11_MAPPED_SUBRESOURCE, kNumSpriteBatchVertexBuffers> m_mapping_info;
 
     struct DeferredTexQuad
     {
@@ -304,8 +295,10 @@ class Renderer final
 public:
 
     static const DirectX::XMFLOAT4A kClearColor; // Color used to wipe the screen at the start of a frame
-    static const DirectX::XMFLOAT4A kColorWhite;
-    static const DirectX::XMFLOAT4A kColorBlack;
+    static const DirectX::XMFLOAT4A kColorWhite; // Alpha=1
+    static const DirectX::XMFLOAT4A kColorBlack; // Alpha=1
+    static const DirectX::XMFLOAT4A kFloat4Zero; // All zeros
+    static const DirectX::XMFLOAT4A kFloat4One;  // All ones
 
     // Convenience getters
     SpriteBatch            * SBatch(SpriteBatch::BatchId id) { return &m_sprite_batches[id];              }
@@ -333,6 +326,9 @@ public:
     void EndFrame();
     void Flush2D();
 
+    void EnableDepthTest();
+    void DisableDepthTest();
+
     void DrawHelper(unsigned num_verts, unsigned first_vert, const ShaderProgram & program,
                     ID3D11Buffer * const vb, D3D11_PRIMITIVE_TOPOLOGY topology,
                     unsigned offset, unsigned stride);
@@ -359,27 +355,25 @@ public:
 
 private:
 
-    using HlslBool = std::uint32_t; // HLSL booleans are 4 bytes.
-
-    struct alignas(16) ConstantBufferDataUIVS
+    struct ConstantBufferDataUIVS
     {
-        DirectX::XMFLOAT4 screen_dimensions;
+        DirectX::XMFLOAT4A screen_dimensions;
     };
 
-    struct alignas(16) ConstantBufferDataSGeomVS
+    struct ConstantBufferDataSGeomVS
     {
         DirectX::XMMATRIX mvp_matrix;
     };
 
-    struct alignas(16) ConstantBufferDataSGeomPS
+    struct ConstantBufferDataSGeomPS
     {
-        HlslBool disable_texturing;
-        HlslBool blend_debug_color;
-        std::uint8_t padding[8] = {}; // unused
+        DirectX::XMFLOAT4A texture_color_scaling; // Multiplied with texture color
+        DirectX::XMFLOAT4A vertex_color_scaling;  // Multiplied with vertex color
     };
 
     void CreateRSObjects();
     void LoadShaders();
+    void RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& frame_data);
 
 private:
 

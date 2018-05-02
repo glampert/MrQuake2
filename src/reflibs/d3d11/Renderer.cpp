@@ -7,6 +7,7 @@
 
 // Debug markers need these.
 #include <cstdarg>
+#include <cstddef>
 #include <cwchar>
 
 // Path from the project root where to find shaders for this renderer (wchar_t)
@@ -276,24 +277,23 @@ void SpriteBatch::Init(const int max_verts)
 {
     m_num_verts = max_verts;
 
-    D3D11_BUFFER_DESC bd = {0};
+    D3D11_BUFFER_DESC bd = {};
     bd.Usage             = D3D11_USAGE_DYNAMIC;
     bd.CPUAccessFlags    = D3D11_CPU_ACCESS_WRITE;
-    bd.ByteWidth         = sizeof(Vertex2D) * max_verts;
+    bd.ByteWidth         = sizeof(DrawVertex2D) * max_verts;
     bd.BindFlags         = D3D11_BIND_VERTEX_BUFFER;
 
-    for (int b = 0; b < 2; ++b)
+    for (unsigned b = 0; b < m_vertex_buffers.size(); ++b)
     {
         if (FAILED(g_Renderer->Device()->CreateBuffer(&bd, nullptr, m_vertex_buffers[b].GetAddressOf())))
         {
             GameInterface::Errorf("Failed to create SpriteBatch vertex buffer %i", b);
         }
-
         m_mapping_info[b] = {};
     }
 
-    MemTagsTrackAlloc(bd.ByteWidth, MemTag::kVertIndexBuffer);
-    GameInterface::Printf("SpriteBatch used %s", FormatMemoryUnit(bd.ByteWidth));
+    MemTagsTrackAlloc(bd.ByteWidth * kNumSpriteBatchVertexBuffers, MemTag::kVertIndexBuffer);
+    GameInterface::Printf("SpriteBatch used %s", FormatMemoryUnit(bd.ByteWidth * kNumSpriteBatchVertexBuffers));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -336,7 +336,7 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl
 
         // Draw with the current vertex buffer:
         g_Renderer->DrawHelper(m_used_verts, 0, program, current_buffer,
-                               D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(Vertex2D));
+                               D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex2D));
     }
     else // Handle small unique textured draws:
     {
@@ -351,7 +351,7 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl
             }
 
             g_Renderer->DrawHelper(/*num_verts=*/ 6, d.quad_start_vtx, program, current_buffer,
-                                   D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(Vertex2D));
+                                   D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex2D));
         }
     }
 
@@ -359,7 +359,7 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl
     context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
     // Move to the next buffer:
-    m_buffer_index = !m_buffer_index;
+    m_buffer_index = (m_buffer_index + 1) % kNumSpriteBatchVertexBuffers;
     m_used_verts = 0;
 
     if (!m_deferred_textured_quads.empty())
@@ -370,11 +370,11 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl
 
 ///////////////////////////////////////////////////////////////////////////////
 
-Vertex2D * SpriteBatch::Increment(const int count)
+DrawVertex2D * SpriteBatch::Increment(const int count)
 {
     FASTASSERT(count > 0 && count <= m_num_verts);
 
-    auto * verts = static_cast<Vertex2D *>(m_mapping_info[m_buffer_index].pData);
+    auto * verts = static_cast<DrawVertex2D *>(m_mapping_info[m_buffer_index].pData);
     FASTASSERT(verts != nullptr);
 
     verts += m_used_verts;
@@ -391,17 +391,17 @@ Vertex2D * SpriteBatch::Increment(const int count)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SpriteBatch::PushTriVerts(const Vertex2D tri[3])
+void SpriteBatch::PushTriVerts(const DrawVertex2D tri[3])
 {
-    Vertex2D * verts = Increment(3);
-    std::memcpy(verts, tri, sizeof(Vertex2D) * 3);
+    DrawVertex2D * verts = Increment(3);
+    std::memcpy(verts, tri, sizeof(DrawVertex2D) * 3);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SpriteBatch::PushQuadVerts(const Vertex2D quad[4])
+void SpriteBatch::PushQuadVerts(const DrawVertex2D quad[4])
 {
-    Vertex2D * tri = Increment(6);           // Expand quad into 2 triangles
+    DrawVertex2D * tri = Increment(6);       // Expand quad into 2 triangles
     const int indexes[6] = { 0,1,2, 2,3,0 }; // CW winding
     for (int i = 0; i < 6; ++i)
     {
@@ -415,27 +415,39 @@ void SpriteBatch::PushQuad(const float x, const float y, const float w, const fl
                            const float u0, const float v0, const float u1, const float v1,
                            const DirectX::XMFLOAT4A & color)
 {
-    Vertex2D quad[4];
-    quad[0].xy_uv.x = x;
-    quad[0].xy_uv.y = y;
-    quad[0].xy_uv.z = u0;
-    quad[0].xy_uv.w = v0;
-    quad[0].rgba    = color;
-    quad[1].xy_uv.x = x + w;
-    quad[1].xy_uv.y = y;
-    quad[1].xy_uv.z = u1;
-    quad[1].xy_uv.w = v0;
-    quad[1].rgba    = color;
-    quad[2].xy_uv.x = x + w;
-    quad[2].xy_uv.y = y + h;
-    quad[2].xy_uv.z = u1;
-    quad[2].xy_uv.w = v1;
-    quad[2].rgba    = color;
-    quad[3].xy_uv.x = x;
-    quad[3].xy_uv.y = y + h;
-    quad[3].xy_uv.z = u0;
-    quad[3].xy_uv.w = v1;
-    quad[3].rgba    = color;
+    DrawVertex2D quad[4];
+    quad[0].xy_uv[0] = x;
+    quad[0].xy_uv[1] = y;
+    quad[0].xy_uv[2] = u0;
+    quad[0].xy_uv[3] = v0;
+    quad[0].rgba[0]  = color.x;
+    quad[0].rgba[1]  = color.y;
+    quad[0].rgba[2]  = color.z;
+    quad[0].rgba[3]  = color.w;
+    quad[1].xy_uv[0] = x + w;
+    quad[1].xy_uv[1] = y;
+    quad[1].xy_uv[2] = u1;
+    quad[1].xy_uv[3] = v0;
+    quad[1].rgba[0]  = color.x;
+    quad[1].rgba[1]  = color.y;
+    quad[1].rgba[2]  = color.z;
+    quad[1].rgba[3]  = color.w;
+    quad[2].xy_uv[0] = x + w;
+    quad[2].xy_uv[1] = y + h;
+    quad[2].xy_uv[2] = u1;
+    quad[2].xy_uv[3] = v1;
+    quad[2].rgba[0]  = color.x;
+    quad[2].rgba[1]  = color.y;
+    quad[2].rgba[2]  = color.z;
+    quad[2].rgba[3]  = color.w;
+    quad[3].xy_uv[0] = x;
+    quad[3].xy_uv[1] = y + h;
+    quad[3].xy_uv[2] = u0;
+    quad[3].xy_uv[3] = v1;
+    quad[3].rgba[0]  = color.x;
+    quad[3].rgba[1]  = color.y;
+    quad[3].rgba[2]  = color.z;
+    quad[3].rgba[3]  = color.w;
     PushQuadVerts(quad);
 }
 
@@ -479,31 +491,30 @@ void ViewDrawStateImpl::Init(const int max_verts, const ShaderProgram & sp,
     m_cbuffer_vs = cbuff_vs;
     m_cbuffer_ps = cbuff_ps;
 
-    D3D11_BUFFER_DESC bd = {0};
+    D3D11_BUFFER_DESC bd = {};
     bd.Usage             = D3D11_USAGE_DYNAMIC;
     bd.CPUAccessFlags    = D3D11_CPU_ACCESS_WRITE;
-    bd.ByteWidth         = sizeof(Vertex3D) * max_verts;
+    bd.ByteWidth         = sizeof(DrawVertex3D) * max_verts;
     bd.BindFlags         = D3D11_BIND_VERTEX_BUFFER;
 
-    for (int b = 0; b < 2; ++b)
+    for (unsigned b = 0; b < m_vertex_buffers.size(); ++b)
     {
         if (FAILED(g_Renderer->Device()->CreateBuffer(&bd, nullptr, m_vertex_buffers[b].GetAddressOf())))
         {
             GameInterface::Errorf("Failed to create ViewDrawStateImpl vertex buffer %i", b);
         }
-
         m_mapping_info[b] = {};
     }
 
-    MemTagsTrackAlloc(bd.ByteWidth, MemTag::kVertIndexBuffer);
-    GameInterface::Printf("ViewDrawStateImpl used %s", FormatMemoryUnit(bd.ByteWidth));
+    MemTagsTrackAlloc(bd.ByteWidth * kNumViewDrawVertexBuffers, MemTag::kVertIndexBuffer);
+    GameInterface::Printf("ViewDrawStateImpl used %s", FormatMemoryUnit(bd.ByteWidth * kNumViewDrawVertexBuffers));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawStateImpl::BeginSurfacesBatch(const TextureImage & tex)
+MiniImBatch ViewDrawStateImpl::BeginSurfacesBatch(const TextureImage & tex)
 {
-    FASTASSERT(m_used_verts == 0);
+    FASTASSERT(m_batch_open == false);
 
     // Map the current buffer:
     if (FAILED(g_Renderer->DeviceContext()->Map(m_vertex_buffers[m_buffer_index].Get(),
@@ -513,64 +524,19 @@ void ViewDrawStateImpl::BeginSurfacesBatch(const TextureImage & tex)
     }
 
     m_current_texture = static_cast<const TextureImageImpl *>(&tex);
-}
+    m_batch_open = true;
 
-///////////////////////////////////////////////////////////////////////////////
-
-void ViewDrawStateImpl::BatchSurfacePolys(const ModelSurface & surf)
-{
-    const ModelPoly & poly  = *surf.polys;
-    const int num_triangles = (poly.num_verts - 2);
-    const int num_verts     = (num_triangles  * 3);
-
-    FASTASSERT(num_triangles > 0);
-    FASTASSERT(num_verts > 0 && num_verts <= m_num_verts);
-
-    auto * verts = static_cast<Vertex3D *>(m_mapping_info[m_buffer_index].pData);
+    auto * verts = static_cast<DrawVertex3D *>(m_mapping_info[m_buffer_index].pData);
     FASTASSERT(verts != nullptr);
 
-    verts += m_used_verts;
-    m_used_verts += num_verts;
-
-    if (m_used_verts > m_num_verts)
-    {
-        GameInterface::Errorf("ViewDrawStateImpl vertex batch overflowed! used_verts=%i, num_verts=%i. "
-                              "Increase size.", m_used_verts, m_num_verts);
-    }
-
-    Vertex3D * verts_iter = verts;
-    for (int t = 0; t < num_triangles; ++t)
-    {
-        const ModelTriangle & tri = poly.triangles[t];
-        for (int v = 0; v < 3; ++v)
-        {
-            const PolyVertex & poly_vert = poly.vertexes[tri.vertexes[v]];
-
-            verts_iter->position.x = poly_vert.position[0];
-            verts_iter->position.y = poly_vert.position[1];
-            verts_iter->position.z = poly_vert.position[2];
-            verts_iter->position.w = 1.0f;
-
-            verts_iter->uv.x = poly_vert.texture_s;
-            verts_iter->uv.y = poly_vert.texture_t;
-            verts_iter->uv.z = 0.0f;
-            verts_iter->uv.w = 0.0f;
-
-            float r, g, b, a;
-            ColorFloats(surf.debug_color, r, g, b, a);
-            verts_iter->rgba = { r, g, b, a };
-
-            ++verts_iter;
-        }
-    }
-
-    FASTASSERT(verts_iter == (verts + num_verts));
+    return MiniImBatch{ verts, m_num_verts };
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawStateImpl::EndSurfacesBatch()
+void ViewDrawStateImpl::EndSurfacesBatch(MiniImBatch & batch)
 {
+    FASTASSERT(m_batch_open == true);
     FASTASSERT(m_current_texture != nullptr);
     FASTASSERT(m_program != nullptr && m_cbuffer_vs != nullptr && m_cbuffer_ps != nullptr);
 
@@ -590,14 +556,16 @@ void ViewDrawStateImpl::EndSurfacesBatch()
     context->PSSetSamplers(0, 1, m_current_texture->sampler.GetAddressOf());
 
     // Draw with the current vertex buffer:
-    g_Renderer->DrawHelper(m_used_verts, 0, *m_program, current_buffer,
-                           D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(Vertex3D));
+    g_Renderer->DrawHelper(batch.UsedVerts(), 0, *m_program, current_buffer,
+                           D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex3D));
 
     // Move to the next buffer:
-    m_buffer_index = !m_buffer_index;
-    m_used_verts = 0;
+    m_buffer_index = (m_buffer_index + 1) % kNumViewDrawVertexBuffers;
 
     m_current_texture = nullptr;
+    m_batch_open = false;
+
+    batch.Clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -607,6 +575,8 @@ void ViewDrawStateImpl::EndSurfacesBatch()
 const DirectX::XMFLOAT4A Renderer::kClearColor{ 0.0f, 0.0f, 0.0f, 1.0f };
 const DirectX::XMFLOAT4A Renderer::kColorWhite{ 1.0f, 1.0f, 1.0f, 1.0f };
 const DirectX::XMFLOAT4A Renderer::kColorBlack{ 0.0f, 0.0f, 0.0f, 1.0f };
+const DirectX::XMFLOAT4A Renderer::kFloat4Zero{ 0.0f, 0.0f, 0.0f, 0.0f };
+const DirectX::XMFLOAT4A Renderer::kFloat4One { 1.0f, 1.0f, 1.0f, 1.0f };
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -646,7 +616,7 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
     m_window.Init();
 
     // 2D sprite/UI batch setup
-    m_sprite_batches[SpriteBatch::kDrawChar].Init(6 * 5000);
+    m_sprite_batches[SpriteBatch::kDrawChar].Init(6 * 5000); // 6 verts per quad (expand to 2 triangles each)
     m_sprite_batches[SpriteBatch::kDrawPics].Init(6 * 128);
 
     // Initialize the stores/caches
@@ -658,9 +628,9 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
     LoadShaders();
 
     // World geometry rendering helper
-    m_view_draw_state.Init(2048, m_shader_solid_geom,
-                           m_cbuffer_solid_geom_vs.Get(),
-                           m_cbuffer_solid_geom_ps.Get());
+    constexpr int kViewDrawBatchSize = 4096;
+    m_view_draw_state.Init(kViewDrawBatchSize, m_shader_solid_geom,
+                           m_cbuffer_solid_geom_vs.Get(), m_cbuffer_solid_geom_ps.Get());
 
     // So we can annotate our RenderDoc captures
     InitDebugEvents();
@@ -718,9 +688,9 @@ void Renderer::LoadShaders()
 
     // UI/2D sprites:
     {
-        const D3D11_INPUT_ELEMENT_DESC layout[] = { // Vertex2D
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        const D3D11_INPUT_ELEMENT_DESC layout[] = { // DrawVertex2D
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex2D, xy_uv), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex2D, rgba),  D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
         const int num_elements = ARRAYSIZE(layout);
         m_shader_ui_sprites.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"UISprites2D.fx",
@@ -754,10 +724,11 @@ void Renderer::LoadShaders()
 
     // Solid geometry:
     {
-        const D3D11_INPUT_ELEMENT_DESC layout[] = { // Vertex3D
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 32, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        const D3D11_INPUT_ELEMENT_DESC layout[] = { // DrawVertex3D
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, offsetof(DrawVertex3D, position), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, offsetof(DrawVertex3D, normal),   D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(DrawVertex3D, uv),       D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex3D, rgba),     D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
         const int num_elements = ARRAYSIZE(layout);
         m_shader_solid_geom.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"SolidGeom.fx",
@@ -790,35 +761,73 @@ void Renderer::RenderView(const refdef_s & view_def)
     PushEvent(L"Renderer::RenderView");
 
     ViewDrawStateImpl::FrameData frame_data{ m_tex_store, *m_mdl_store.WorldModel(), view_def };
-    auto * deviceContex = DeviceContext();
 
     // Enter 3D mode (depth test ON)
-    deviceContex->OMSetDepthStencilState(m_dss_depth_test_enabled.Get(), 0);
+    EnableDepthTest();
 
-    // Set up camera/view:
+    // Set up camera/view (fills frame_data)
     m_view_draw_state.RenderViewSetup(frame_data);
 
-    // Update the constant buffers:
-    {
-        ConstantBufferDataSGeomVS cbuffer_data_solid_geom_vs;
-        cbuffer_data_solid_geom_vs.mvp_matrix = frame_data.view_proj_matrix;
+    // Update the constant buffers for this frame
+    RenderViewUpdateCBuffers(frame_data);
 
-        ConstantBufferDataSGeomPS cbuffer_data_solid_geom_ps;
-        cbuffer_data_solid_geom_ps.disable_texturing = m_disable_texturing.AsInt();
-        cbuffer_data_solid_geom_ps.blend_debug_color = m_blend_debug_color.AsInt();
+    //
+    // Now render the solid geometries (world and entities)
+    //
 
-        deviceContex->UpdateSubresource(m_cbuffer_solid_geom_vs.Get(), 0, nullptr, &cbuffer_data_solid_geom_vs, 0, 0);
-        deviceContex->UpdateSubresource(m_cbuffer_solid_geom_ps.Get(), 0, nullptr, &cbuffer_data_solid_geom_ps, 0, 0);
-    }
-
-    // Now render the geometries:
+    PushEvent(L"RenderWorldModel");
     m_view_draw_state.RenderWorldModel(frame_data);
+    PopEvent(); // "RenderWorldModel"
+
+    PushEvent(L"RenderEntities");
     m_view_draw_state.RenderEntities(frame_data);
+    PopEvent(); // "RenderEntities"
 
     // Back to 2D rendering mode (depth test OFF)
-    deviceContex->OMSetDepthStencilState(m_dss_depth_test_disabled.Get(), 0);
+    DisableDepthTest();
 
     PopEvent(); // "Renderer::RenderView"
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& frame_data)
+{
+    ConstantBufferDataSGeomVS cbuffer_data_solid_geom_vs;
+    cbuffer_data_solid_geom_vs.mvp_matrix = frame_data.view_proj_matrix;
+    DeviceContext()->UpdateSubresource(m_cbuffer_solid_geom_vs.Get(), 0, nullptr, &cbuffer_data_solid_geom_vs, 0, 0);
+
+    ConstantBufferDataSGeomPS cbuffer_data_solid_geom_ps;
+    if (m_disable_texturing.IsSet()) // Use only debug vertex color
+    {
+        cbuffer_data_solid_geom_ps.texture_color_scaling = kFloat4Zero;
+        cbuffer_data_solid_geom_ps.vertex_color_scaling  = kFloat4One;
+    }
+    else if (m_blend_debug_color.IsSet()) // Blend debug vertex color with texture
+    {
+        cbuffer_data_solid_geom_ps.texture_color_scaling = kFloat4One;
+        cbuffer_data_solid_geom_ps.vertex_color_scaling  = kFloat4One;
+    }
+    else // Normal rendering
+    {
+        cbuffer_data_solid_geom_ps.texture_color_scaling = kFloat4One;
+        cbuffer_data_solid_geom_ps.vertex_color_scaling  = kFloat4Zero;
+    }
+    DeviceContext()->UpdateSubresource(m_cbuffer_solid_geom_ps.Get(), 0, nullptr, &cbuffer_data_solid_geom_ps, 0, 0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::EnableDepthTest()
+{
+    DeviceContext()->OMSetDepthStencilState(m_dss_depth_test_enabled.Get(), 0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::DisableDepthTest()
+{
+    DeviceContext()->OMSetDepthStencilState(m_dss_depth_test_disabled.Get(), 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -871,6 +880,7 @@ void Renderer::Flush2D()
     if (m_window_resized)
     {
         ConstantBufferDataUIVS cbuffer_data_ui;
+        cbuffer_data_ui.screen_dimensions = kFloat4Zero; // Set unused elements to zero
         cbuffer_data_ui.screen_dimensions.x = static_cast<float>(m_window.width);
         cbuffer_data_ui.screen_dimensions.y = static_cast<float>(m_window.height);
         DeviceContext()->UpdateSubresource(m_cbuffer_ui_sprites.Get(), 0, nullptr, &cbuffer_data_ui, 0, 0);
@@ -947,7 +957,7 @@ void Renderer::UploadTexture(const TextureImageImpl * const tex)
 void Renderer::InitDebugEvents()
 {
     auto r_debug_frame_events = GameInterface::Cvar::Get("r_debug_frame_events", "0", CvarWrapper::kFlagArchive);
-    if (r_debug_frame_events.AsInt() != 0)
+    if (r_debug_frame_events.IsSet())
     {
         ID3DUserDefinedAnnotation * annotations = nullptr;
         if (SUCCEEDED(DeviceContext()->QueryInterface(__uuidof(annotations), (void **)&annotations)))

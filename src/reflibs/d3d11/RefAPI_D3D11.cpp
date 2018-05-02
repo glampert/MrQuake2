@@ -43,7 +43,7 @@ static int InitRefresh(void * hInstance, void * wndproc, int fullscreen)
     constexpr bool debug_validation = false;
     #endif // DEBUG
 
-    if (r_renderdoc.AsInt() != 0)
+    if (r_renderdoc.IsSet())
     {
         RenderDocUtils::Initialize();
     }

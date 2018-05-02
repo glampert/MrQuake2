@@ -9,7 +9,65 @@ namespace MrQ2
 {
 
 ///////////////////////////////////////////////////////////////////////////////
-// Local helpers:
+// MiniImBatch
+///////////////////////////////////////////////////////////////////////////////
+
+void MiniImBatch::PushVertex(const DrawVertex3D & vert)
+{
+    //TODO - WIP
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void MiniImBatch::PushModelSurface(const ModelSurface & surf)
+{
+    FASTASSERT(IsValid()); // Clear()ed?
+
+    const ModelPoly & poly  = *surf.polys;
+    const int num_triangles = (poly.num_verts - 2);
+    const int num_verts     = (num_triangles  * 3);
+
+    FASTASSERT(num_triangles > 0);
+    FASTASSERT(num_verts <= NumVerts());
+
+    DrawVertex3D * const first_vert = Increment(num_verts);
+    DrawVertex3D * verts_iter = first_vert;
+
+    for (int t = 0; t < num_triangles; ++t)
+    {
+        const ModelTriangle & mdl_tri = poly.triangles[t];
+
+        for (int v = 0; v < 3; ++v)
+        {
+            const PolyVertex & poly_vert = poly.vertexes[mdl_tri.vertexes[v]];
+
+            verts_iter->position[0] = poly_vert.position[0];
+            verts_iter->position[1] = poly_vert.position[1];
+            verts_iter->position[2] = poly_vert.position[2];
+
+            // TODO: Fill in vertex normal!
+            verts_iter->normal[0] = 0.0f;
+            verts_iter->normal[1] = 0.0f;
+            verts_iter->normal[2] = 0.0f;
+
+            verts_iter->uv[0] = poly_vert.texture_s;
+            verts_iter->uv[1] = poly_vert.texture_t;
+
+            ColorFloats(surf.debug_color,
+                        verts_iter->rgba[0],
+                        verts_iter->rgba[1],
+                        verts_iter->rgba[2],
+                        verts_iter->rgba[3]);
+
+            ++verts_iter;
+        }
+    }
+
+    FASTASSERT(verts_iter == (first_vert + num_verts));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Local ViewDrawState helpers:
 ///////////////////////////////////////////////////////////////////////////////
 
 // Returns the proper texture for a given time and base texture.
@@ -508,7 +566,7 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
             continue;
         }
 
-        BeginSurfacesBatch(*tex);
+        MiniImBatch batch = BeginSurfacesBatch(*tex);
         for (const ModelSurface * surf = tex->texture_chain; surf; surf = surf->texture_chain)
         {
             // Need at least one triangle.
@@ -516,9 +574,9 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
             {
                 continue;
             }
-            BatchSurfacePolys(*surf);
+            batch.PushModelSurface(*surf);
         }
-        EndSurfacesBatch();
+        EndSurfacesBatch(batch);
 
         // All world geometry using this texture has been drawn, clear for the next frame.
         tex->texture_chain = nullptr;
@@ -555,42 +613,30 @@ void ViewDrawState::RenderEntities(FrameData & frame_data)
 
         if (entity.flags & RF_TRANSLUCENT)
         {
+            // TODO copy then into a FixedArray for the second pass.
             continue; // Drawn on the following pass
-            //TODO copy then into a FixedVector for the second pass.
         }
 
         if (entity.flags & RF_BEAM)
         {
-            //DrawBeamModel(entity);
+            DrawBeamModel(entity);
             continue;
         }
 
         // entity_t::model is an opaque pointer outside the Refresh module, so we need the cast.
         const auto * model = reinterpret_cast<const ModelInstance *>(entity.model);
-
         if (model == nullptr)
         {
-            //DrawNullModel(entity);
+            DrawNullModel(entity);
             continue;
         }
 
         switch (model->type)
         {
-        case ModelType::kBrush :
-            //DrawBrushModel(entity);
-            break;
-
-        case ModelType::kSprite :
-            //DrawSpriteModel(entity);
-            break;
-
-        case ModelType::kAliasMD2 :
-            //DrawAliasMD2Model(entity);
-            break;
-
-        default:
-            GameInterface::Errorf("ViewDrawState::RenderEntities: Bad model type for '%s'!", model->name.CStr());
-            break;
+        case ModelType::kBrush    : DrawBrushModel(entity);    break;
+        case ModelType::kSprite   : DrawSpriteModel(entity);   break;
+        case ModelType::kAliasMD2 : DrawAliasMD2Model(entity); break;
+        default : GameInterface::Errorf("ViewDrawState::RenderEntities: Bad model type for '%s'!", model->name.CStr());
         } // switch
     }
 
@@ -599,6 +645,50 @@ void ViewDrawState::RenderEntities(FrameData & frame_data)
     //
 
     // TODO
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::DrawBrushModel(const entity_t & entity)
+{
+    //TODO
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::DrawSpriteModel(const entity_t & entity)
+{
+    //TODO
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::DrawAliasMD2Model(const entity_t & entity)
+{
+    //TODO
+
+    /*
+    MiniImBatch batch = BeginEntityBatch(texture [, max_verts] );
+
+    for each triangle in the model
+        batch.PushVertex(x,y,z, u,v, rgba);
+
+    EndEntityBatch(batch);
+    */
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::DrawBeamModel(const entity_t & entity)
+{
+    //TODO
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::DrawNullModel(const entity_t & entity)
+{
+    //TODO
 }
 
 ///////////////////////////////////////////////////////////////////////////////
