@@ -32,6 +32,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\src\external\renderdoc\renderdoc_app.h" />
     <ClInclude Include="..\..\src\external\stb\stb_image_write.h" />
+    <ClInclude Include="..\..\src\reflibs\shared\FixedSizeArray.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\Memory.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\ModelStore.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\ModelStructs.hpp" />

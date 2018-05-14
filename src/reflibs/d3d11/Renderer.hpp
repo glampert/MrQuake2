@@ -199,17 +199,25 @@ public:
 
 protected:
 
-    /*virtual*/ MiniImBatch BeginSurfacesBatch(const TextureImage & tex) override;
-    /*virtual*/ void EndSurfacesBatch(MiniImBatch & batch) override;
+    /*virtual*/ MiniImBatch BeginBatch(const BeginBatchArgs & args) override;
+    /*virtual*/ void EndBatch(MiniImBatch & batch) override;
+
+    void SetCurrentTexture(const TextureImage & tex)
+    {
+        m_current_texture = static_cast<const TextureImageImpl *>(&tex);
+    }
 
 private:
 
-    int  m_num_verts    = 0;
-    int  m_buffer_index = 0;
-    bool m_batch_open   = false;
+    int m_num_verts    = 0;
+    int m_buffer_index = 0;
 
     std::array<ComPtr<ID3D11Buffer>,     kNumViewDrawVertexBuffers> m_vertex_buffers;
     std::array<D3D11_MAPPED_SUBRESOURCE, kNumViewDrawVertexBuffers> m_mapping_info;
+
+    bool m_batch_open = false;
+    PrimitiveTopology m_current_topology;
+    DirectX::XMMATRIX m_current_model_mtx;
 
     // Refs are owned by the parent Renderer.
     const TextureImageImpl * m_current_texture = nullptr;
@@ -341,17 +349,17 @@ public:
     //
     // Debug frame annotations/makers
     //
-#if REFD3D11_WITH_DEBUG_FRAME_EVENTS
+    #if REFD3D11_WITH_DEBUG_FRAME_EVENTS
     void InitDebugEvents();
     void PushEventF(const wchar_t * format, ...);
     void PushEvent(const wchar_t * event_name)   { if (m_annotations) m_annotations->BeginEvent(event_name); }
     void PopEvent()                              { if (m_annotations) m_annotations->EndEvent(); }
-#else // REFD3D11_WITH_DEBUG_FRAME_EVENTS
+    #else // REFD3D11_WITH_DEBUG_FRAME_EVENTS
     static void InitDebugEvents()                {}
     static void PushEventF(const wchar_t *, ...) {}
     static void PushEvent(const wchar_t *)       {}
     static void PopEvent()                       {}
-#endif // REFD3D11_WITH_DEBUG_FRAME_EVENTS
+    #endif // REFD3D11_WITH_DEBUG_FRAME_EVENTS
 
 private:
 

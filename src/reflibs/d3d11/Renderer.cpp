@@ -19,6 +19,19 @@ namespace D3D11
 {
 
 ///////////////////////////////////////////////////////////////////////////////
+
+static D3D_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D(const PrimitiveTopology topology)
+{
+    switch (topology)
+    {
+    case PrimitiveTopology::TriangleList  : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    case PrimitiveTopology::TriangleStrip : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+    case PrimitiveTopology::TriangleFan   : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST; // Converted by the front-end
+    default : GameInterface::Errorf("Bad PrimitiveTopology enum!");
+    } // switch
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // TextureImageImpl
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -376,6 +389,7 @@ DrawVertex2D * SpriteBatch::Increment(const int count)
 
     auto * verts = static_cast<DrawVertex2D *>(m_mapping_info[m_buffer_index].pData);
     FASTASSERT(verts != nullptr);
+    FASTASSERT_ALIGN16(verts);
 
     verts += m_used_verts;
     m_used_verts += count;
@@ -512,7 +526,20 @@ void ViewDrawStateImpl::Init(const int max_verts, const ShaderProgram & sp,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-MiniImBatch ViewDrawStateImpl::BeginSurfacesBatch(const TextureImage & tex)
+//
+//TODO: Would actually be better to just fill up the vertex buffer
+// like we so with the sprite batch and do a single unmap/draw at the
+// end of a frame. Begin/End calls only set the state markers and write
+// the verts to the currently mapped buffer.
+//
+// Needs a bigger VB but should be a lot more efficient.
+//
+
+static DirectX::XMMATRIX g_CurrMvp; // FIXME TEMP
+
+///////////////////////////////////////////////////////////////////////////////
+
+MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
 {
     FASTASSERT(m_batch_open == false);
 
@@ -523,21 +550,26 @@ MiniImBatch ViewDrawStateImpl::BeginSurfacesBatch(const TextureImage & tex)
         GameInterface::Errorf("Failed to map ViewDrawStateImpl vertex buffer %i", m_buffer_index);
     }
 
-    m_current_texture = static_cast<const TextureImageImpl *>(&tex);
-    m_batch_open = true;
-
     auto * verts = static_cast<DrawVertex3D *>(m_mapping_info[m_buffer_index].pData);
     FASTASSERT(verts != nullptr);
+    FASTASSERT_ALIGN16(verts);
 
-    return MiniImBatch{ verts, m_num_verts };
+    SetCurrentTexture(args.optional_tex ? *args.optional_tex : *(g_Renderer->TexStore()->tex_white2x2));
+
+    m_current_topology  = args.topology;
+    m_current_model_mtx = args.model_matrix;
+    m_batch_open        = true;
+
+    return MiniImBatch{ verts, m_num_verts, m_current_topology };
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawStateImpl::EndSurfacesBatch(MiniImBatch & batch)
+void ViewDrawStateImpl::EndBatch(MiniImBatch & batch)
 {
     FASTASSERT(m_batch_open == true);
     FASTASSERT(m_current_texture != nullptr);
+    FASTASSERT(m_current_topology == batch.Topology());
     FASTASSERT(m_program != nullptr && m_cbuffer_vs != nullptr && m_cbuffer_ps != nullptr);
 
     ID3D11DeviceContext * const context = g_Renderer->DeviceContext();
@@ -546,6 +578,11 @@ void ViewDrawStateImpl::EndSurfacesBatch(MiniImBatch & batch)
     // Unmap current buffer:
     context->Unmap(current_buffer, 0);
     m_mapping_info[m_buffer_index] = {};
+
+// TEMP - should use the struct - ALSO dont need for the world surfaces
+    DirectX::XMMATRIX mvp_matrix = m_current_model_mtx * g_CurrMvp;
+    context->UpdateSubresource(m_cbuffer_vs, 0, nullptr, &mvp_matrix, 0, 0);
+// TEMP
 
     // Constant buffer at register(b0) (VS) and register(b1) (PS)
     context->VSSetConstantBuffers(0, 1, &m_cbuffer_vs);
@@ -557,7 +594,7 @@ void ViewDrawStateImpl::EndSurfacesBatch(MiniImBatch & batch)
 
     // Draw with the current vertex buffer:
     g_Renderer->DrawHelper(batch.UsedVerts(), 0, *m_program, current_buffer,
-                           D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex3D));
+                           PrimitiveTopologyToD3D(m_current_topology), 0, sizeof(DrawVertex3D));
 
     // Move to the next buffer:
     m_buffer_index = (m_buffer_index + 1) % kNumViewDrawVertexBuffers;
@@ -628,7 +665,7 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
     LoadShaders();
 
     // World geometry rendering helper
-    constexpr int kViewDrawBatchSize = 4096;
+    constexpr int kViewDrawBatchSize = 4096; // size in vertices
     m_view_draw_state.Init(kViewDrawBatchSize, m_shader_solid_geom,
                            m_cbuffer_solid_geom_vs.Get(), m_cbuffer_solid_geom_ps.Get());
 
@@ -726,7 +763,6 @@ void Renderer::LoadShaders()
     {
         const D3D11_INPUT_ELEMENT_DESC layout[] = { // DrawVertex3D
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, offsetof(DrawVertex3D, position), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, offsetof(DrawVertex3D, normal),   D3D11_INPUT_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(DrawVertex3D, uv),       D3D11_INPUT_PER_VERTEX_DATA, 0 },
             { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex3D, rgba),     D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
@@ -771,6 +807,8 @@ void Renderer::RenderView(const refdef_s & view_def)
     // Update the constant buffers for this frame
     RenderViewUpdateCBuffers(frame_data);
 
+    g_CurrMvp = frame_data.view_proj_matrix; // *** FIXME TEMP HACK ***
+
     //
     // Now render the solid geometries (world and entities)
     //
@@ -779,9 +817,9 @@ void Renderer::RenderView(const refdef_s & view_def)
     m_view_draw_state.RenderWorldModel(frame_data);
     PopEvent(); // "RenderWorldModel"
 
-    PushEvent(L"RenderEntities");
-    m_view_draw_state.RenderEntities(frame_data);
-    PopEvent(); // "RenderEntities"
+    PushEvent(L"RenderSolidEntities");
+    m_view_draw_state.RenderSolidEntities(frame_data);
+    PopEvent(); // "RenderSolidEntities"
 
     // Back to 2D rendering mode (depth test OFF)
     DisableDepthTest();

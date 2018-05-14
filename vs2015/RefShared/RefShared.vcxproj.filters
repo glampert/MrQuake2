@@ -76,5 +76,8 @@
     <ClInclude Include="..\..\src\external\renderdoc\renderdoc_app.h">
       <Filter>External</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\shared\FixedSizeArray.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

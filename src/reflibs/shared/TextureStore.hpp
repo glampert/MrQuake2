@@ -133,6 +133,7 @@ public:
     const TextureImage * tex_conback  = nullptr;
     const TextureImage * tex_backtile = nullptr;
     const TextureImage * tex_white2x2 = nullptr;
+    const TextureImage * tex_debug    = nullptr;
     const TextureImage * tex_cinframe = nullptr;
 
     // Global palette access.

@@ -14,7 +14,42 @@ namespace MrQ2
 
 void MiniImBatch::PushVertex(const DrawVertex3D & vert)
 {
-    //TODO - WIP
+    FASTASSERT(IsValid()); // Clear()ed?
+
+    #if REFLIB_EMULATED_TRIANGLE_FANS
+    {
+        if (m_topology != PrimitiveTopology::TriangleFan)
+        {
+            *Increment(1) = vert;
+        }
+        else // Emulated triangle fan
+        {
+            if (m_tri_fan_vert_count == 3)
+            {
+                DrawVertex3D * v = Increment(2);
+                v[0] = m_tri_fan_first_vert;
+                v[1] = m_tri_fan_last_vert;
+            }
+            else if (m_tri_fan_vert_count == 1)
+            {
+                *Increment(1) = m_tri_fan_first_vert;
+                ++m_tri_fan_vert_count;
+            }
+            else
+            {
+                ++m_tri_fan_vert_count;
+            }
+            *Increment(1) = vert;
+        }
+
+        // Save for triangle fan emulation
+        m_tri_fan_last_vert = vert;
+    }
+    #else // REFLIB_EMULATED_TRIANGLE_FANS
+    {
+        *Increment(1) = vert;
+    }
+    #endif // REFLIB_EMULATED_TRIANGLE_FANS
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -45,11 +80,6 @@ void MiniImBatch::PushModelSurface(const ModelSurface & surf)
             verts_iter->position[1] = poly_vert.position[1];
             verts_iter->position[2] = poly_vert.position[2];
 
-            // TODO: Fill in vertex normal!
-            verts_iter->normal[0] = 0.0f;
-            verts_iter->normal[1] = 0.0f;
-            verts_iter->normal[2] = 0.0f;
-
             verts_iter->uv[0] = poly_vert.texture_s;
             verts_iter->uv[1] = poly_vert.texture_t;
 
@@ -64,6 +94,14 @@ void MiniImBatch::PushModelSurface(const ModelSurface & surf)
     }
 
     FASTASSERT(verts_iter == (first_vert + num_verts));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+REFLIB_NOINLINE void MiniImBatch::OverflowError() const
+{
+    GameInterface::Errorf("MiniImBatch overflowed! used_verts=%i, num_verts=%i. "
+                          "Increase vertex batch size.", m_used_verts, m_num_verts);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -217,7 +255,36 @@ static std::uint8_t SignBitsForPlane(const cplane_t & plane)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+static DirectX::XMMATRIX MakeEntityModelMatrix(const entity_t & entity)
+{
+    const auto t  = DirectX::XMMatrixTranslation(entity.origin[0], entity.origin[1], entity.origin[2]);
+    const auto rx = DirectX::XMMatrixRotationX(DegToRad(-entity.angles[2]));
+    const auto ry = DirectX::XMMatrixRotationY(DegToRad(-entity.angles[0]));
+    const auto rz = DirectX::XMMatrixRotationZ(DegToRad(entity.angles[1]));
+    return rx * ry * rz * t;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // ViewDrawState
+///////////////////////////////////////////////////////////////////////////////
+
+ViewDrawState::ViewDrawState()
+    : m_force_null_entity_models{ GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0) }
+{
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::BeginRegistration()
+{
+    // New map loaded, clear the view clusters.
+    m_view_cluster      = -1;
+    m_view_cluster2     = -1;
+    m_old_view_cluster  = -1;
+    m_old_view_cluster2 = -1;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 void ViewDrawState::SetUpViewClusters(const FrameData & frame_data)
@@ -555,6 +622,10 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
 {
     TextureStore & tex_store = frame_data.tex_store;
 
+    BeginBatchArgs args;
+    args.model_matrix = DirectX::XMMatrixIdentity();
+    args.topology     = PrimitiveTopology::TriangleList;
+
     // Draw with sorting by texture:
     for (TextureImage * tex : tex_store)
     {
@@ -566,17 +637,21 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
             continue;
         }
 
-        MiniImBatch batch = BeginSurfacesBatch(*tex);
-        for (const ModelSurface * surf = tex->texture_chain; surf; surf = surf->texture_chain)
+        args.optional_tex = tex;
+
+        MiniImBatch batch = BeginBatch(args);
         {
-            // Need at least one triangle.
-            if (surf->polys == nullptr || surf->polys->num_verts < 3)
+            for (const ModelSurface * surf = tex->texture_chain; surf; surf = surf->texture_chain)
             {
-                continue;
+                // Need at least one triangle.
+                if (surf->polys == nullptr || surf->polys->num_verts < 3)
+                {
+                    continue;
+                }
+                batch.PushModelSurface(*surf);
             }
-            batch.PushModelSurface(*surf);
         }
-        EndSurfacesBatch(batch);
+        EndBatch(batch);
 
         // All world geometry using this texture has been drawn, clear for the next frame.
         tex->texture_chain = nullptr;
@@ -599,107 +674,136 @@ void ViewDrawState::RenderWorldModel(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::RenderEntities(FrameData & frame_data)
+void ViewDrawState::RenderSolidEntities(FrameData & frame_data)
 {
     const int num_entities = frame_data.view_def.num_entities;
     const entity_t * const entities_list = frame_data.view_def.entities;
+    const bool force_null_entity_models = m_force_null_entity_models.IsSet();
 
-    //
-    // Draw solid entities first:
-    //
     for (int e = 0; e < num_entities; ++e)
     {
         const entity_t & entity = entities_list[e];
 
         if (entity.flags & RF_TRANSLUCENT)
         {
-            // TODO copy then into a FixedArray for the second pass.
-            continue; // Drawn on the following pass
+            frame_data.translucent_entities.push_back(&entity);
+            continue; // Drawn on the next pass
         }
 
         if (entity.flags & RF_BEAM)
         {
-            DrawBeamModel(entity);
+            DrawBeamModel(frame_data, entity);
             continue;
         }
 
         // entity_t::model is an opaque pointer outside the Refresh module, so we need the cast.
         const auto * model = reinterpret_cast<const ModelInstance *>(entity.model);
-        if (model == nullptr)
+        if (model == nullptr || force_null_entity_models)
         {
-            DrawNullModel(entity);
+            DrawNullModel(frame_data, entity);
             continue;
         }
 
         switch (model->type)
         {
-        case ModelType::kBrush    : DrawBrushModel(entity);    break;
-        case ModelType::kSprite   : DrawSpriteModel(entity);   break;
-        case ModelType::kAliasMD2 : DrawAliasMD2Model(entity); break;
-        default : GameInterface::Errorf("ViewDrawState::RenderEntities: Bad model type for '%s'!", model->name.CStr());
+        case ModelType::kBrush    : { DrawBrushModel(frame_data, entity);    break; }
+        case ModelType::kSprite   : { DrawSpriteModel(frame_data, entity);   break; }
+        case ModelType::kAliasMD2 : { DrawAliasMD2Model(frame_data, entity); break; }
+        default : GameInterface::Errorf("RenderSolidEntities: Bad model type for '%s'!", model->name.CStr());
         } // switch
     }
-
-    //
-    // Now draw the translucent/transparent ones:
-    //
-
-    // TODO
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DrawBrushModel(const entity_t & entity)
+void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t & entity)
 {
     //TODO
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DrawSpriteModel(const entity_t & entity)
+void ViewDrawState::DrawSpriteModel(const FrameData & frame_data, const entity_t & entity)
 {
     //TODO
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DrawAliasMD2Model(const entity_t & entity)
-{
-    //TODO
-
-    /*
-    MiniImBatch batch = BeginEntityBatch(texture [, max_verts] );
-
-    for each triangle in the model
-        batch.PushVertex(x,y,z, u,v, rgba);
-
-    EndEntityBatch(batch);
-    */
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void ViewDrawState::DrawBeamModel(const entity_t & entity)
+void ViewDrawState::DrawAliasMD2Model(const FrameData & frame_data, const entity_t & entity)
 {
     //TODO
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DrawNullModel(const entity_t & entity)
+void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t & entity)
 {
     //TODO
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::BeginRegistration()
+void ViewDrawState::DrawNullModel(const FrameData & frame_data, const entity_t & entity)
 {
-    // New map loaded, clear the view clusters.
-    m_view_cluster      = -1;
-    m_view_cluster2     = -1;
-    m_old_view_cluster  = -1;
-    m_old_view_cluster2 = -1;
+    vec4_t color;
+    if (entity.flags & RF_FULLBRIGHT)
+    {
+        color[0] = 1.0f;
+        color[1] = 1.0f;
+        color[2] = 1.0f;
+        color[3] = 1.0f;
+    }
+    else
+    {
+        CalcPointLightColor(frame_data, entity, color);
+    }
+
+    const vec2_t uvs[3] = {
+        {0.0f, 1.0f},
+        {1.0f, 1.0f},
+        {1.0f, 0.0f},
+    };
+
+    BeginBatchArgs args;
+    args.model_matrix = MakeEntityModelMatrix(entity);
+    args.optional_tex = frame_data.tex_store.tex_debug;
+    args.topology     = PrimitiveTopology::TriangleFan;
+
+    // Draw a small octahedron as a placeholder for the entity model:
+    MiniImBatch batch = BeginBatch(args);
+    {
+        // Bottom halve
+        batch.SetTriangleFanFirstVertex({ {0.0f, 0.0f, -16.0f}, {0.0f, 0.0f},
+                                          {color[0], color[1], color[2], color[3]} });
+        for (int i = 0, j = 0; i <= 4; ++i)
+        {
+            batch.PushVertex({ {16.0f * std::cosf(i * M_PI / 2.0f), 16.0f * std::sinf(i * M_PI / 2.0f), 0.0f},
+                               {uvs[j][0], uvs[j][1]}, {color[0], color[1], color[2], color[3]} });
+            if (++j > 2) j = 1;
+        }
+
+        // Top halve
+        batch.SetTriangleFanFirstVertex({ {0.0f, 0.0f, 16.0f}, {0.0f, 0.0f},
+                                          {color[0], color[1], color[2], color[3]} });
+        for (int i = 4, j = 0; i >= 0; --i)
+        {
+            batch.PushVertex({ {16.0f * std::cosf(i * M_PI / 2.0f), 16.0f * std::sinf(i * M_PI / 2.0f), 0.0f},
+                               {uvs[j][0], uvs[j][1]}, {color[0], color[1], color[2], color[3]} });
+            if (++j > 2) j = 1;
+        }
+    }
+    EndBatch(batch);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::CalcPointLightColor(const FrameData & frame_data, const entity_t & entity,
+                                        vec4_t outShadeLightColor) const
+{
+    //TODO
+    outShadeLightColor[0] = outShadeLightColor[1] =
+    outShadeLightColor[2] = outShadeLightColor[3] = 1.0f;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

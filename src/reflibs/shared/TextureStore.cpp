@@ -138,6 +138,35 @@ void TextureStore::DestroyAllLoadedTextures()
 
 ///////////////////////////////////////////////////////////////////////////////
 
+constexpr int kCheckerDim     = 64;
+constexpr int kCheckerSquares = 4;
+constexpr int kCheckerSize    = kCheckerDim / kCheckerSquares;
+
+// Generate a black and pink checkerboard pattern for the debug texture.
+// Caller handles lifetime of the allocated buffer.
+static ColorRGBA32 * MakeCheckerPattern()
+{
+    const ColorRGBA32 colors[] = {
+        BytesToColor(255, 100, 255, 255), // pink
+        BytesToColor(0, 0, 0, 255)        // black
+    };
+
+    auto * pixels = new(MemTag::kTextures) ColorRGBA32[kCheckerDim * kCheckerDim];
+
+    for (int y = 0; y < kCheckerDim; ++y)
+    {
+        for (int x = 0; x < kCheckerDim; ++x)
+        {
+            const auto color_index = ((y / kCheckerSize) + (x / kCheckerSize)) % 2;
+            pixels[x + (y * kCheckerDim)] = colors[color_index];
+        }
+    }
+
+    return pixels;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void TextureStore::TouchResidentTextures()
 {
     // Create the scrap texture if needed
@@ -161,6 +190,15 @@ void TextureStore::TouchResidentTextures()
         tex_white2x2 = tex;
     }
 
+    // Also generated dynamically
+    if (tex_debug == nullptr)
+    {
+        TextureImage * tex = CreateTexture(MakeCheckerPattern(), m_registration_num, TextureType::kPic, false,
+                                           kCheckerDim, kCheckerDim, {0,0}, {0,0}, "pics/debug.pcx"); // with a fake filename
+        m_teximages_cache.push_back(tex);
+        tex_debug = tex;
+    }
+
     // Cinematic frame texture is also a resident buffer
     if (tex_cinframe == nullptr)
     {
@@ -181,6 +219,7 @@ void TextureStore::TouchResidentTextures()
     tex_conback  = FindOrLoad("conback",  TextureType::kPic);
     tex_backtile = FindOrLoad("backtile", TextureType::kPic);
     tex_white2x2 = FindOrLoad("white2x2", TextureType::kPic);
+    tex_debug    = FindOrLoad("debug",    TextureType::kPic);
     tex_cinframe = FindOrLoad("cinframe", TextureType::kPic);
 }
 

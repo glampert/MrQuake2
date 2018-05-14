@@ -43,12 +43,17 @@ using vec4_t = float[4];
 // For Errorf() which always aborts.
 #define REFLIB_NORETURN __declspec(noreturn)
 
+// Prevents an otherwise inlineable function from being inlined.
+#define REFLIB_NOINLINE __declspec(noinline)
+
 // Debug-only assert that triggers an immediate debug break.
 // Also generates less code (no function calls emitted).
 #ifndef NDEBUG
-    #define FASTASSERT(expr) (void)((expr) || (__debugbreak(), 0))
+    #define FASTASSERT(expr)         (void)((expr) || (__debugbreak(), 0))
+    #define FASTASSERT_ALIGN16(ptr)  FASTASSERT((std::uintptr_t(ptr) % 16) == 0)
 #else // NDEBUG
-    #define FASTASSERT(expr) /* nothing */
+    #define FASTASSERT(expr)         /* nothing */
+    #define FASTASSERT_ALIGN16(ptr)  /* nothing */
 #endif // NDEBUG
 
 namespace MrQ2
