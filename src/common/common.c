@@ -1511,6 +1511,9 @@ void Qcommon_Init(int argc, char ** argv)
         SCR_EndLoadingPlaque();
     }
     */
+    //FIXME this is for temporary testing only! Restore the above once done!
+    Cbuf_AddText("killserver ; maxclients 1 ; deathmatch 1 ; map fact3\n");
+    Cbuf_Execute();
 
     Com_Printf("---- Quake II Initialized! ----\n");
 }

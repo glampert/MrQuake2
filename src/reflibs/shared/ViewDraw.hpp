@@ -18,8 +18,8 @@
 #include "common/q_files.h"
 
 // If set to non-zero, deconstruct PrimitiveTopology::TriangleFan primitives in the 
-// MiniImBatch into PrimitiveTopology::TriangleList primitives, to support back-end APIs
-// that are not capable of drawing triangle fans natively.
+// MiniImBatch into PrimitiveTopology::TriangleList primitives, to support back-end
+// APIs that are not capable of drawing triangle fans natively.
 #define REFLIB_EMULATED_TRIANGLE_FANS 1
 
 namespace MrQ2
@@ -222,7 +222,13 @@ private:
     void DrawNullModel(const FrameData & frame_data, const entity_t & entity);
 
     // Lighting/shading:
-    void CalcPointLightColor(const FrameData & frame_data, const entity_t & entity, vec4_t outShadeLightColor) const;
+    void CalcPointLightColor(const FrameData & frame_data, const entity_t & entity,
+                             vec4_t out_shade_light_color) const;
+
+    // Defined in DrawAliasMD2.cpp
+    void DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t * const alias_header, const float backlerp,
+                               const vec3_t shade_light, const DirectX::XMMATRIX & model_matrix,
+                               const TextureImage * const model_skin);
 
 private:
 
@@ -241,6 +247,7 @@ private:
 
     // Cached Cvars:
     CvarWrapper m_force_null_entity_models;
+    CvarWrapper m_lerp_entity_models;
 };
 
 } // MrQ2

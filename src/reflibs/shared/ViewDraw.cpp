@@ -256,12 +256,12 @@ static std::uint8_t SignBitsForPlane(const cplane_t & plane)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static DirectX::XMMATRIX MakeEntityModelMatrix(const entity_t & entity)
+static DirectX::XMMATRIX MakeEntityModelMatrix(const entity_t & entity, const bool flipUpV = true)
 {
     const auto t  = DirectX::XMMatrixTranslation(entity.origin[0], entity.origin[1], entity.origin[2]);
-    const auto rx = DirectX::XMMatrixRotationX(DegToRad(-entity.angles[2]));
-    const auto ry = DirectX::XMMatrixRotationY(DegToRad(-entity.angles[0]));
-    const auto rz = DirectX::XMMatrixRotationZ(DegToRad(entity.angles[1]));
+    const auto rx = DirectX::XMMatrixRotationX(DegToRad(-entity.angles[ROLL]));
+    const auto ry = DirectX::XMMatrixRotationY(DegToRad(entity.angles[PITCH] * (flipUpV ? -1.0f : 1.0f)));
+    const auto rz = DirectX::XMMatrixRotationZ(DegToRad(entity.angles[YAW]));
     return rx * ry * rz * t;
 }
 
@@ -271,6 +271,7 @@ static DirectX::XMMATRIX MakeEntityModelMatrix(const entity_t & entity)
 
 ViewDrawState::ViewDrawState()
     : m_force_null_entity_models{ GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0) }
+    , m_lerp_entity_models{ GameInterface::Cvar::Get("r_lerp_entity_models", "1", 0) }
 {
 }
 
@@ -690,11 +691,12 @@ void ViewDrawState::RenderSolidEntities(FrameData & frame_data)
             continue; // Drawn on the next pass
         }
 
-        if (entity.flags & RF_BEAM)
-        {
-            DrawBeamModel(frame_data, entity);
-            continue;
-        }
+        // ONLY DRAWS AS TRANSPARENCY
+//        if (entity.flags & RF_BEAM)
+//        {
+//            DrawBeamModel(frame_data, entity);
+//            continue;
+//        }
 
         // entity_t::model is an opaque pointer outside the Refresh module, so we need the cast.
         const auto * model = reinterpret_cast<const ModelInstance *>(entity.model);
@@ -732,14 +734,117 @@ void ViewDrawState::DrawSpriteModel(const FrameData & frame_data, const entity_t
 
 void ViewDrawState::DrawAliasMD2Model(const FrameData & frame_data, const entity_t & entity)
 {
-    //TODO
+    // TODO - weapon depth hack
+    const vec3_t shade_light = { 1.0f, 1.0f, 1.0f }; // TODO - temp
+
+    const float  backlerp = (m_lerp_entity_models.IsSet() ? entity.backlerp : 0.0f);
+    const auto   mdl_mtx  = MakeEntityModelMatrix(entity, /* flipUpV = */false);
+    const auto * model    = reinterpret_cast<const ModelInstance *>(entity.model);
+
+    // Select skin texture:
+    const TextureImage * skin = nullptr;
+    if (entity.skin != nullptr)
+    {
+        // Custom player skin (opaque outside the renderer)
+        skin = reinterpret_cast<const TextureImage *>(entity.skin);
+    }
+    else
+    {
+        if (entity.skinnum >= MAX_MD2SKINS)
+        {
+            skin = model->data.skins[0];
+        }
+        else
+        {
+            skin = model->data.skins[entity.skinnum];
+            if (skin == nullptr)
+            {
+                skin = model->data.skins[0];
+            }
+        }
+    }
+    if (skin == nullptr)
+    {
+        skin = frame_data.tex_store.tex_white2x2; // fallback...
+    }
+
+    // Draw interpolated frame:
+    DrawAliasMD2FrameLerp(entity, model->hunk.ViewBaseAs<dmdl_t>(), backlerp, shade_light, mdl_mtx, skin);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t & entity)
 {
-    //TODO
+    constexpr int kNumBeamSegs = 6;
+
+    vec3_t perp_vec;
+    vec3_t old_origin, origin;
+    vec3_t direction, normalized_direction;
+
+    Vec3Copy(entity.oldorigin, old_origin);
+    Vec3Copy(entity.origin, origin);
+
+    normalized_direction[0] = direction[0] = old_origin[0] - origin[0];
+    normalized_direction[1] = direction[1] = old_origin[1] - origin[1];
+    normalized_direction[2] = direction[2] = old_origin[2] - origin[2];
+
+    if (Vec3Normalize(normalized_direction) == 0.0f)
+    {
+        return;
+    }
+
+    MrQ2::PerpendicularVector(perp_vec, normalized_direction);
+    Vec3Scale(perp_vec, entity.frame / 2, perp_vec);
+
+    const ColorRGBA32 color = TextureStore::ColorForIndex(entity.skinnum & 0xFF);
+    const std::uint8_t bR = (color & 0xFF);
+    const std::uint8_t bG = (color >> 8)  & 0xFF;
+    const std::uint8_t bB = (color >> 16) & 0xFF;
+
+    const float fR = bR * (1.0f / 255.0f);
+    const float fG = bG * (1.0f / 255.0f);
+    const float fB = bB * (1.0f / 255.0f);
+    const float fA = entity.alpha;
+
+    DrawVertex3D start_points[kNumBeamSegs] = {};
+    DrawVertex3D end_points[kNumBeamSegs] = {};
+
+    for (int i = 0; i < kNumBeamSegs; ++i)
+    {
+        MrQ2::RotatePointAroundVector(start_points[i].position, normalized_direction,
+                                      perp_vec, (360.0f / kNumBeamSegs) * float(i));
+
+        Vec3Add(start_points[i].position, origin, start_points[i].position);
+        Vec3Add(start_points[i].position, direction, end_points[i].position);
+
+        start_points[i].rgba[0] = end_points[i].rgba[0] = fR;
+        start_points[i].rgba[1] = end_points[i].rgba[1] = fG;
+        start_points[i].rgba[2] = end_points[i].rgba[2] = fB;
+        start_points[i].rgba[3] = end_points[i].rgba[3] = fA;
+    }
+
+    BeginBatchArgs args;
+    args.model_matrix = DirectX::XMMatrixIdentity();
+    args.optional_tex = nullptr; // No texture
+    args.topology     = PrimitiveTopology::TriangleStrip;
+
+    //TODO - missing states!
+//    qglDisable(GL_TEXTURE_2D);
+//    qglEnable(GL_BLEND);
+//    qglDepthMask(GL_FALSE);
+
+    MiniImBatch batch = BeginBatch(args);
+    {
+        for (int i = 0; i < kNumBeamSegs; ++i)
+        {
+            batch.PushVertex(start_points[i]);
+            batch.PushVertex(end_points[i]);
+            batch.PushVertex(start_points[(i + 1) % kNumBeamSegs]);
+            batch.PushVertex(end_points[(i + 1) % kNumBeamSegs]);
+        }
+    }
+    EndBatch(batch);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -799,11 +904,11 @@ void ViewDrawState::DrawNullModel(const FrameData & frame_data, const entity_t &
 ///////////////////////////////////////////////////////////////////////////////
 
 void ViewDrawState::CalcPointLightColor(const FrameData & frame_data, const entity_t & entity,
-                                        vec4_t outShadeLightColor) const
+                                        vec4_t out_shade_light_color) const
 {
     //TODO
-    outShadeLightColor[0] = outShadeLightColor[1] =
-    outShadeLightColor[2] = outShadeLightColor[3] = 1.0f;
+    out_shade_light_color[0] = out_shade_light_color[1] =
+    out_shade_light_color[2] = out_shade_light_color[3] = 1.0f;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

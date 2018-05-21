@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\reflibs\shared\DrawAliasMD2.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\Memory.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\ModelLoad.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\ModelStore.cpp" />

@@ -157,6 +157,9 @@
     <ClInclude Include="..\src\windows\winquake.h">
       <Filter>src\windows</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\client\anormtab.h">
+      <Filter>src\client</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\client\cl_cin.c">

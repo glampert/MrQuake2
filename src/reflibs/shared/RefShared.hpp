@@ -138,7 +138,14 @@ inline void Vec3Copy(const vec3_t in, vec3_t out)
     out[2] = in[2];
 }
 
-inline void Vec3Normalize(vec3_t v)
+inline void Vec3Scale(const vec3_t in, const float scale, vec3_t out)
+{
+    out[0] = in[0] * scale;
+    out[1] = in[1] * scale;
+    out[2] = in[2] * scale;
+}
+
+inline float Vec3Normalize(vec3_t v)
 {
     const float length = std::sqrt((v[0] * v[0]) + (v[1] * v[1]) + (v[2] * v[2]));
     if (length != 0.0f)
@@ -148,9 +155,11 @@ inline void Vec3Normalize(vec3_t v)
         v[1] *= invlength;
         v[2] *= invlength;
     }
+    return length;
 }
 
 // Copied from Quake's math library since we compile as a DLL and won't link against the game EXE.
+void PerpendicularVector(vec3_t dst, const vec3_t src);
 void VectorsFromAngles(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
 void RotatePointAroundVector(vec3_t dst, const vec3_t dir, const vec3_t point, const float degrees);
 int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_s * p);

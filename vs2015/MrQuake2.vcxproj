@@ -152,6 +152,7 @@
   <ItemGroup>
     <ClInclude Include="..\src\client\adivtab.h" />
     <ClInclude Include="..\src\client\anorms.h" />
+    <ClInclude Include="..\src\client\anormtab.h" />
     <ClInclude Include="..\src\client\cdaudio.h" />
     <ClInclude Include="..\src\client\client.h" />
     <ClInclude Include="..\src\client\console.h" />
