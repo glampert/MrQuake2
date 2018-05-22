@@ -52,6 +52,7 @@ class TextureImage
 {
 public:
 
+    const PathName       name;          // Texture filename/unique id (must be the first field - game code assumes this).
     const ColorRGBA32  * pixels;        // Pointer to heap memory with image pixels (or into scrap atlas).
     const ModelSurface * texture_chain; // For sort-by-texture world drawing.
     std::uint32_t        reg_num;       // Registration num, so we know if currently referenced by the level being played.
@@ -61,11 +62,11 @@ public:
     const int            height;        // Height in pixels.
     const Vec2u16        scrap_uv0;     // Offsets into the scrap if this is allocate from the scrap, zero otherwise.
     const Vec2u16        scrap_uv1;     // If not zero, this is a scrap image. In such case, use these instead of width & height.
-    const PathName       name;          // Texture filename/unique id.
 
     TextureImage(const ColorRGBA32 * const pix, const std::uint32_t regn, const TextureType tt, const bool use_scrap,
                  const int w, const int h, const Vec2u16 scrap0, const Vec2u16 scrap1, const char * const tex_name)
-        : pixels{ pix }
+        : name{ tex_name }
+        , pixels{ pix }
         , texture_chain{ nullptr }
         , reg_num{ regn }
         , type{ tt }
@@ -74,7 +75,6 @@ public:
         , height{ h }
         , scrap_uv0{ scrap0 }
         , scrap_uv1{ scrap1 }
-        , name{ tex_name }
     {
     }
 
@@ -105,7 +105,8 @@ class TextureStore
 {
 public:
 
-    static constexpr int kTexturePoolSize = 1024;
+    static constexpr int kTexturePoolSize = 1024; // - in TextureImages
+    static constexpr int kScrapSize       = 256;  // - width & height
 
     TextureStore();
     virtual ~TextureStore();
@@ -127,7 +128,6 @@ public:
     auto end()   { return m_teximages_cache.end();   }
 
     // Resident textures:
-    static constexpr int kScrapSize   = 512; // - width & height
     const TextureImage * tex_scrap    = nullptr;
     const TextureImage * tex_conchars = nullptr;
     const TextureImage * tex_conback  = nullptr;

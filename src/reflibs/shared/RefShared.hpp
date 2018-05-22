@@ -219,15 +219,15 @@ public:
         }
     }
 
+    const char *  CStr()   const { return m_string; }
     std::uint32_t Hash()   const { return m_hash;   }
     std::uint32_t Length() const { return m_length; }
-    const char *  CStr()   const { return m_string; }
 
 private:
 
+    char m_string[kNameMaxLen]; // File name with game path including extension - first to allow unsafe char* casts from the game code.
     std::uint32_t m_hash;       // Hash of the following string, for faster lookup.
     std::uint32_t m_length;     // Cached length of string not including terminator.
-    char m_string[kNameMaxLen]; // File name with game path including extension.
 };
 
 /*

@@ -296,11 +296,8 @@ public:
         const TextureImage * skins[kMaxMD2Skins]; // For alias models and skins.
     };
 
-    // POD data that we can memset to zeros on construction.
-    RenderData data;
-
-    // Memory hunk backing the model's data.
-    MemHunk hunk;
+    // File name with path + hash (must be the first field - game code assumes this).
+    const PathName name;
 
     // Model type flag.
     const ModelType type;
@@ -308,14 +305,17 @@ public:
     // Registration number, so we know if it is currently referenced by the level being played.
     std::uint32_t reg_num;
 
-    // File name with path + hash.
-    const PathName name;
+    // POD data that we can memset to zeros on construction.
+    RenderData data;
+
+    // Memory hunk backing the model's data.
+    MemHunk hunk;
 
     // Initializing constructor.
     ModelInstance(const char * const mdl_name, const ModelType mt, const std::uint32_t regn)
-        : type{ mt }
+        : name{ mdl_name }
+        , type{ mt }
         , reg_num{ regn }
-        , name{ mdl_name }
     {
         std::memset(&data, 0, sizeof(data));
     }
