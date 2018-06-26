@@ -184,8 +184,12 @@ void ModelStore::LoadWorldModel(const char * const map_name)
 
 ModelInstance * ModelStore::FindInlineModel(const char * const name)
 {
-    // TODO
-    return CreateModel(name, ModelType::kBrush, m_registration_num);
+    const int idx = atoi(name + 1);
+    if (idx < 1 || m_world_model == nullptr || idx >= m_world_model->data.num_submodels)
+    {
+       GameInterface::Errorf("Bad inline model number or null world model (%i)", idx);
+    }
+    return GetInlineModel(idx);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -216,7 +220,7 @@ ModelInstance * ModelStore::LoadNewModel(const char * const name)
     switch (id)
     {
     case IDBSPHEADER :
-        LoadBrushModel(m_tex_store, *new_model, file.data_ptr, file.length);
+        LoadBrushModel(*this, m_tex_store, *new_model, file.data_ptr, file.length);
         break;
     case IDSPRITEHEADER :
         LoadSpriteModel(m_tex_store, *new_model, file.data_ptr, file.length);

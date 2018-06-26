@@ -52,6 +52,8 @@ enum class ModelType : std::uint8_t
     kAny = 0xFF,
 };
 
+constexpr float kBackFaceEpsilon = 0.01f;
+
 // Size in pixels of the lightmap atlases.
 constexpr int kLightmapBlockWidth  = 128;
 constexpr int kLightmapBlockHeight = 128;
@@ -302,6 +304,9 @@ public:
     // Model type flag.
     const ModelType type;
 
+    // True if from the inline models pool.
+    const bool is_inline;
+
     // Registration number, so we know if it is currently referenced by the level being played.
     std::uint32_t reg_num;
 
@@ -312,9 +317,10 @@ public:
     MemHunk hunk;
 
     // Initializing constructor.
-    ModelInstance(const char * const mdl_name, const ModelType mt, const std::uint32_t regn)
+    ModelInstance(const char * const mdl_name, const ModelType mt, const std::uint32_t regn, const bool inline_mdl)
         : name{ mdl_name }
         , type{ mt }
+        , is_inline{ inline_mdl }
         , reg_num{ regn }
     {
         std::memset(&data, 0, sizeof(data));

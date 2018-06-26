@@ -12,11 +12,15 @@ namespace MrQ2
 // MiniImBatch
 ///////////////////////////////////////////////////////////////////////////////
 
+bool MiniImBatch::sm_emulated_triangle_fans = true;
+
+///////////////////////////////////////////////////////////////////////////////
+
 void MiniImBatch::PushVertex(const DrawVertex3D & vert)
 {
     FASTASSERT(IsValid()); // Clear()ed?
 
-    #if REFLIB_EMULATED_TRIANGLE_FANS
+    if (sm_emulated_triangle_fans)
     {
         if (m_topology != PrimitiveTopology::TriangleFan)
         {
@@ -45,11 +49,10 @@ void MiniImBatch::PushVertex(const DrawVertex3D & vert)
         // Save for triangle fan emulation
         m_tri_fan_last_vert = vert;
     }
-    #else // REFLIB_EMULATED_TRIANGLE_FANS
+    else
     {
         *Increment(1) = vert;
     }
-    #endif // REFLIB_EMULATED_TRIANGLE_FANS
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -692,6 +695,7 @@ void ViewDrawState::RenderSolidEntities(FrameData & frame_data)
         }
 
         // ONLY DRAWS AS TRANSPARENCY
+        FASTASSERT(!(entity.flags & RF_BEAM));
 //        if (entity.flags & RF_BEAM)
 //        {
 //            DrawBeamModel(frame_data, entity);
@@ -720,7 +724,142 @@ void ViewDrawState::RenderSolidEntities(FrameData & frame_data)
 
 void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t & entity)
 {
-    //TODO
+    const auto * model = reinterpret_cast<const ModelInstance *>(entity.model);
+    FASTASSERT(model != nullptr);
+
+    if (model->data.num_model_surfaces == 0)
+    {
+        return;
+    }
+
+    vec3_t mins, maxs;
+    bool rotated;
+
+    if (entity.angles[0] || entity.angles[1] || entity.angles[2])
+    {
+        rotated = true;
+        for (int i = 0; i < 3; ++i)
+        {
+            mins[i] = entity.origin[i] - model->data.radius;
+            maxs[i] = entity.origin[i] + model->data.radius;
+        }
+    }
+    else
+    {
+        rotated = false;
+        Vec3Add(entity.origin, model->data.mins, mins);
+        Vec3Add(entity.origin, model->data.maxs, maxs);
+    }
+
+    if (ShouldCullBBox(frame_data.frustum, mins, maxs))
+    {
+        return;
+    }
+
+    vec3_t model_origin;
+    Vec3Sub(frame_data.view_def.vieworg, entity.origin, model_origin);
+
+    if (rotated)
+    {
+        vec3_t temp;
+        vec3_t forward, right, up;
+
+        Vec3Copy(model_origin, temp);
+        MrQ2::VectorsFromAngles(entity.angles, forward, right, up);
+
+        model_origin[0] =  Vec3Dot(temp, forward);
+        model_origin[1] = -Vec3Dot(temp, right);
+        model_origin[2] =  Vec3Dot(temp, up);
+    }
+
+    const auto mdl_mtx = MakeEntityModelMatrix(entity, /* flipUpV = */false);
+
+    /* TODO
+    // Calculate dynamic lighting for bmodel
+    if (!gl_flashblend->value)
+    {
+        lt = r_newrefdef.dlights;
+        for (k = 0; k < r_newrefdef.num_dlights; k++, lt++)
+        {
+            R_MarkLights(lt, 1 << k, currentmodel->nodes + currentmodel->firstnode);
+        }
+    }
+    */
+
+    /* TODO
+    // Handle transparency pass
+    if (entity.flags & RF_TRANSLUCENT)
+    {
+        qglEnable(GL_BLEND);
+        qglColor4f(1, 1, 1, 0.25);
+        GL_TexEnv(GL_MODULATE);
+    }
+    */
+
+    const ModelSurface * surf = &model->data.surfaces[model->data.first_model_surface];
+    const int num_surfaces = model->data.num_model_surfaces;
+
+    for (int i = 0; i < num_surfaces; ++i, ++surf)
+    {
+        // Find which side of the node we are on
+        const cplane_t plane = *surf->plane;
+        const float dot = Vec3Dot(model_origin, plane.normal) - plane.dist;
+
+        // Draw the polygon
+        if (((surf->flags & kSurf_PlaneBack) && (dot < -kBackFaceEpsilon)) ||
+           (!(surf->flags & kSurf_PlaneBack) && (dot >  kBackFaceEpsilon)))
+        {
+            /*
+            if (surf->texinfo->flags & (SURF_TRANS33 | SURF_TRANS66))
+            {
+                // Add to the translucent chain
+                surf->texturechain = r_alpha_surfaces;
+                r_alpha_surfaces = surf;
+            }
+            else if (qglMTexCoord2fSGIS && !(psurf->flags & SURF_DRAWTURB))
+            {
+                GL_RenderLightmappedPoly(psurf);
+            }
+            else
+            {
+                GL_EnableMultitexture(false);
+                R_RenderBrushPoly(psurf);
+                GL_EnableMultitexture(true);
+            }
+            */
+
+            //TODO handle water polys (SURF_DRAWTURB) as in
+            //R_RenderBrushPoly
+
+            //TODO probably becomes an assert once water polygons are handled???
+            if (surf->polys == nullptr) continue;
+
+            BeginBatchArgs args;
+            args.model_matrix = mdl_mtx;
+            args.optional_tex = TextureAnimation(surf->texinfo);
+            args.topology     = PrimitiveTopology::TriangleList;
+
+            MiniImBatch batch = BeginBatch(args);
+            {
+                batch.PushModelSurface(*surf);
+            }
+            EndBatch(batch);
+        }
+    }
+
+    /* TODO
+    if (!(entity.flags & RF_TRANSLUCENT))
+    {
+        if (!qglMTexCoord2fSGIS)
+            R_BlendLightmaps();
+    }
+    else
+    {
+        qglDisable(GL_BLEND);
+        qglColor4f(1, 1, 1, 1);
+        GL_TexEnv(GL_REPLACE);
+    }
+    */
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -776,7 +915,7 @@ void ViewDrawState::DrawAliasMD2Model(const FrameData & frame_data, const entity
 
 void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t & entity)
 {
-    constexpr int kNumBeamSegs = 6;
+    constexpr unsigned kNumBeamSegs = 6;
 
     vec3_t perp_vec;
     vec3_t old_origin, origin;
@@ -810,7 +949,7 @@ void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t &
     DrawVertex3D start_points[kNumBeamSegs] = {};
     DrawVertex3D end_points[kNumBeamSegs] = {};
 
-    for (int i = 0; i < kNumBeamSegs; ++i)
+    for (unsigned i = 0; i < kNumBeamSegs; ++i)
     {
         MrQ2::RotatePointAroundVector(start_points[i].position, normalized_direction,
                                       perp_vec, (360.0f / kNumBeamSegs) * float(i));
@@ -836,7 +975,7 @@ void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t &
 
     MiniImBatch batch = BeginBatch(args);
     {
-        for (int i = 0; i < kNumBeamSegs; ++i)
+        for (unsigned i = 0; i < kNumBeamSegs; ++i)
         {
             batch.PushVertex(start_points[i]);
             batch.PushVertex(end_points[i]);

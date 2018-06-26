@@ -961,45 +961,42 @@ static void LoadSubModels(ModelInstance & mdl, const void * const mdl_data, cons
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void SetUpSubModels(ModelInstance & mdl)
+static void SetUpSubModels(ModelStore & mdl_store, ModelInstance & mdl)
 {
-    // TODO - sort out how to handle the inline models
-
-    /*
-    for (int i = 0; i < mdl.data.num_submodels; ++i)
+    const int num_submodels = mdl.data.num_submodels;
+    for (int i = 0; i < num_submodels; ++i)
     {
-        mdl_submod_t * submodel = &mdl->submodels[i];
-        model_t * inline_mdl = &inline_models[i];
+        const SubModelInfo & submodel = mdl.data.submodels[i];
+        ModelInstance * inline_mdl = mdl_store.GetInlineModel(i);
 
-        *inline_mdl = *mdl;
-        inline_mdl->first_model_surface = submodel->first_face;
-        inline_mdl->num_model_surfaces  = submodel->num_faces;
-        inline_mdl->first_node          = submodel->head_node;
+        inline_mdl->data = mdl.data;
+        inline_mdl->data.first_model_surface = submodel.first_face;
+        inline_mdl->data.num_model_surfaces  = submodel.num_faces;
+        inline_mdl->data.first_node          = submodel.head_node;
 
-        if (inline_mdl->first_node >= mdl->num_nodes)
+        if (inline_mdl->data.first_node >= mdl.data.num_nodes)
         {
-            Sys_Error("Inline model %i has bad first_node!", i);
+            GameInterface::Errorf("Inline model %i has bad first_node!", i);
         }
 
-        VectorCopy(submodel->maxs, inline_mdl->maxs);
-        VectorCopy(submodel->mins, inline_mdl->mins);
-        inline_mdl->radius = submodel->radius;
+        Vec3Copy(submodel.maxs, inline_mdl->data.maxs);
+        Vec3Copy(submodel.mins, inline_mdl->data.mins);
+        inline_mdl->data.radius = submodel.radius;
 
         if (i == 0)
         {
-            *mdl = *inline_mdl;
+            mdl.data = inline_mdl->data;
         }
 
-        inline_mdl->num_leafs = submodel->vis_leafs;
+        inline_mdl->data.num_leafs = submodel.vis_leafs;
     }
-    */
 }
 
 } // BMod
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len)
+void LoadBrushModel(ModelStore & mdl_store, TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len)
 {
     FASTASSERT(mdl_data != nullptr);
     FASTASSERT(mdl_data_len > 0);
@@ -1035,7 +1032,7 @@ void LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, const void * 
     BMod::LoadLeafs(mdl, mdl_data, header->lumps[LUMP_LEAFS]);
     BMod::LoadNodes(mdl, mdl_data, header->lumps[LUMP_NODES]);
     BMod::LoadSubModels(mdl, mdl_data, header->lumps[LUMP_MODELS]);
-    BMod::SetUpSubModels(mdl);
+    BMod::SetUpSubModels(mdl_store, mdl);
     mdl.data.num_frames = 2; // regular and alternate animation
 
     // Make sure all images are referenced now:

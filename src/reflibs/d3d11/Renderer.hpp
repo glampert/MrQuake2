@@ -142,10 +142,7 @@ class ModelInstanceImpl final
 {
 public:
     using ModelInstance::ModelInstance;
-
-    // TODO
-
-    void InitD3DSpecific();
+    // Nothing back-end specific for the Render Models.
 };
 
 // ============================================================================
@@ -161,21 +158,19 @@ public:
     {
     }
 
-    ~ModelStoreImpl()
-    {
-        DestroyAllLoadedModels();
-    }
-
+    ~ModelStoreImpl();
     void Init();
 
 protected:
 
+    /*virtual*/ ModelInstance * GetInlineModel(int model_index) override { return m_inline_models[model_index]; }
     /*virtual*/ ModelInstance * CreateModel(const char * name, ModelType mt, std::uint32_t regn) override;
     /*virtual*/ void DestroyModel(ModelInstance * mdl) override;
 
 private:
 
     Pool<ModelInstanceImpl, kModelPoolSize> m_models_pool;
+    std::vector<ModelInstanceImpl *>        m_inline_models;
 };
 
 /*

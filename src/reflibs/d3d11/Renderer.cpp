@@ -188,21 +188,36 @@ void TextureStoreImpl::DestroyTexture(TextureImage * tex)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// ModelInstanceImpl
+// ModelStoreImpl
 ///////////////////////////////////////////////////////////////////////////////
 
-void ModelInstanceImpl::InitD3DSpecific()
+ModelStoreImpl::~ModelStoreImpl()
 {
-    // TODO
+    for (ModelInstance * mdl : m_inline_models)
+    {
+        DestroyModel(mdl);
+    }
+
+    m_inline_models.clear();
+    DestroyAllLoadedModels();
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// ModelStoreImpl
 ///////////////////////////////////////////////////////////////////////////////
 
 void ModelStoreImpl::Init()
 {
-    // Nothing at the moment.
+    // Give default names to the inline models:
+    m_inline_models.reserve(kModelPoolSize);
+    for (int m = 0; m < kModelPoolSize; ++m)
+    {
+        char name[128];
+        std::snprintf(name, sizeof(name), "inline_model_%i", m);
+
+        ModelInstanceImpl * impl = m_models_pool.Allocate(); // First page in the pool will contain the inlines.
+        Construct(impl, name, ModelType::kBrush, /* reg_num = */0U, /* inline_mdl = */true);
+
+        m_inline_models.push_back(impl);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -210,8 +225,7 @@ void ModelStoreImpl::Init()
 ModelInstance * ModelStoreImpl::CreateModel(const char * name, ModelType mt, std::uint32_t regn)
 {
     ModelInstanceImpl * impl = m_models_pool.Allocate();
-    Construct(impl, name, mt, regn);
-    impl->InitD3DSpecific();
+    Construct(impl, name, mt, regn, /* inline_mdl = */false);
     return impl;
 }
 

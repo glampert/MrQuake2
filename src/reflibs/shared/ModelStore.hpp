@@ -38,6 +38,7 @@ public:
     // Models cache:
     const ModelInstance * Find(const char * name, ModelType mt);       // Must be in cache, null otherwise
     const ModelInstance * FindOrLoad(const char * name, ModelType mt); // Load if necessary
+    virtual ModelInstance * GetInlineModel(int model_index) = 0;
 
 protected:
 
@@ -70,7 +71,7 @@ private:
 // ============================================================================
 
 // Defined in ModelLoad.cpp
-void LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
+void LoadBrushModel(ModelStore & mdl_store, TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
 void LoadSpriteModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
 void LoadAliasMD2Model(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
 

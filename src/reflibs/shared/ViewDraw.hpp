@@ -17,11 +17,6 @@
 #include "client/ref.h"
 #include "common/q_files.h"
 
-// If set to non-zero, deconstruct PrimitiveTopology::TriangleFan primitives in the 
-// MiniImBatch into PrimitiveTopology::TriangleList primitives, to support back-end
-// APIs that are not capable of drawing triangle fans natively.
-#define REFLIB_EMULATED_TRIANGLE_FANS 1
-
 namespace MrQ2
 {
 
@@ -72,11 +67,9 @@ public:
         , m_num_verts{ num_verts }
         , m_used_verts{ 0 }
         , m_topology{ topology }
-        #if REFLIB_EMULATED_TRIANGLE_FANS
         , m_tri_fan_vert_count{ 0 }
         , m_tri_fan_first_vert{}
         , m_tri_fan_last_vert{}
-        #endif // REFLIB_EMULATED_TRIANGLE_FANS
     { }
 
     void Clear()
@@ -99,16 +92,20 @@ public:
 
     void SetTriangleFanFirstVertex(const DrawVertex3D & vert)
     {
-        #if REFLIB_EMULATED_TRIANGLE_FANS
+        if (sm_emulated_triangle_fans)
         {
             m_tri_fan_vert_count = 1;
             m_tri_fan_first_vert = vert;
         }
-        #else // REFLIB_EMULATED_TRIANGLE_FANS
+        else
         {
             PushVertex(vert);
         }
-        #endif // REFLIB_EMULATED_TRIANGLE_FANS
+    }
+
+    static void EnableEmulatedTriangleFans(const bool do_enable)
+    {
+        sm_emulated_triangle_fans = do_enable;
     }
 
     void PushVertex(const DrawVertex3D & vert);
@@ -128,11 +125,15 @@ private:
     int               m_used_verts;
     PrimitiveTopology m_topology;
 
-    #if REFLIB_EMULATED_TRIANGLE_FANS
+    // Triangle fan emulation support:
     std::uint8_t      m_tri_fan_vert_count;
     DrawVertex3D      m_tri_fan_first_vert;
     DrawVertex3D      m_tri_fan_last_vert;
-    #endif // REFLIB_EMULATED_TRIANGLE_FANS
+
+    // If set to true, deconstruct PrimitiveTopology::TriangleFan primitives in the
+    // MiniImBatch into PrimitiveTopology::TriangleList primitives, to support back-end
+    // APIs that are not capable of drawing triangle fans natively.
+    static bool       sm_emulated_triangle_fans;
 };
 
 /*
@@ -148,16 +149,16 @@ public:
 
     struct FrameData final
     {
-        FrameData(TextureStore & ts, ModelInstance & world, const refdef_t & view)
-            : tex_store{ ts }
+        FrameData(TextureStore & texstore, ModelInstance & world, const refdef_t & view)
+            : tex_store{ texstore }
             , world_model{ world }
             , view_def{ view }
         { }
 
         // Inputs
-        TextureStore & tex_store;
+        TextureStore  & tex_store;
         ModelInstance & world_model;
-        const refdef_t view_def; // Local copy
+        const refdef_t  view_def; // Local copy
 
         // Scene viewer/camera
         vec3_t camera_origin;
