@@ -102,7 +102,7 @@ static inline const float * GetShadeDotsForEnt(const entity_t & entity)
 ///////////////////////////////////////////////////////////////////////////////
 
 void ViewDrawState::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t * const alias_header, const float backlerp,
-                                          const vec3_t shade_light, const DirectX::XMMATRIX & model_matrix,
+                                          const vec3_t shade_light, const RenderMatrix & model_matrix,
                                           const TextureImage * const model_skin)
 {
     FASTASSERT(alias_header != nullptr);

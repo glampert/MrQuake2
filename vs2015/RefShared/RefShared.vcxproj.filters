@@ -44,6 +44,12 @@
     <ClCompile Include="..\..\src\reflibs\shared\DrawAliasMD2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\shared\SkyBox.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\shared\MiniImBatch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\reflibs\shared\RefShared.hpp">
@@ -80,6 +86,12 @@
       <Filter>External</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\reflibs\shared\FixedSizeArray.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\shared\SkyBox.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\shared\MiniImBatch.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

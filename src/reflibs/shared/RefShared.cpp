@@ -287,6 +287,272 @@ int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_s * p)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+inline void Vec3MergeXY(const vec3_t V1, const vec3_t V2, vec3_t out)
+{
+    out[0] = V1[0];
+    out[1] = V2[0];
+    out[2] = V1[1];
+    out[3] = V2[1];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+inline void Vec3MergeZW(const vec3_t V1, const vec3_t V2, vec3_t out)
+{
+    out[0] = V1[2];
+    out[1] = V2[2];
+    out[2] = V1[3];
+    out[3] = V2[3];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// RenderMatrix
+///////////////////////////////////////////////////////////////////////////////
+
+static_assert(sizeof(RenderMatrix) == sizeof(float) * 16, "Unexpected padding in RenderMatrix struct?");
+
+///////////////////////////////////////////////////////////////////////////////
+
+RenderMatrix RenderMatrix::Multiply(const RenderMatrix & M1, const RenderMatrix & M2)
+{
+    RenderMatrix result;
+    // Cache the invariants in registers
+    float x = M1.m[0][0];
+    float y = M1.m[0][1];
+    float z = M1.m[0][2];
+    float w = M1.m[0][3];
+    // Perform the operation on the first row
+    result.m[0][0] = (M2.m[0][0] * x) + (M2.m[1][0] * y) + (M2.m[2][0] * z) + (M2.m[3][0] * w);
+    result.m[0][1] = (M2.m[0][1] * x) + (M2.m[1][1] * y) + (M2.m[2][1] * z) + (M2.m[3][1] * w);
+    result.m[0][2] = (M2.m[0][2] * x) + (M2.m[1][2] * y) + (M2.m[2][2] * z) + (M2.m[3][2] * w);
+    result.m[0][3] = (M2.m[0][3] * x) + (M2.m[1][3] * y) + (M2.m[2][3] * z) + (M2.m[3][3] * w);
+    // Repeat for all the other rows
+    x = M1.m[1][0];
+    y = M1.m[1][1];
+    z = M1.m[1][2];
+    w = M1.m[1][3];
+    result.m[1][0] = (M2.m[0][0] * x) + (M2.m[1][0] * y) + (M2.m[2][0] * z) + (M2.m[3][0] * w);
+    result.m[1][1] = (M2.m[0][1] * x) + (M2.m[1][1] * y) + (M2.m[2][1] * z) + (M2.m[3][1] * w);
+    result.m[1][2] = (M2.m[0][2] * x) + (M2.m[1][2] * y) + (M2.m[2][2] * z) + (M2.m[3][2] * w);
+    result.m[1][3] = (M2.m[0][3] * x) + (M2.m[1][3] * y) + (M2.m[2][3] * z) + (M2.m[3][3] * w);
+    x = M1.m[2][0];
+    y = M1.m[2][1];
+    z = M1.m[2][2];
+    w = M1.m[2][3];
+    result.m[2][0] = (M2.m[0][0] * x) + (M2.m[1][0] * y) + (M2.m[2][0] * z) + (M2.m[3][0] * w);
+    result.m[2][1] = (M2.m[0][1] * x) + (M2.m[1][1] * y) + (M2.m[2][1] * z) + (M2.m[3][1] * w);
+    result.m[2][2] = (M2.m[0][2] * x) + (M2.m[1][2] * y) + (M2.m[2][2] * z) + (M2.m[3][2] * w);
+    result.m[2][3] = (M2.m[0][3] * x) + (M2.m[1][3] * y) + (M2.m[2][3] * z) + (M2.m[3][3] * w);
+    x = M1.m[3][0];
+    y = M1.m[3][1];
+    z = M1.m[3][2];
+    w = M1.m[3][3];
+    result.m[3][0] = (M2.m[0][0] * x) + (M2.m[1][0] * y) + (M2.m[2][0] * z) + (M2.m[3][0] * w);
+    result.m[3][1] = (M2.m[0][1] * x) + (M2.m[1][1] * y) + (M2.m[2][1] * z) + (M2.m[3][1] * w);
+    result.m[3][2] = (M2.m[0][2] * x) + (M2.m[1][2] * y) + (M2.m[2][2] * z) + (M2.m[3][2] * w);
+    result.m[3][3] = (M2.m[0][3] * x) + (M2.m[1][3] * y) + (M2.m[2][3] * z) + (M2.m[3][3] * w);
+    return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+RenderMatrix RenderMatrix::Transpose(const RenderMatrix & M)
+{
+    RenderMatrix P, MT;
+    Vec3MergeXY(M.rows[0], M.rows[2], P.rows[0]);
+    Vec3MergeXY(M.rows[1], M.rows[3], P.rows[1]);
+    Vec3MergeZW(M.rows[0], M.rows[2], P.rows[2]);
+    Vec3MergeZW(M.rows[1], M.rows[3], P.rows[3]);
+    Vec3MergeXY(P.rows[0], P.rows[1], MT.rows[0]);
+    Vec3MergeZW(P.rows[0], P.rows[1], MT.rows[1]);
+    Vec3MergeXY(P.rows[2], P.rows[3], MT.rows[2]);
+    Vec3MergeZW(P.rows[2], P.rows[3], MT.rows[3]);
+    return MT;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+RenderMatrix RenderMatrix::LookToLH(const vec3_t eye_position, const vec3_t eye_direction, const vec3_t up_direction)
+{
+    vec3_t R2;
+    Vec3Copy(eye_direction, R2);
+    Vec3Normalize(R2);
+
+    vec3_t R0;
+    Vec3Cross(up_direction, R2, R0);
+    Vec3Normalize(R0);
+
+    vec3_t R1;
+    Vec3Cross(R2, R0, R1);
+
+    vec3_t neg_eye_position;
+    Vec3Copy(eye_position, neg_eye_position);
+    Vec3Negate(neg_eye_position);
+
+    const float D0 = Vec3Dot(R0, neg_eye_position);
+    const float D1 = Vec3Dot(R1, neg_eye_position);
+    const float D2 = Vec3Dot(R2, neg_eye_position);
+
+    RenderMatrix M;
+    Vec3Copy(R0, M.rows[0]); M.rows[0][3] = D0;
+    Vec3Copy(R1, M.rows[1]); M.rows[1][3] = D1;
+    Vec3Copy(R2, M.rows[2]); M.rows[2][3] = D2;
+
+    M.rows[3][0] = 0.0f;
+    M.rows[3][1] = 0.0f;
+    M.rows[3][2] = 0.0f;
+    M.rows[3][3] = 1.0f;
+
+    M = Transpose(M);
+    return M;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+RenderMatrix RenderMatrix::LookAtRH(const vec3_t eye_position, const vec3_t focus_position, const vec3_t up_direction)
+{
+    vec3_t neg_eye_direction;
+    Vec3Sub(eye_position, focus_position, neg_eye_direction);
+    return LookToLH(eye_position, neg_eye_direction, up_direction);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+RenderMatrix RenderMatrix::PerspectiveFovRH(const float fov_angle_y, const float aspect_ratio, const float near_z, const float far_z)
+{
+    const float sin_fov = std::sin(0.5f * fov_angle_y);
+    const float cos_fov = std::cos(0.5f * fov_angle_y);
+    const float height  = cos_fov / sin_fov;
+    const float width   = height  / aspect_ratio;
+    const float range   = far_z   / (near_z - far_z);
+
+    RenderMatrix M;
+    M.m[0][0] = width;
+    M.m[0][1] = 0.0f;
+    M.m[0][2] = 0.0f;
+    M.m[0][3] = 0.0f;
+    M.m[1][0] = 0.0f;
+    M.m[1][1] = height;
+    M.m[1][2] = 0.0f;
+    M.m[1][3] = 0.0f;
+    M.m[2][0] = 0.0f;
+    M.m[2][1] = 0.0f;
+    M.m[2][2] = range;
+    M.m[2][3] = -1.0f;
+    M.m[3][0] = 0.0f;
+    M.m[3][1] = 0.0f;
+    M.m[3][2] = range * near_z;
+    M.m[3][3] = 0.0f;
+    return M;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+RenderMatrix RenderMatrix::Translation(const float offset_x, const float offset_y, const float offset_z)
+{
+    RenderMatrix M;
+    M.m[0][0] = 1.0f;
+    M.m[0][1] = 0.0f;
+    M.m[0][2] = 0.0f;
+    M.m[0][3] = 0.0f;
+    M.m[1][0] = 0.0f;
+    M.m[1][1] = 1.0f;
+    M.m[1][2] = 0.0f;
+    M.m[1][3] = 0.0f;
+    M.m[2][0] = 0.0f;
+    M.m[2][1] = 0.0f;
+    M.m[2][2] = 1.0f;
+    M.m[2][3] = 0.0f;
+    M.m[3][0] = offset_x;
+    M.m[3][1] = offset_y;
+    M.m[3][2] = offset_z;
+    M.m[3][3] = 1.0f;
+    return M;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+RenderMatrix RenderMatrix::RotationX(const float angle_radians)
+{
+    const float sin_angle = std::sin(angle_radians);
+    const float cos_angle = std::cos(angle_radians);
+
+    RenderMatrix M;
+    M.m[0][0] = 1.0f;
+    M.m[0][1] = 0.0f;
+    M.m[0][2] = 0.0f;
+    M.m[0][3] = 0.0f;
+    M.m[1][0] = 0.0f;
+    M.m[1][1] = cos_angle;
+    M.m[1][2] = sin_angle;
+    M.m[1][3] = 0.0f;
+    M.m[2][0] = 0.0f;
+    M.m[2][1] = -sin_angle;
+    M.m[2][2] = cos_angle;
+    M.m[2][3] = 0.0f;
+    M.m[3][0] = 0.0f;
+    M.m[3][1] = 0.0f;
+    M.m[3][2] = 0.0f;
+    M.m[3][3] = 1.0f;
+    return M;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+RenderMatrix RenderMatrix::RotationY(const float angle_radians)
+{
+    const float sin_angle = std::sin(angle_radians);
+    const float cos_angle = std::cos(angle_radians);
+
+    RenderMatrix M;
+    M.m[0][0] = cos_angle;
+    M.m[0][1] = 0.0f;
+    M.m[0][2] = -sin_angle;
+    M.m[0][3] = 0.0f;
+    M.m[1][0] = 0.0f;
+    M.m[1][1] = 1.0f;
+    M.m[1][2] = 0.0f;
+    M.m[1][3] = 0.0f;
+    M.m[2][0] = sin_angle;
+    M.m[2][1] = 0.0f;
+    M.m[2][2] = cos_angle;
+    M.m[2][3] = 0.0f;
+    M.m[3][0] = 0.0f;
+    M.m[3][1] = 0.0f;
+    M.m[3][2] = 0.0f;
+    M.m[3][3] = 1.0f;
+    return M;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+RenderMatrix RenderMatrix::RotationZ(const float angle_radians)
+{
+    const float sin_angle = std::sin(angle_radians);
+    const float cos_angle = std::cos(angle_radians);
+
+    RenderMatrix M;
+    M.m[0][0] = cos_angle;
+    M.m[0][1] = sin_angle;
+    M.m[0][2] = 0.0f;
+    M.m[0][3] = 0.0f;
+    M.m[1][0] = -sin_angle;
+    M.m[1][1] = cos_angle;
+    M.m[1][2] = 0.0f;
+    M.m[1][3] = 0.0f;
+    M.m[2][0] = 0.0f;
+    M.m[2][1] = 0.0f;
+    M.m[2][2] = 1.0f;
+    M.m[2][3] = 0.0f;
+    M.m[3][0] = 0.0f;
+    M.m[3][1] = 0.0f;
+    M.m[3][2] = 0.0f;
+    M.m[3][3] = 1.0f;
+    return M;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // GameInterface
 ///////////////////////////////////////////////////////////////////////////////
 

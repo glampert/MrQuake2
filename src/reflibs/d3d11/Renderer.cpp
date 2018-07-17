@@ -556,6 +556,7 @@ static DirectX::XMMATRIX g_CurrMvp; // FIXME TEMP
 MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
 {
     FASTASSERT(m_batch_open == false);
+    FASTASSERT_ALIGN16(args.model_matrix.floats);
 
     // Map the current buffer:
     if (FAILED(g_Renderer->DeviceContext()->Map(m_vertex_buffers[m_buffer_index].Get(),
@@ -571,7 +572,7 @@ MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
     SetCurrentTexture(args.optional_tex ? *args.optional_tex : *(g_Renderer->TexStore()->tex_white2x2));
 
     m_current_topology  = args.topology;
-    m_current_model_mtx = args.model_matrix;
+    m_current_model_mtx = DirectX::XMMATRIX{ args.model_matrix.floats };
     m_batch_open        = true;
 
     return MiniImBatch{ verts, m_num_verts, m_current_topology };
@@ -821,7 +822,8 @@ void Renderer::RenderView(const refdef_s & view_def)
     // Update the constant buffers for this frame
     RenderViewUpdateCBuffers(frame_data);
 
-    g_CurrMvp = frame_data.view_proj_matrix; // *** FIXME TEMP HACK ***
+    FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
+    g_CurrMvp = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats }; // *** FIXME TEMP HACK ***
 
     //
     // Now render the solid geometries (world and entities)
@@ -845,8 +847,10 @@ void Renderer::RenderView(const refdef_s & view_def)
 
 void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& frame_data)
 {
+    FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
+
     ConstantBufferDataSGeomVS cbuffer_data_solid_geom_vs;
-    cbuffer_data_solid_geom_vs.mvp_matrix = frame_data.view_proj_matrix;
+    cbuffer_data_solid_geom_vs.mvp_matrix = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
     DeviceContext()->UpdateSubresource(m_cbuffer_solid_geom_vs.Get(), 0, nullptr, &cbuffer_data_solid_geom_vs, 0, 0);
 
     ConstantBufferDataSGeomPS cbuffer_data_solid_geom_ps;

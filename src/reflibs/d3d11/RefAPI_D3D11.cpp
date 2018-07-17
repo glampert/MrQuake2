@@ -123,7 +123,7 @@ static image_s * RegisterPic(const char * name)
 
 static void SetSky(const char * name, float rotate, vec3_t axis)
 {
-    // TODO
+    g_Renderer->ViewState()->Sky() = SkyBox(*g_Renderer->TexStore(), name, rotate, axis);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

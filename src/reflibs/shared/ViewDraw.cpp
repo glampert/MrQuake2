@@ -9,105 +9,6 @@ namespace MrQ2
 {
 
 ///////////////////////////////////////////////////////////////////////////////
-// MiniImBatch
-///////////////////////////////////////////////////////////////////////////////
-
-bool MiniImBatch::sm_emulated_triangle_fans = true;
-
-///////////////////////////////////////////////////////////////////////////////
-
-void MiniImBatch::PushVertex(const DrawVertex3D & vert)
-{
-    FASTASSERT(IsValid()); // Clear()ed?
-
-    if (sm_emulated_triangle_fans)
-    {
-        if (m_topology != PrimitiveTopology::TriangleFan)
-        {
-            *Increment(1) = vert;
-        }
-        else // Emulated triangle fan
-        {
-            if (m_tri_fan_vert_count == 3)
-            {
-                DrawVertex3D * v = Increment(2);
-                v[0] = m_tri_fan_first_vert;
-                v[1] = m_tri_fan_last_vert;
-            }
-            else if (m_tri_fan_vert_count == 1)
-            {
-                *Increment(1) = m_tri_fan_first_vert;
-                ++m_tri_fan_vert_count;
-            }
-            else
-            {
-                ++m_tri_fan_vert_count;
-            }
-            *Increment(1) = vert;
-        }
-
-        // Save for triangle fan emulation
-        m_tri_fan_last_vert = vert;
-    }
-    else
-    {
-        *Increment(1) = vert;
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void MiniImBatch::PushModelSurface(const ModelSurface & surf)
-{
-    FASTASSERT(IsValid()); // Clear()ed?
-
-    const ModelPoly & poly  = *surf.polys;
-    const int num_triangles = (poly.num_verts - 2);
-    const int num_verts     = (num_triangles  * 3);
-
-    FASTASSERT(num_triangles > 0);
-    FASTASSERT(num_verts <= NumVerts());
-
-    DrawVertex3D * const first_vert = Increment(num_verts);
-    DrawVertex3D * verts_iter = first_vert;
-
-    for (int t = 0; t < num_triangles; ++t)
-    {
-        const ModelTriangle & mdl_tri = poly.triangles[t];
-
-        for (int v = 0; v < 3; ++v)
-        {
-            const PolyVertex & poly_vert = poly.vertexes[mdl_tri.vertexes[v]];
-
-            verts_iter->position[0] = poly_vert.position[0];
-            verts_iter->position[1] = poly_vert.position[1];
-            verts_iter->position[2] = poly_vert.position[2];
-
-            verts_iter->uv[0] = poly_vert.texture_s;
-            verts_iter->uv[1] = poly_vert.texture_t;
-
-            ColorFloats(surf.debug_color,
-                        verts_iter->rgba[0],
-                        verts_iter->rgba[1],
-                        verts_iter->rgba[2],
-                        verts_iter->rgba[3]);
-
-            ++verts_iter;
-        }
-    }
-
-    FASTASSERT(verts_iter == (first_vert + num_verts));
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-REFLIB_NOINLINE void MiniImBatch::OverflowError() const
-{
-    GameInterface::Errorf("MiniImBatch overflowed! used_verts=%i, num_verts=%i. "
-                          "Increase vertex batch size.", m_used_verts, m_num_verts);
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // Local ViewDrawState helpers:
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -259,12 +160,12 @@ static std::uint8_t SignBitsForPlane(const cplane_t & plane)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static DirectX::XMMATRIX MakeEntityModelMatrix(const entity_t & entity, const bool flipUpV = true)
+static RenderMatrix MakeEntityModelMatrix(const entity_t & entity, const bool flipUpV = true)
 {
-    const auto t  = DirectX::XMMatrixTranslation(entity.origin[0], entity.origin[1], entity.origin[2]);
-    const auto rx = DirectX::XMMatrixRotationX(DegToRad(-entity.angles[ROLL]));
-    const auto ry = DirectX::XMMatrixRotationY(DegToRad(entity.angles[PITCH] * (flipUpV ? -1.0f : 1.0f)));
-    const auto rz = DirectX::XMMatrixRotationZ(DegToRad(entity.angles[YAW]));
+    const auto t  = RenderMatrix::Translation(entity.origin[0], entity.origin[1], entity.origin[2]);
+    const auto rx = RenderMatrix::RotationX(DegToRad(-entity.angles[ROLL]));
+    const auto ry = RenderMatrix::RotationY(DegToRad(entity.angles[PITCH] * (flipUpV ? -1.0f : 1.0f)));
+    const auto rz = RenderMatrix::RotationZ(DegToRad(entity.angles[YAW]));
     return rx * ry * rz * t;
 }
 
@@ -385,25 +286,14 @@ void ViewDrawState::RenderViewSetup(FrameData & frame_data)
     // Other camera/lens parameters
     const float aspect_ratio = float(frame_data.view_def.width) / float(frame_data.view_def.height);
     const float fov_y  = frame_data.view_def.fov_y;
-    const float z_near = 4.0f;    // From ref_gl
-    const float z_far  = 4096.0f; // From ref_gl
+    const float near_z = 4.0f;    // From ref_gl
+    const float far_z  = 4096.0f; // From ref_gl
 
     // Set projection and view matrices for the frame
-    const DirectX::XMFLOAT3A eye_position   { frame_data.camera_origin };
-    const DirectX::XMFLOAT3A focus_position { frame_data.camera_lookat };
-    const DirectX::XMFLOAT3A up_direction   { -frame_data.up_vec[0], -frame_data.up_vec[1], -frame_data.up_vec[2] };
-
-    frame_data.view_matrix = DirectX::XMMatrixLookAtRH(
-                        DirectX::XMLoadFloat3A(&eye_position),
-                        DirectX::XMLoadFloat3A(&focus_position),
-                        DirectX::XMLoadFloat3A(&up_direction));
-
-    frame_data.proj_matrix = DirectX::XMMatrixPerspectiveFovRH(
-                        fov_y, aspect_ratio, z_near, z_far);
-
-    frame_data.view_proj_matrix = DirectX::XMMatrixMultiply(
-                        frame_data.view_matrix,
-                        frame_data.proj_matrix);
+    const vec3_t up_direction = { -frame_data.up_vec[0], -frame_data.up_vec[1], -frame_data.up_vec[2] };
+    frame_data.view_matrix = RenderMatrix::LookAtRH(frame_data.camera_origin, frame_data.camera_lookat, up_direction);
+    frame_data.proj_matrix = RenderMatrix::PerspectiveFovRH(fov_y, aspect_ratio, near_z, far_z);
+    frame_data.view_proj_matrix = RenderMatrix::Multiply(frame_data.view_matrix, frame_data.proj_matrix);
 
     // Update the frustum planes
     SetUpFrustum(frame_data);
@@ -627,7 +517,7 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
     TextureStore & tex_store = frame_data.tex_store;
 
     BeginBatchArgs args;
-    args.model_matrix = DirectX::XMMatrixIdentity();
+    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
     args.topology     = PrimitiveTopology::TriangleList;
 
     // Draw with sorting by texture:
@@ -964,7 +854,7 @@ void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t &
     }
 
     BeginBatchArgs args;
-    args.model_matrix = DirectX::XMMatrixIdentity();
+    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
     args.optional_tex = nullptr; // No texture
     args.topology     = PrimitiveTopology::TriangleStrip;
 

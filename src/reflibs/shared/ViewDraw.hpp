@@ -5,13 +5,11 @@
 #pragma once
 
 // RefShared includes
-#include "RefShared.hpp"
-#include "ModelStore.hpp"
-#include "TextureStore.hpp"
 #include "FixedSizeArray.hpp"
-
-// TODO remove D3D dependency - RefShared should be standalone!
-#include <DirectXMath.h>
+#include "TextureStore.hpp"
+#include "ModelStore.hpp"
+#include "MiniImBatch.hpp"
+#include "SkyBox.hpp"
 
 // Quake includes
 #include "client/ref.h"
@@ -19,122 +17,6 @@
 
 namespace MrQ2
 {
-
-/*
-===============================================================================
-
-    DrawVertex3D / DrawVertex2D / PrimitiveTopology
-
-===============================================================================
-*/
-
-struct DrawVertex3D
-{
-    vec3_t position;
-    vec2_t uv;
-    vec4_t rgba;
-};
-
-struct DrawVertex2D
-{
-    vec4_t xy_uv;
-    vec4_t rgba;
-};
-
-enum class PrimitiveTopology : std::uint8_t
-{
-    TriangleList,
-    TriangleStrip,
-    TriangleFan,
-};
-
-// Max per RenderView/frame.
-constexpr int kMaxTranslucentEntities = 128;
-
-/*
-===============================================================================
-
-    MiniImBatch
-
-===============================================================================
-*/
-class MiniImBatch final
-{
-public:
-
-    MiniImBatch(DrawVertex3D * const verts_ptr, const int num_verts, const PrimitiveTopology topology)
-        : m_verts_ptr{ verts_ptr }
-        , m_num_verts{ num_verts }
-        , m_used_verts{ 0 }
-        , m_topology{ topology }
-        , m_tri_fan_vert_count{ 0 }
-        , m_tri_fan_first_vert{}
-        , m_tri_fan_last_vert{}
-    { }
-
-    void Clear()
-    {
-        m_verts_ptr  = nullptr;
-        m_num_verts  = 0;
-        m_used_verts = 0;
-    }
-
-    DrawVertex3D * Increment(const int num_verts)
-    {
-        auto * first_vert = (m_verts_ptr + m_used_verts);
-        m_used_verts += num_verts;
-        if (m_used_verts > m_num_verts)
-        {
-            OverflowError();
-        }
-        return first_vert;
-    }
-
-    void SetTriangleFanFirstVertex(const DrawVertex3D & vert)
-    {
-        if (sm_emulated_triangle_fans)
-        {
-            m_tri_fan_vert_count = 1;
-            m_tri_fan_first_vert = vert;
-        }
-        else
-        {
-            PushVertex(vert);
-        }
-    }
-
-    static void EnableEmulatedTriangleFans(const bool do_enable)
-    {
-        sm_emulated_triangle_fans = do_enable;
-    }
-
-    void PushVertex(const DrawVertex3D & vert);
-    void PushModelSurface(const ModelSurface & surf);
-
-    int NumVerts()  const { return m_num_verts; }
-    int UsedVerts() const { return m_used_verts; }
-    bool IsValid()  const { return m_verts_ptr != nullptr; }
-    PrimitiveTopology Topology() const { return m_topology; }
-
-private:
-
-    REFLIB_NORETURN void OverflowError() const;
-
-    DrawVertex3D *    m_verts_ptr;
-    int               m_num_verts;
-    int               m_used_verts;
-    PrimitiveTopology m_topology;
-
-    // Triangle fan emulation support:
-    std::uint8_t      m_tri_fan_vert_count;
-    DrawVertex3D      m_tri_fan_first_vert;
-    DrawVertex3D      m_tri_fan_last_vert;
-
-    // If set to true, deconstruct PrimitiveTopology::TriangleFan primitives in the
-    // MiniImBatch into PrimitiveTopology::TriangleList primitives, to support back-end
-    // APIs that are not capable of drawing triangle fans natively.
-    static bool       sm_emulated_triangle_fans;
-};
 
 /*
 ===============================================================================
@@ -147,6 +29,9 @@ class ViewDrawState
 {
 public:
 
+    // Max per RenderView/frame.
+    static constexpr int kMaxTranslucentEntities = 128;
+
     struct FrameData final
     {
         FrameData(TextureStore & texstore, ModelInstance & world, const refdef_t & view)
@@ -154,6 +39,11 @@ public:
             , world_model{ world }
             , view_def{ view }
         { }
+
+        // Frame matrices for the back-end
+        RenderMatrix view_matrix;
+        RenderMatrix proj_matrix;
+        RenderMatrix view_proj_matrix;
 
         // Inputs
         TextureStore  & tex_store;
@@ -170,12 +60,6 @@ public:
         // View frustum for the frame, so we can cull bounding boxes out of view
         cplane_t frustum[4];
 
-        // Frame matrices for the back-end
-        // TODO: Replace D3D mtx with something not windows-specific
-        DirectX::XMMATRIX view_matrix;
-        DirectX::XMMATRIX proj_matrix;
-        DirectX::XMMATRIX view_proj_matrix;
-
         // Batched from RenderSolidEntities for the translucencies pass.
         FixedSizeArray<const entity_t *, kMaxTranslucentEntities> translucent_entities;
     };
@@ -191,11 +75,14 @@ public:
     void RenderWorldModel(FrameData & frame_data);
     void RenderSolidEntities(FrameData & frame_data);
 
+    // Assignable ref
+    SkyBox & Sky() { return m_skybox; }
+
 protected:
 
     struct BeginBatchArgs
     {
-        DirectX::XMMATRIX    model_matrix; // TODO kill dependency on D3D!
+        RenderMatrix         model_matrix;
         const TextureImage * optional_tex;
         PrimitiveTopology    topology;
     };
@@ -228,7 +115,7 @@ private:
 
     // Defined in DrawAliasMD2.cpp
     void DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t * const alias_header, const float backlerp,
-                               const vec3_t shade_light, const DirectX::XMMATRIX & model_matrix,
+                               const vec3_t shade_light, const RenderMatrix & model_matrix,
                                const TextureImage * const model_skin);
 
 private:
@@ -249,6 +136,9 @@ private:
     // Cached Cvars:
     CvarWrapper m_force_null_entity_models;
     CvarWrapper m_lerp_entity_models;
+
+    // SkyBox rendering helper
+    SkyBox m_skybox;
 };
 
 } // MrQ2

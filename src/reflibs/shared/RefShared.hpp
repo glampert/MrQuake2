@@ -95,6 +95,13 @@ inline void Vec3Zero(vec3_t v)
     v[0] = v[1] = v[2] = 0.0f;
 }
 
+inline void Vec3Negate(vec3_t v)
+{
+    v[0] = -v[0];
+    v[1] = -v[1];
+    v[2] = -v[2];
+}
+
 inline float Vec3Dot(const vec3_t x, const vec3_t y)
 {
     return (x[0] * y[0]) + (x[1] * y[1]) + (x[2] * y[2]);
@@ -163,6 +170,53 @@ void PerpendicularVector(vec3_t dst, const vec3_t src);
 void VectorsFromAngles(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
 void RotatePointAroundVector(vec3_t dst, const vec3_t dir, const vec3_t point, const float degrees);
 int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_s * p);
+
+/*
+===============================================================================
+
+    RenderMatrix (4x4, float32 vectors, 16 aligned)
+
+===============================================================================
+*/
+struct alignas(16) RenderMatrix final
+{
+    union
+    {
+        float  floats[16];
+        vec4_t rows[4];
+        float  m[4][4];
+    };
+
+    enum IdentityInitializer { Identity };
+
+    RenderMatrix() = default;         // Uninitialized matrix
+    RenderMatrix(IdentityInitializer) // Identity matrix
+    {
+        std::memset(rows, 0, sizeof(rows));
+        rows[0][0] = 1.0f;
+        rows[1][1] = 1.0f;
+        rows[2][2] = 1.0f;
+        rows[3][3] = 1.0f;
+    }
+
+    RenderMatrix & operator*=(const RenderMatrix & M) { *this = Multiply(*this, M); return *this; }
+    RenderMatrix   operator* (const RenderMatrix & M) const { return Multiply(*this, M); }
+
+    // Concatenate/multiply
+    static RenderMatrix Multiply(const RenderMatrix & M1, const RenderMatrix & M2);
+    static RenderMatrix Transpose(const RenderMatrix & M);
+
+    // Make camera/view matrices
+    static RenderMatrix LookToLH(const vec3_t eye_position, const vec3_t eye_direction, const vec3_t up_direction);
+    static RenderMatrix LookAtRH(const vec3_t eye_position, const vec3_t focus_position, const vec3_t up_direction);
+    static RenderMatrix PerspectiveFovRH(float fov_angle_y, float aspect_ratio, float near_z, float far_z);
+
+    // Make translation/rotation matrices
+    static RenderMatrix Translation(float offset_x, float offset_y, float offset_z);
+    static RenderMatrix RotationX(float angle_radians);
+    static RenderMatrix RotationY(float angle_radians);
+    static RenderMatrix RotationZ(float angle_radians);
+};
 
 /*
 ===============================================================================
