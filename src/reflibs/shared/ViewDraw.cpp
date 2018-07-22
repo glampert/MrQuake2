@@ -176,6 +176,10 @@ static RenderMatrix MakeEntityModelMatrix(const entity_t & entity, const bool fl
 ViewDrawState::ViewDrawState()
     : m_force_null_entity_models{ GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0) }
     , m_lerp_entity_models{ GameInterface::Cvar::Get("r_lerp_entity_models", "1", 0) }
+    , m_skip_draw_texture_chains{ GameInterface::Cvar::Get("r_skip_draw_texture_chains", "0", 0) }
+    , m_skip_draw_world{ GameInterface::Cvar::Get("r_skip_draw_world", "0", 0) }
+    , m_skip_draw_sky{ GameInterface::Cvar::Get("r_skip_draw_sky", "0", 0) }
+    , m_skip_draw_entities{ GameInterface::Cvar::Get("r_skip_draw_entities", "0", 0) }
 {
 }
 
@@ -194,7 +198,7 @@ void ViewDrawState::BeginRegistration()
 
 void ViewDrawState::SetUpViewClusters(const FrameData & frame_data)
 {
-    if (frame_data.view_def.rdflags & RDF_NOWORLDMODEL)
+    if ((frame_data.view_def.rdflags & RDF_NOWORLDMODEL) || m_skip_draw_world.IsSet())
     {
         return;
     }
@@ -307,7 +311,7 @@ void ViewDrawState::RenderViewSetup(FrameData & frame_data)
 // was marked for draw in here.
 void ViewDrawState::RecursiveWorldNode(const FrameData & frame_data,
                                        const ModelInstance & world_mdl,
-                                       const ModelNode * const node) const
+                                       const ModelNode * const node)
 {
     FASTASSERT(node != nullptr);
 
@@ -411,7 +415,7 @@ void ViewDrawState::RecursiveWorldNode(const FrameData & frame_data,
         if (surf->texinfo->flags & SURF_SKY)
         {
             // Just adds to visible sky bounds.
-            // TODO
+            m_skybox.AddSkySurface(*surf, frame_data.view_def.vieworg);
         }
         else if (surf->texinfo->flags & (SURF_TRANS33 | SURF_TRANS66))
         {
@@ -515,6 +519,7 @@ void ViewDrawState::MarkLeaves(ModelInstance & world_mdl)
 void ViewDrawState::DrawTextureChains(FrameData & frame_data)
 {
     TextureStore & tex_store = frame_data.tex_store;
+    const bool do_draw = !m_skip_draw_texture_chains.IsSet();
 
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
@@ -531,21 +536,23 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
             continue;
         }
 
-        args.optional_tex = tex;
-
-        MiniImBatch batch = BeginBatch(args);
+        if (do_draw)
         {
-            for (const ModelSurface * surf = tex->texture_chain; surf; surf = surf->texture_chain)
+            args.optional_tex = tex;
+            MiniImBatch batch = BeginBatch(args);
             {
-                // Need at least one triangle.
-                if (surf->polys == nullptr || surf->polys->num_verts < 3)
+                for (const ModelSurface * surf = tex->texture_chain; surf; surf = surf->texture_chain)
                 {
-                    continue;
+                    // Need at least one triangle.
+                    if (surf->polys == nullptr || surf->polys->num_verts < 3)
+                    {
+                        continue;
+                    }
+                    batch.PushModelSurface(*surf);
                 }
-                batch.PushModelSurface(*surf);
             }
+            EndBatch(batch);
         }
-        EndBatch(batch);
 
         // All world geometry using this texture has been drawn, clear for the next frame.
         tex->texture_chain = nullptr;
@@ -556,7 +563,9 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
 
 void ViewDrawState::RenderWorldModel(FrameData & frame_data)
 {
-    if (frame_data.view_def.rdflags & RDF_NOWORLDMODEL)
+    m_skybox.Clear(); // RecursiveWorldNode adds to the sky bounds
+
+    if ((frame_data.view_def.rdflags & RDF_NOWORLDMODEL) || m_skip_draw_world.IsSet())
     {
         return;
     }
@@ -568,8 +577,51 @@ void ViewDrawState::RenderWorldModel(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void ViewDrawState::RenderSkyBox(FrameData & frame_data)
+{
+    // Skybox bounds rendering if visible:
+    if (m_skybox.IsAnyPlaneVisible() && !m_skip_draw_sky.IsSet())
+    {
+        const auto sky_t = RenderMatrix::Translation(frame_data.view_def.vieworg[0],
+                                                     frame_data.view_def.vieworg[1],
+                                                     frame_data.view_def.vieworg[2]);
+
+        const float sky_rotate = DegToRad(frame_data.view_def.time * m_skybox.RotateDegrees());
+        const auto  sky_rxyz   = RenderMatrix::RotationAxis(sky_rotate, m_skybox.AxisX(), m_skybox.AxisY(), m_skybox.AxisZ());
+        const auto  sky_mtx    = sky_rxyz * sky_t;
+
+        for (int i = 0; i < SkyBox::kNumSides; ++i)
+        {
+            BeginBatchArgs args;
+            DrawVertex3D sky_verts[6];
+            const TextureImage * sky_tex = nullptr;
+
+            if (m_skybox.BuildSkyPlane(i, sky_verts, &sky_tex))
+            {
+                args.model_matrix = sky_mtx;
+                args.optional_tex = sky_tex;
+                args.topology     = PrimitiveTopology::TriangleList;
+
+                MiniImBatch batch = BeginBatch(args);
+                for (unsigned v = 0; v < ArrayLength(sky_verts); ++v)
+                {
+                    batch.PushVertex(sky_verts[v]);
+                }
+                EndBatch(batch);
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void ViewDrawState::RenderSolidEntities(FrameData & frame_data)
 {
+    if (m_skip_draw_entities.IsSet())
+    {
+        return;
+    }
+
     const int num_entities = frame_data.view_def.num_entities;
     const entity_t * const entities_list = frame_data.view_def.entities;
     const bool force_null_entity_models = m_force_null_entity_models.IsSet();

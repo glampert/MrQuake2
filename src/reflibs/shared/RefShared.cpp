@@ -553,6 +553,31 @@ RenderMatrix RenderMatrix::RotationZ(const float angle_radians)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+RenderMatrix RenderMatrix::RotationAxis(const float angle_radians, const float x, const float y, const float z)
+{
+    const float s = std::sinf(angle_radians);
+    const float c = std::cosf(angle_radians);
+
+    const float xy = x * y;
+    const float yz = y * z;
+    const float zx = z * x;
+    const float one_minus_cos = 1.0f - c;
+
+    const vec4_t r0 = { (((x * x) * one_minus_cos) + c), ((xy * one_minus_cos) + (z * s)), ((zx * one_minus_cos) - (y * s)), 0.0f };
+    const vec4_t r1 = { ((xy * one_minus_cos) - (z * s)), (((y * y) * one_minus_cos) + c), ((yz * one_minus_cos) + (x * s)), 0.0f };
+    const vec4_t r2 = { ((zx * one_minus_cos) + (y * s)), ((yz * one_minus_cos) - (x * s)), (((z * z) * one_minus_cos) + c), 0.0f };
+    const vec4_t r3 = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+    RenderMatrix M;
+    Vec4Copy(r0, M.rows[0]);
+    Vec4Copy(r1, M.rows[1]);
+    Vec4Copy(r2, M.rows[2]);
+    Vec4Copy(r3, M.rows[3]);
+    return M;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // GameInterface
 ///////////////////////////////////////////////////////////////////////////////
 

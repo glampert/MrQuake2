@@ -137,6 +137,7 @@ struct ModelPoly
     int num_verts;             // size of vertexes[], since it's dynamically allocated
     PolyVertex * vertexes;     // array of polygon vertexes. Never null
     ModelTriangle * triangles; // (num_verts - 2) triangles with indexes into vertexes[]
+    const ModelPoly * next;
 };
 
 //

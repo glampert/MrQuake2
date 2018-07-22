@@ -73,6 +73,7 @@ public:
     // Frame/view rending:
     void RenderViewSetup(FrameData & frame_data);
     void RenderWorldModel(FrameData & frame_data);
+    void RenderSkyBox(FrameData & frame_data);
     void RenderSolidEntities(FrameData & frame_data);
 
     // Assignable ref
@@ -98,7 +99,7 @@ private:
     void SetUpFrustum(FrameData & frame_data) const;
 
     // World rendering:
-    void RecursiveWorldNode(const FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node) const;
+    void RecursiveWorldNode(const FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node);
     void MarkLeaves(ModelInstance & world_mdl);
     void DrawTextureChains(FrameData & frame_data);
 
@@ -136,6 +137,10 @@ private:
     // Cached Cvars:
     CvarWrapper m_force_null_entity_models;
     CvarWrapper m_lerp_entity_models;
+    CvarWrapper m_skip_draw_texture_chains;
+    CvarWrapper m_skip_draw_world;
+    CvarWrapper m_skip_draw_sky;
+    CvarWrapper m_skip_draw_entities;
 
     // SkyBox rendering helper
     SkyBox m_skybox;

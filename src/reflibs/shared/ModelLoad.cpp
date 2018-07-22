@@ -597,7 +597,8 @@ static void BuildPolygonFromSurface(ModelInstance & mdl, ModelSurface & surf)
     const int num_triangles = num_verts - 2;
 
     auto * poly = mdl.hunk.AllocBlockOfType<ModelPoly>(1);
-    surf.polys = poly;
+    poly->next  = surf.polys;
+    surf.polys  = poly;
 
     poly->num_verts = num_verts;
     poly->vertexes  = mdl.hunk.AllocBlockOfType<PolyVertex>(num_verts);

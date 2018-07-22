@@ -145,6 +145,14 @@ inline void Vec3Copy(const vec3_t in, vec3_t out)
     out[2] = in[2];
 }
 
+inline void Vec4Copy(const vec4_t in, vec4_t out)
+{
+    out[0] = in[0];
+    out[1] = in[1];
+    out[2] = in[2];
+    out[3] = in[3];
+}
+
 inline void Vec3Scale(const vec3_t in, const float scale, vec3_t out)
 {
     out[0] = in[0] * scale;
@@ -174,7 +182,7 @@ int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_s * p);
 /*
 ===============================================================================
 
-    RenderMatrix (4x4, float32 vectors, 16 aligned)
+    RenderMatrix (row-major 4x4, float32 vectors, 16 aligned)
 
 ===============================================================================
 */
@@ -216,6 +224,7 @@ struct alignas(16) RenderMatrix final
     static RenderMatrix RotationX(float angle_radians);
     static RenderMatrix RotationY(float angle_radians);
     static RenderMatrix RotationZ(float angle_radians);
+    static RenderMatrix RotationAxis(float angle_radians, float x, float y, float z);
 };
 
 /*

@@ -206,18 +206,10 @@ ModelStoreImpl::~ModelStoreImpl()
 
 void ModelStoreImpl::Init()
 {
-    // Give default names to the inline models:
-    m_inline_models.reserve(kModelPoolSize);
-    for (int m = 0; m < kModelPoolSize; ++m)
-    {
-        char name[128];
-        std::snprintf(name, sizeof(name), "inline_model_%i", m);
-
-        ModelInstanceImpl * impl = m_models_pool.Allocate(); // First page in the pool will contain the inlines.
-        Construct(impl, name, ModelType::kBrush, /* reg_num = */0U, /* inline_mdl = */true);
-
-        m_inline_models.push_back(impl);
-    }
+    CommonInitInlineModelsPool(m_inline_models,
+        [this]() -> ModelInstanceImpl * {
+            return m_models_pool.Allocate(); // First page in the pool will contain the inlines.
+        });
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -833,6 +825,10 @@ void Renderer::RenderView(const refdef_s & view_def)
     m_view_draw_state.RenderWorldModel(frame_data);
     PopEvent(); // "RenderWorldModel"
 
+    PushEvent(L"RenderSkyBox");
+    m_view_draw_state.RenderSkyBox(frame_data);
+    PopEvent(); // "RenderSkyBox"
+
     PushEvent(L"RenderSolidEntities");
     m_view_draw_state.RenderSolidEntities(frame_data);
     PopEvent(); // "RenderSolidEntities"
@@ -893,7 +889,7 @@ void Renderer::BeginFrame()
     PushEvent(L"Renderer::BeginFrame");
     m_frame_started = true;
 
-    PushEvent(L"ClearRenderTargets");
+    PushEvent(L"Renderer::ClearRenderTargets");
     {
         m_window.device_context->ClearRenderTargetView(m_window.framebuffer_rtv.Get(), &kClearColor.x);
 

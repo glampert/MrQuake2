@@ -5,9 +5,7 @@
 #pragma once
 
 #include "ModelStructs.hpp"
-
 #include <vector>
-#include <memory>
 
 namespace MrQ2
 {
@@ -48,6 +46,23 @@ protected:
 
     // So the back end can cleanup on exit.
     void DestroyAllLoadedModels();
+
+    // Common setup for the inline models pool. Can be shared by all ModelStore impls.
+    template<typename MdlImpl, typename AllocMdlFunc>
+    static void CommonInitInlineModelsPool(std::vector<MdlImpl *> & dest_collection, AllocMdlFunc && alloc_model_fn)
+    {
+        dest_collection.reserve(kModelPoolSize);
+        for (int m = 0; m < kModelPoolSize; ++m)
+        {
+            char name[128]; // Give default names to the inline models
+            std::snprintf(name, sizeof(name), "inline_model_%i", m);
+
+            MdlImpl * impl = alloc_model_fn();
+            Construct(impl, name, ModelType::kBrush, /* reg_num = */0U, /* inline_mdl = */true);
+
+            dest_collection.push_back(impl);
+        }
+    }
 
 private:
 
