@@ -164,6 +164,7 @@
     <ClInclude Include="..\src\client\snd_loc.h" />
     <ClInclude Include="..\src\client\sound.h" />
     <ClInclude Include="..\src\client\vid.h" />
+    <ClInclude Include="..\src\client\warpsin.h" />
     <ClInclude Include="..\src\common\q_common.h" />
     <ClInclude Include="..\src\common\q_crc.h" />
     <ClInclude Include="..\src\common\q_files.h" />

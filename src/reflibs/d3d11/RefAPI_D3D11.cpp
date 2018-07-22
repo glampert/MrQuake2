@@ -91,6 +91,7 @@ static void EndRegistration()
     g_Renderer->MdlStore()->EndRegistration();
     g_Renderer->TexStore()->EndRegistration();
     g_Renderer->TexStore()->UploadScrapIfNeeded();
+    g_Renderer->ViewState()->EndRegistration();
 
     MemTagsPrintAll();
 }
@@ -256,10 +257,12 @@ static void DrawChar(int x, int y, int c)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void DrawTileClear(int x, int y, int w, int h, const char * name)
+static void DrawTileClear(int /*x*/, int /*y*/, int /*w*/, int /*h*/, const char * /*name*/)
 {
     FASTASSERT(g_Renderer->FrameStarted());
-    // TODO
+
+    // FIXME - Only used when letterboxing the screen for SW rendering, so not required.
+    GameInterface::Errorf("D3D11::DrawTileClear() not implemented!");
 }
 
 ///////////////////////////////////////////////////////////////////////////////

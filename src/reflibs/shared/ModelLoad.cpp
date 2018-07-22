@@ -662,6 +662,167 @@ static void BuildPolygonFromSurface(ModelInstance & mdl, ModelSurface & surf)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static void BoundPoly(const int num_verts, const float * const verts, vec3_t mins, vec3_t maxs)
+{
+    mins[0] = mins[1] = mins[2] = +9999;
+    maxs[0] = maxs[1] = maxs[2] = -9999;
+
+    const float * v = verts;
+    for (int i = 0; i < num_verts; ++i)
+    {
+        for (int j = 0; j < 3; ++j, ++v)
+        {
+            if (*v < mins[j]) mins[j] = *v;
+            if (*v > maxs[j]) maxs[j] = *v;
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+static void SubdividePolygon(ModelInstance & mdl, ModelSurface & surf, const int num_verts, float * verts)
+{
+    if (num_verts > (kSubdivideSize - 4))
+    {
+        GameInterface::Errorf("BMod::SubdividePolygon -> Too many verts (%i)", num_verts);
+    }
+
+    vec3_t mins, maxs;
+    BoundPoly(num_verts, verts, mins, maxs);
+
+    float  dist[kSubdivideSize];
+    vec3_t front[kSubdivideSize];
+    vec3_t back[kSubdivideSize];
+
+    for (int i = 0; i < 3; ++i)
+    {
+        float m = (mins[i] + maxs[i]) * 0.5f;
+        m = kSubdivideSize * std::floor(m / kSubdivideSize + 0.5f);
+
+        if (maxs[i] - m < 8.0f) continue;
+        if (m - mins[i] < 8.0f) continue;
+
+        // cut it
+        int j;
+        float * v = verts + i;
+        for (j = 0; j < num_verts; ++j, v += 3)
+        {
+            dist[j] = *v - m;
+        }
+
+        // wrap cases
+        dist[j] = dist[0];
+        v -= i;
+        Vec3Copy(verts, v);
+
+        int f = 0, b = 0;
+        v = verts;
+        for (j = 0; j < num_verts; ++j, v += 3)
+        {
+            if (dist[j] >= 0)
+            {
+                Vec3Copy(v, front[f]);
+                ++f;
+            }
+            if (dist[j] <= 0)
+            {
+                Vec3Copy(v, back[b]);
+                ++b;
+            }
+            if (dist[j] == 0.0f || dist[j + 1] == 0.0f)
+            {
+                continue;
+            }
+            if ((dist[j] > 0.0f) != (dist[j + 1] > 0.0f))
+            {
+                // clip point
+                const float frac = dist[j] / (dist[j] - dist[j + 1]);
+                for (int k = 0; k < 3; ++k)
+                {
+                    front[f][k] = back[b][k] = v[k] + frac * (v[3 + k] - v[k]);
+                }
+                ++f;
+                ++b;
+            }
+        }
+
+        SubdividePolygon(mdl, surf, f, front[0]);
+        SubdividePolygon(mdl, surf, b, back[0]);
+        return;
+    }
+
+    auto * poly = mdl.hunk.AllocBlockOfType<ModelPoly>(1);
+    poly->next  = surf.polys;
+    surf.polys  = poly;
+
+    poly->num_verts = num_verts + 2; // add a point in the center to help keep warp valid
+    poly->vertexes  = mdl.hunk.AllocBlockOfType<PolyVertex>(poly->num_verts);
+    poly->triangles = nullptr; // NOTE: will not be allocated for the warped water polygons
+
+    vec3_t total  = {};
+    float total_s = 0.0f;
+    float total_t = 0.0f;
+
+    for (int i = 0; i < num_verts; ++i, verts += 3)
+    {
+        Vec3Copy(verts, poly->vertexes[i + 1].position);
+
+        const float s = Vec3Dot(verts, surf.texinfo->vecs[0]);
+        const float t = Vec3Dot(verts, surf.texinfo->vecs[1]);
+        total_s += s;
+        total_t += t;
+
+        Vec3Add(total, verts, total);
+
+        poly->vertexes[i + 1].texture_s = s;
+        poly->vertexes[i + 1].texture_t = t;
+    }
+
+    Vec3Scale(total, (1.0f / num_verts), poly->vertexes[0].position);
+    poly->vertexes[0].texture_s = total_s / num_verts;
+    poly->vertexes[0].texture_t = total_t / num_verts;
+
+    // copy first vertex to last
+    std::memcpy(&poly->vertexes[num_verts + 1], &poly->vertexes[1], sizeof(poly->vertexes[0]));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Breaks a polygon up along axial 'kSubdivideSize' (64) unit boundaries
+// so that turbulent and sky warps can be done reasonably.
+static void SubdivideSurface(ModelInstance & mdl, ModelSurface & surf)
+{
+    vec3_t verts[kSubdivideSize];
+    int verts_count = 0;
+
+    // Convert edges back to a normal polygon:
+    for (int i = 0; i < surf.num_edges; ++i)
+    {
+        const int lindex = mdl.data.surf_edges[surf.first_edge + i];
+        const float * vec;
+
+        if (lindex > 0)
+        {
+            vec = mdl.data.vertexes[mdl.data.edges[lindex].v[0]].position;
+        }
+        else
+        {
+            vec = mdl.data.vertexes[mdl.data.edges[-lindex].v[1]].position;
+        }
+
+        if (verts_count >= kSubdivideSize)
+        {
+            GameInterface::Errorf("BMod::SubdivideSurface -> Max verts exceeded!");
+        }
+
+        Vec3Copy(vec, verts[verts_count++]);
+    }
+
+    SubdividePolygon(mdl, surf, verts_count, verts[0]);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lump_t & l)
 {
     FASTASSERT(mdl.data.planes   != nullptr); // load first!
@@ -731,7 +892,7 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
         }
 
         //
-        // Set the drawing flags:
+        // Water simulated surfaces:
         //
         if (out->texinfo->flags & SURF_WARP)
         {
@@ -742,12 +903,11 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
                 out->texture_mins[i] = -8192;
             }
 
-            // TODO
-            //GL_SubdivideSurface(out); // cut up polygon for warps
+            SubdivideSurface(mdl, *out); // Cut up polygon for warps
         }
 
         //
-        // Create lightmaps and polygons:
+        // Create lightmaps:
         //
         if (!(out->texinfo->flags & (SURF_SKY | SURF_TRANS33 | SURF_TRANS66 | SURF_WARP)))
         {
@@ -755,6 +915,9 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
             //GL_CreateSurfaceLightmap(out);
         }
 
+        //
+        // Regular opaque surface:
+        //
         if (!(out->texinfo->flags & SURF_WARP))
         {
             BuildPolygonFromSurface(mdl, *out);

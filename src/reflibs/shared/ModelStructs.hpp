@@ -53,6 +53,7 @@ enum class ModelType : std::uint8_t
 };
 
 constexpr float kBackFaceEpsilon = 0.01f;
+constexpr int kSubdivideSize = 64;
 
 // Size in pixels of the lightmap atlases.
 constexpr int kLightmapBlockWidth  = 128;

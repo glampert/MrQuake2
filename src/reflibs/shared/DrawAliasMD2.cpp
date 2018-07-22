@@ -21,12 +21,12 @@ constexpr int kShadeDotQuant    = 16;
 #endif // _MSC_VER
 
 // Pre-calculated vertex normals for simple models
-static const float r_vertex_normals[kNumVertexNormals][3] = {
+static const float s_vertex_normals[kNumVertexNormals][3] = {
 #include "client/anorms.h"
 };
 
 // Pre-calculated dot products for quantized angles
-static const float r_vertex_normal_dots[kShadeDotQuant][256] = {
+static const float s_vertex_normal_dots[kShadeDotQuant][256] = {
 #include "client/anormtab.h"
 };
 
@@ -59,7 +59,7 @@ static void LerpEntityVerts(const LerpInputs & in, float * lerp)
     {
         for (int i = 0; i < num_verts; i++, v++, ov++, lerp += 3)
         {
-            const float * const normal = r_vertex_normals[in.frame_verts[i].lightnormalindex];
+            const float * const normal = s_vertex_normals[in.frame_verts[i].lightnormalindex];
             lerp[0] = in.move[0] + ov->v[0] * in.backv[0] + v->v[0] * in.frontv[0] + normal[0] * POWERSUIT_SCALE;
             lerp[1] = in.move[1] + ov->v[1] * in.backv[1] + v->v[1] * in.frontv[1] + normal[1] * POWERSUIT_SCALE;
             lerp[2] = in.move[2] + ov->v[2] * in.backv[2] + v->v[2] * in.frontv[2] + normal[2] * POWERSUIT_SCALE;
@@ -95,8 +95,8 @@ static inline const std::int32_t * GetAliasGLCmds(const dmdl_t * const alias_hea
 static inline const float * GetShadeDotsForEnt(const entity_t & entity)
 {
     const std::size_t index = ((int)(entity.angles[YAW] * (kShadeDotQuant / 360.0f))) & (kShadeDotQuant - 1);
-    FASTASSERT(index < ArrayLength(r_vertex_normal_dots));
-    return r_vertex_normal_dots[index];
+    FASTASSERT(index < ArrayLength(s_vertex_normal_dots));
+    return s_vertex_normal_dots[index];
 }
 
 ///////////////////////////////////////////////////////////////////////////////

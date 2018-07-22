@@ -818,7 +818,7 @@ void Renderer::RenderView(const refdef_s & view_def)
     g_CurrMvp = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats }; // *** FIXME TEMP HACK ***
 
     //
-    // Now render the solid geometries (world and entities)
+    // Render solid geometries (world and entities)
     //
 
     PushEvent(L"RenderWorldModel");
@@ -832,6 +832,14 @@ void Renderer::RenderView(const refdef_s & view_def)
     PushEvent(L"RenderSolidEntities");
     m_view_draw_state.RenderSolidEntities(frame_data);
     PopEvent(); // "RenderSolidEntities"
+
+    //
+    // Transparencies/alpha pass
+    //
+
+    PushEvent(L"RenderTranslucentSurfaces");
+    m_view_draw_state.RenderTranslucentSurfaces(frame_data);
+    PopEvent(); // "RenderTranslucentSurfaces"
 
     // Back to 2D rendering mode (depth test OFF)
     DisableDepthTest();

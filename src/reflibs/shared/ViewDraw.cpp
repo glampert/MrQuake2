@@ -176,6 +176,7 @@ static RenderMatrix MakeEntityModelMatrix(const entity_t & entity, const bool fl
 ViewDrawState::ViewDrawState()
     : m_force_null_entity_models{ GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0) }
     , m_lerp_entity_models{ GameInterface::Cvar::Get("r_lerp_entity_models", "1", 0) }
+    , m_skip_draw_alpha_surfs{ GameInterface::Cvar::Get("r_skip_draw_alpha_surfs", "0", 0) }
     , m_skip_draw_texture_chains{ GameInterface::Cvar::Get("r_skip_draw_texture_chains", "0", 0) }
     , m_skip_draw_world{ GameInterface::Cvar::Get("r_skip_draw_world", "0", 0) }
     , m_skip_draw_sky{ GameInterface::Cvar::Get("r_skip_draw_sky", "0", 0) }
@@ -192,6 +193,13 @@ void ViewDrawState::BeginRegistration()
     m_view_cluster2     = -1;
     m_old_view_cluster  = -1;
     m_old_view_cluster2 = -1;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::EndRegistration()
+{
+    // Currently not required.
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -417,10 +425,11 @@ void ViewDrawState::RecursiveWorldNode(const FrameData & frame_data,
             // Just adds to visible sky bounds.
             m_skybox.AddSkySurface(*surf, frame_data.view_def.vieworg);
         }
-        else if (surf->texinfo->flags & (SURF_TRANS33 | SURF_TRANS66))
+        else if (surf->texinfo->flags & (SURF_TRANS33 | SURF_TRANS66 | SURF_WARP))
         {
             // Add to the translucent draw chain.
-            // TODO
+            surf->texture_chain = m_alpha_world_surfaces;
+            m_alpha_world_surfaces = surf;
         }
         else // Opaque texture chain
         {
@@ -561,8 +570,154 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void ViewDrawState::RenderTranslucentSurfaces(FrameData & frame_data)
+{
+    if (m_skip_draw_alpha_surfs.IsSet())
+    {
+        return;
+    }
+
+    // Draw water surfaces and windows.
+    // The BSP tree is walked front to back, so unwinding the chain
+    // of alpha surfaces will draw back to front, giving proper ordering.
+
+    for (const ModelSurface * surf = m_alpha_world_surfaces; surf; surf = surf->texture_chain)
+    {
+        // Need at least one triangle.
+        if (surf->polys == nullptr || surf->polys->num_verts < 3)
+        {
+            continue;
+        }
+
+        if (surf->flags & kSurf_DrawTurb) // Draw with vertex animation/displacement
+        {
+            DrawAnimatedWaterPolys(*surf, frame_data.view_def.time);
+        }
+        else // Static translucent surface (glass, completely still fluid)
+        {
+            BeginBatchArgs args;
+            args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+            args.optional_tex = surf->texinfo->teximage;
+            args.topology     = PrimitiveTopology::TriangleList;
+
+            MiniImBatch batch = BeginBatch(args);
+            {
+                batch.PushModelSurface(*surf);
+            }
+            EndBatch(batch);
+        }
+
+        //TEMP - tidy
+        /*
+        // the textures are prescaled up for a better lighting range,
+        // so scale it back down
+        intens = gl_state.inverse_intensity;
+
+        GL_Bind(s->texinfo->image->texnum);
+        if (s->texinfo->flags & SURF_TRANS33)
+            qglColor4f(intens, intens, intens, 0.33);
+        else if (s->texinfo->flags & SURF_TRANS66)
+            qglColor4f(intens, intens, intens, 0.66);
+        else
+            qglColor4f(intens, intens, intens, 1);
+        if (s->flags & SURF_DRAWTURB)
+            EmitWaterPolys(s);
+        else
+            DrawGLPoly(s->polys);
+        */
+    }
+
+    m_alpha_world_surfaces = nullptr;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+constexpr float kTurbScale = (256.0f / (2.0f * M_PI));
+
+#ifdef _MSC_VER
+    // "conversion from 'double' to 'const float' requires a narrowing conversion"
+    // warpsin values from Quake 2 are missing the .f suffix on float values.
+    #pragma warning(push)
+    #pragma warning(disable: 4838)
+#endif // _MSC_VER
+
+static const float s_turb_sin[] = {
+#include "client/warpsin.h"
+};
+
+#ifdef _MSC_VER
+    #pragma warning(pop)
+#endif // _MSC_VER
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::DrawAnimatedWaterPolys(const ModelSurface & surf, const float frame_time)
+{
+    float scroll;
+    if (surf.texinfo->flags & SURF_FLOWING)
+    {
+        scroll = -float(kSubdivideSize) * ((frame_time * 0.5f) - int(frame_time * 0.5f));
+    }
+    else
+    {
+        scroll = 0.0f;
+    }
+
+    BeginBatchArgs args;
+    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+    args.optional_tex = surf.texinfo->teximage;
+    args.topology     = PrimitiveTopology::TriangleFan;
+
+    for (const ModelPoly * poly = surf.polys; poly; poly = poly->next)
+    {
+        MiniImBatch batch = BeginBatch(args);
+        {
+            const int num_verts = poly->num_verts;
+            for (int v = 0; v < num_verts; ++v)
+            {
+                const float os = poly->vertexes[v].texture_s;
+                const float ot = poly->vertexes[v].texture_t;
+
+                float s = os + s_turb_sin[int((ot * 0.125f + frame_time) * kTurbScale) & 255];
+                s += scroll;
+                s *= (1.0f / kSubdivideSize);
+
+                float t = ot + s_turb_sin[int((os * 0.125f + frame_time) * kTurbScale) & 255];
+                t *= (1.0f / kSubdivideSize);
+
+                DrawVertex3D vert;
+
+                vert.position[0] = poly->vertexes[v].position[0];
+                vert.position[1] = poly->vertexes[v].position[1];
+                vert.position[2] = poly->vertexes[v].position[2];
+
+                vert.uv[0] = s;
+                vert.uv[1] = t;
+
+                vert.rgba[0] = 1.0f;
+                vert.rgba[1] = 1.0f;
+                vert.rgba[2] = 1.0f;
+                vert.rgba[3] = 1.0f;
+
+                if (v == 0)
+                {
+                    batch.SetTriangleFanFirstVertex(vert);
+                }
+                else
+                {
+                    batch.PushVertex(vert);
+                }
+            }
+        }
+        EndBatch(batch);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void ViewDrawState::RenderWorldModel(FrameData & frame_data)
 {
+    m_alpha_world_surfaces = nullptr;
     m_skybox.Clear(); // RecursiveWorldNode adds to the sky bounds
 
     if ((frame_data.view_def.rdflags & RDF_NOWORLDMODEL) || m_skip_draw_world.IsSet())
@@ -738,7 +893,7 @@ void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t 
     }
     */
 
-    const ModelSurface * surf = &model->data.surfaces[model->data.first_model_surface];
+    ModelSurface * surf = &model->data.surfaces[model->data.first_model_surface];
     const int num_surfaces = model->data.num_model_surfaces;
 
     for (int i = 0; i < num_surfaces; ++i, ++surf)
@@ -751,41 +906,44 @@ void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t 
         if (((surf->flags & kSurf_PlaneBack) && (dot < -kBackFaceEpsilon)) ||
            (!(surf->flags & kSurf_PlaneBack) && (dot >  kBackFaceEpsilon)))
         {
-            /*
-            if (surf->texinfo->flags & (SURF_TRANS33 | SURF_TRANS66))
+            if (surf->texinfo->flags & (SURF_TRANS33 | SURF_TRANS66 | SURF_WARP))
             {
-                // Add to the translucent chain
-                surf->texturechain = r_alpha_surfaces;
-                r_alpha_surfaces = surf;
+                // Add to the translucent draw chain.
+                surf->texture_chain = m_alpha_world_surfaces;
+                m_alpha_world_surfaces = surf;
             }
-            else if (qglMTexCoord2fSGIS && !(psurf->flags & SURF_DRAWTURB))
+            else 
             {
-                GL_RenderLightmappedPoly(psurf);
+                /*
+                else if (qglMTexCoord2fSGIS && !(psurf->flags & SURF_DRAWTURB))
+                {
+                    GL_RenderLightmappedPoly(psurf);
+                }
+                else
+                {
+                    GL_EnableMultitexture(false);
+                    R_RenderBrushPoly(psurf);
+                    GL_EnableMultitexture(true);
+                }
+                */
+
+                //TODO handle water polys (SURF_DRAWTURB) as in
+                //R_RenderBrushPoly
+
+                //TODO probably becomes an assert once water polygons are handled???
+                if (surf->polys == nullptr) continue;
+
+                BeginBatchArgs args;
+                args.model_matrix = mdl_mtx;
+                args.optional_tex = TextureAnimation(surf->texinfo);
+                args.topology     = PrimitiveTopology::TriangleList;
+
+                MiniImBatch batch = BeginBatch(args);
+                {
+                    batch.PushModelSurface(*surf);
+                }
+                EndBatch(batch);
             }
-            else
-            {
-                GL_EnableMultitexture(false);
-                R_RenderBrushPoly(psurf);
-                GL_EnableMultitexture(true);
-            }
-            */
-
-            //TODO handle water polys (SURF_DRAWTURB) as in
-            //R_RenderBrushPoly
-
-            //TODO probably becomes an assert once water polygons are handled???
-            if (surf->polys == nullptr) continue;
-
-            BeginBatchArgs args;
-            args.model_matrix = mdl_mtx;
-            args.optional_tex = TextureAnimation(surf->texinfo);
-            args.topology     = PrimitiveTopology::TriangleList;
-
-            MiniImBatch batch = BeginBatch(args);
-            {
-                batch.PushModelSurface(*surf);
-            }
-            EndBatch(batch);
         }
     }
 

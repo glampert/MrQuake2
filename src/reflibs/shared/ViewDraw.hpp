@@ -69,12 +69,14 @@ public:
 
     // Level-load registration:
     void BeginRegistration();
+    void EndRegistration();
 
     // Frame/view rending:
     void RenderViewSetup(FrameData & frame_data);
     void RenderWorldModel(FrameData & frame_data);
     void RenderSkyBox(FrameData & frame_data);
     void RenderSolidEntities(FrameData & frame_data);
+    void RenderTranslucentSurfaces(FrameData & frame_data);
 
     // Assignable ref
     SkyBox & Sky() { return m_skybox; }
@@ -102,6 +104,7 @@ private:
     void RecursiveWorldNode(const FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node);
     void MarkLeaves(ModelInstance & world_mdl);
     void DrawTextureChains(FrameData & frame_data);
+    void DrawAnimatedWaterPolys(const ModelSurface & surf, float frame_time);
 
     // Entity rendering:
     void DrawBrushModel(const FrameData & frame_data, const entity_t & entity);
@@ -137,10 +140,14 @@ private:
     // Cached Cvars:
     CvarWrapper m_force_null_entity_models;
     CvarWrapper m_lerp_entity_models;
+    CvarWrapper m_skip_draw_alpha_surfs;
     CvarWrapper m_skip_draw_texture_chains;
     CvarWrapper m_skip_draw_world;
     CvarWrapper m_skip_draw_sky;
     CvarWrapper m_skip_draw_entities;
+
+    // Chain of world surfaces that draw with transparency (water/glass).
+    const ModelSurface * m_alpha_world_surfaces = nullptr;
 
     // SkyBox rendering helper
     SkyBox m_skybox;

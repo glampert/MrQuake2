@@ -160,6 +160,9 @@
     <ClInclude Include="..\src\client\anormtab.h">
       <Filter>src\client</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\client\warpsin.h">
+      <Filter>src\client</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\client\cl_cin.c">
