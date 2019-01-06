@@ -191,7 +191,7 @@
     <ClInclude Include="..\..\src\reflibs\d3d11\RenderWindow.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\..\src\reflibs\d3d11\shaders\SolidGeom.fx">
+    <FxCompile Include="..\..\src\reflibs\d3d11\shaders\GeometryCommon.fx">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>

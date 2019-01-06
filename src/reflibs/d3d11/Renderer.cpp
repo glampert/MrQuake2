@@ -329,8 +329,7 @@ void SpriteBatch::BeginFrame()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl * const tex,
-                           ID3D11BlendState * const blend_state, ID3D11Buffer * const cbuffer)
+void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl * const tex, ID3D11Buffer * const cbuffer)
 {
     ID3D11DeviceContext * const context = g_Renderer->DeviceContext();
     ID3D11Buffer * const current_buffer = m_vertex_buffers[m_buffer_index].Get();
@@ -343,8 +342,7 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl
     context->VSSetConstantBuffers(0, 1, &cbuffer);
 
     // Set blending for transparency:
-    const float blend_factor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    context->OMSetBlendState(blend_state, blend_factor, 0xFFFFFFFF);
+    g_Renderer->EnableAlphaBlending();
 
     // Fast path - one texture for the whole batch:
     if (tex != nullptr)
@@ -375,7 +373,7 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl
     }
 
     // Restore default blend state.
-    context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+    g_Renderer->DisableAlphaBlending();
 
     // Move to the next buffer:
     m_buffer_index = (m_buffer_index + 1) % kNumSpriteBatchVertexBuffers;
@@ -533,15 +531,12 @@ void ViewDrawStateImpl::Init(const int max_verts, const ShaderProgram & sp,
 ///////////////////////////////////////////////////////////////////////////////
 
 //
-//TODO: Would actually be better to just fill up the vertex buffer
-// like we so with the sprite batch and do a single unmap/draw at the
-// end of a frame. Begin/End calls only set the state markers and write
-// the verts to the currently mapped buffer.
+// TODO - PERFORMANCE: Would actually be better to just fill up the vertex buffer
+//  like we do with the sprite batch and do a single unmap/draw at the
+//  end of a frame. Begin/End calls only set the state markers and write
+//  verts to the currently mapped buffer. Needs a bigger VB but should
+//  be a lot more efficient.
 //
-// Needs a bigger VB but should be a lot more efficient.
-//
-
-static DirectX::XMMATRIX g_CurrMvp; // FIXME TEMP
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -586,10 +581,8 @@ void ViewDrawStateImpl::EndBatch(MiniImBatch & batch)
     context->Unmap(current_buffer, 0);
     m_mapping_info[m_buffer_index] = {};
 
-// TEMP - should use the struct - ALSO dont need for the world surfaces
-    DirectX::XMMATRIX mvp_matrix = m_current_model_mtx * g_CurrMvp;
+    const DirectX::XMMATRIX mvp_matrix = m_current_model_mtx * m_current_viewproj_mtx;
     context->UpdateSubresource(m_cbuffer_vs, 0, nullptr, &mvp_matrix, 0, 0);
-// TEMP
 
     // Constant buffer at register(b0) (VS) and register(b1) (PS)
     context->VSSetConstantBuffers(0, 1, &m_cbuffer_vs);
@@ -673,8 +666,8 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
 
     // World geometry rendering helper
     constexpr int kViewDrawBatchSize = 4096; // size in vertices
-    m_view_draw_state.Init(kViewDrawBatchSize, m_shader_solid_geom,
-                           m_cbuffer_solid_geom_vs.Get(), m_cbuffer_solid_geom_ps.Get());
+    m_view_draw_state.Init(kViewDrawBatchSize, m_shader_geometry,
+                           m_cbuffer_geometry_vs.Get(), m_cbuffer_geometry_ps.Get());
 
     // So we can annotate our RenderDoc captures
     InitDebugEvents();
@@ -740,7 +733,7 @@ void Renderer::LoadShaders()
         m_shader_ui_sprites.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"UISprites2D.fx",
                                            "VS_main", "PS_main", { layout, num_elements });
 
-        // Blend state for the screen text:
+        // Blend state for the screen text and transparencies:
         D3D11_BLEND_DESC bs_desc                      = {};
         bs_desc.RenderTarget[0].BlendEnable           = true;
         bs_desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
@@ -750,7 +743,7 @@ void Renderer::LoadShaders()
         bs_desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
         bs_desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
         bs_desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
-        if (FAILED(Device()->CreateBlendState(&bs_desc, m_blend_state_ui_sprites.GetAddressOf())))
+        if (FAILED(Device()->CreateBlendState(&bs_desc, m_blend_state_alpha.GetAddressOf())))
         {
             GameInterface::Errorf("CreateBlendState failed!");
         }
@@ -766,7 +759,7 @@ void Renderer::LoadShaders()
         }
     }
 
-    // Solid geometry:
+    // Common 3D geometry:
     {
         const D3D11_INPUT_ELEMENT_DESC layout[] = { // DrawVertex3D
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, offsetof(DrawVertex3D, position), D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -774,21 +767,21 @@ void Renderer::LoadShaders()
             { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex3D, rgba),     D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
         const int num_elements = ARRAYSIZE(layout);
-        m_shader_solid_geom.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"SolidGeom.fx",
-                                           "VS_main", "PS_main", { layout, num_elements });
+        m_shader_geometry.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"GeometryCommon.fx",
+                                         "VS_main", "PS_main", { layout, num_elements });
 
         // Create the constant buffers:
         D3D11_BUFFER_DESC buf_desc = {};
         buf_desc.Usage             = D3D11_USAGE_DEFAULT;
         buf_desc.ByteWidth         = sizeof(ConstantBufferDataSGeomVS);
         buf_desc.BindFlags         = D3D11_BIND_CONSTANT_BUFFER;
-        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_solid_geom_vs.GetAddressOf())))
+        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_geometry_vs.GetAddressOf())))
         {
             GameInterface::Errorf("Failed to create VS shader constant buffer!");
         }
 
         buf_desc.ByteWidth = sizeof(ConstantBufferDataSGeomPS);
-        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_solid_geom_ps.GetAddressOf())))
+        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_geometry_ps.GetAddressOf())))
         {
             GameInterface::Errorf("Failed to create PS shader constant buffer!");
         }
@@ -814,8 +807,10 @@ void Renderer::RenderView(const refdef_s & view_def)
     // Update the constant buffers for this frame
     RenderViewUpdateCBuffers(frame_data);
 
+    // Set the camera/world-view:
     FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
-    g_CurrMvp = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats }; // *** FIXME TEMP HACK ***
+    const auto vp_mtx = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
+    m_view_draw_state.SetCurrentViewProjMatrix(vp_mtx);
 
     //
     // Render solid geometries (world and entities)
@@ -837,9 +832,15 @@ void Renderer::RenderView(const refdef_s & view_def)
     // Transparencies/alpha pass
     //
 
+    // Color Blend ON
+    EnableAlphaBlending();
+
     PushEvent(L"RenderTranslucentSurfaces");
     m_view_draw_state.RenderTranslucentSurfaces(frame_data);
     PopEvent(); // "RenderTranslucentSurfaces"
+
+    // Color Blend OFF
+    DisableAlphaBlending();
 
     // Back to 2D rendering mode (depth test OFF)
     DisableDepthTest();
@@ -853,27 +854,27 @@ void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& fram
 {
     FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
 
-    ConstantBufferDataSGeomVS cbuffer_data_solid_geom_vs;
-    cbuffer_data_solid_geom_vs.mvp_matrix = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
-    DeviceContext()->UpdateSubresource(m_cbuffer_solid_geom_vs.Get(), 0, nullptr, &cbuffer_data_solid_geom_vs, 0, 0);
+    ConstantBufferDataSGeomVS cbuffer_data_geometry_vs;
+    cbuffer_data_geometry_vs.mvp_matrix = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
+    DeviceContext()->UpdateSubresource(m_cbuffer_geometry_vs.Get(), 0, nullptr, &cbuffer_data_geometry_vs, 0, 0);
 
-    ConstantBufferDataSGeomPS cbuffer_data_solid_geom_ps;
+    ConstantBufferDataSGeomPS cbuffer_data_geometry_ps;
     if (m_disable_texturing.IsSet()) // Use only debug vertex color
     {
-        cbuffer_data_solid_geom_ps.texture_color_scaling = kFloat4Zero;
-        cbuffer_data_solid_geom_ps.vertex_color_scaling  = kFloat4One;
+        cbuffer_data_geometry_ps.texture_color_scaling = kFloat4Zero;
+        cbuffer_data_geometry_ps.vertex_color_scaling  = kFloat4One;
     }
     else if (m_blend_debug_color.IsSet()) // Blend debug vertex color with texture
     {
-        cbuffer_data_solid_geom_ps.texture_color_scaling = kFloat4One;
-        cbuffer_data_solid_geom_ps.vertex_color_scaling  = kFloat4One;
+        cbuffer_data_geometry_ps.texture_color_scaling = kFloat4One;
+        cbuffer_data_geometry_ps.vertex_color_scaling  = kFloat4One;
     }
     else // Normal rendering
     {
-        cbuffer_data_solid_geom_ps.texture_color_scaling = kFloat4One;
-        cbuffer_data_solid_geom_ps.vertex_color_scaling  = kFloat4Zero;
+        cbuffer_data_geometry_ps.texture_color_scaling = kFloat4One;
+        cbuffer_data_geometry_ps.vertex_color_scaling  = kFloat4Zero;
     }
-    DeviceContext()->UpdateSubresource(m_cbuffer_solid_geom_ps.Get(), 0, nullptr, &cbuffer_data_solid_geom_ps, 0, 0);
+    DeviceContext()->UpdateSubresource(m_cbuffer_geometry_ps.Get(), 0, nullptr, &cbuffer_data_geometry_ps, 0, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -888,6 +889,21 @@ void Renderer::EnableDepthTest()
 void Renderer::DisableDepthTest()
 {
     DeviceContext()->OMSetDepthStencilState(m_dss_depth_test_disabled.Get(), 0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::EnableAlphaBlending()
+{
+    const float blend_factor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    DeviceContext()->OMSetBlendState(m_blend_state_alpha.Get(), blend_factor, 0xFFFFFFFF);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::DisableAlphaBlending()
+{
+    DeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -934,7 +950,6 @@ void Renderer::Flush2D()
     PushEvent(L"Renderer::Flush2D");
 
     FASTASSERT(m_tex_store.tex_conchars != nullptr);
-    FASTASSERT(m_blend_state_ui_sprites != nullptr);
     FASTASSERT(m_cbuffer_ui_sprites != nullptr);
 
     if (m_window_resized)
@@ -947,13 +962,13 @@ void Renderer::Flush2D()
     }
 
     // Remaining 2D geometry:
-    m_sprite_batches[SpriteBatch::kDrawPics].EndFrame(m_shader_ui_sprites, nullptr,
-            m_blend_state_ui_sprites.Get(), m_cbuffer_ui_sprites.Get());
+    m_sprite_batches[SpriteBatch::kDrawPics].EndFrame(m_shader_ui_sprites,
+        nullptr, m_cbuffer_ui_sprites.Get());
 
     // Flush 2D text:
     m_sprite_batches[SpriteBatch::kDrawChar].EndFrame(m_shader_ui_sprites,
-            static_cast<const TextureImageImpl *>(m_tex_store.tex_conchars),
-            m_blend_state_ui_sprites.Get(), m_cbuffer_ui_sprites.Get());
+        static_cast<const TextureImageImpl *>(m_tex_store.tex_conchars),
+        m_cbuffer_ui_sprites.Get());
 
     PopEvent(); // "Renderer::Flush2D"
 }

@@ -36,7 +36,7 @@
     <FxCompile Include="..\..\src\reflibs\d3d11\shaders\UISprites2D.fx">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\src\reflibs\d3d11\shaders\SolidGeom.fx">
+    <FxCompile Include="..\..\src\reflibs\d3d11\shaders\GeometryCommon.fx">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

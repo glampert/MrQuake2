@@ -181,6 +181,7 @@ ViewDrawState::ViewDrawState()
     , m_skip_draw_world{ GameInterface::Cvar::Get("r_skip_draw_world", "0", 0) }
     , m_skip_draw_sky{ GameInterface::Cvar::Get("r_skip_draw_sky", "0", 0) }
     , m_skip_draw_entities{ GameInterface::Cvar::Get("r_skip_draw_entities", "0", 0) }
+    , m_intensity{ GameInterface::Cvar::Get("r_intensity", "2", 0) }
 {
 }
 
@@ -577,6 +578,10 @@ void ViewDrawState::RenderTranslucentSurfaces(FrameData & frame_data)
         return;
     }
 
+    // The textures are prescaled up for a better
+    // lighting range, so scale it back down.
+    const float inv_intensity = 1.0f / m_intensity.AsFloat();
+
     // Draw water surfaces and windows.
     // The BSP tree is walked front to back, so unwinding the chain
     // of alpha surfaces will draw back to front, giving proper ordering.
@@ -589,9 +594,32 @@ void ViewDrawState::RenderTranslucentSurfaces(FrameData & frame_data)
             continue;
         }
 
+        vec4_t color_alpha;
+        if (surf->texinfo->flags & SURF_TRANS33)
+        {
+            color_alpha[0] = inv_intensity;
+            color_alpha[1] = inv_intensity;
+            color_alpha[2] = inv_intensity;
+            color_alpha[3] = 0.33f;
+        }
+        else if (surf->texinfo->flags & SURF_TRANS66)
+        {
+            color_alpha[0] = inv_intensity;
+            color_alpha[1] = inv_intensity;
+            color_alpha[2] = inv_intensity;
+            color_alpha[3] = 0.66f;
+        }
+        else // Solid color
+        {
+            color_alpha[0] = inv_intensity;
+            color_alpha[1] = inv_intensity;
+            color_alpha[2] = inv_intensity;
+            color_alpha[3] = 1.0f;
+        }
+
         if (surf->flags & kSurf_DrawTurb) // Draw with vertex animation/displacement
         {
-            DrawAnimatedWaterPolys(*surf, frame_data.view_def.time);
+            DrawAnimatedWaterPolys(*surf, frame_data.view_def.time, color_alpha);
         }
         else // Static translucent surface (glass, completely still fluid)
         {
@@ -602,29 +630,10 @@ void ViewDrawState::RenderTranslucentSurfaces(FrameData & frame_data)
 
             MiniImBatch batch = BeginBatch(args);
             {
-                batch.PushModelSurface(*surf);
+                batch.PushModelSurface(*surf, &color_alpha);
             }
             EndBatch(batch);
         }
-
-        //TEMP - tidy
-        /*
-        // the textures are prescaled up for a better lighting range,
-        // so scale it back down
-        intens = gl_state.inverse_intensity;
-
-        GL_Bind(s->texinfo->image->texnum);
-        if (s->texinfo->flags & SURF_TRANS33)
-            qglColor4f(intens, intens, intens, 0.33);
-        else if (s->texinfo->flags & SURF_TRANS66)
-            qglColor4f(intens, intens, intens, 0.66);
-        else
-            qglColor4f(intens, intens, intens, 1);
-        if (s->flags & SURF_DRAWTURB)
-            EmitWaterPolys(s);
-        else
-            DrawGLPoly(s->polys);
-        */
     }
 
     m_alpha_world_surfaces = nullptr;
@@ -651,7 +660,7 @@ static const float s_turb_sin[] = {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DrawAnimatedWaterPolys(const ModelSurface & surf, const float frame_time)
+void ViewDrawState::DrawAnimatedWaterPolys(const ModelSurface & surf, const float frame_time, const vec4_t color)
 {
     float scroll;
     if (surf.texinfo->flags & SURF_FLOWING)
@@ -694,10 +703,10 @@ void ViewDrawState::DrawAnimatedWaterPolys(const ModelSurface & surf, const floa
                 vert.uv[0] = s;
                 vert.uv[1] = t;
 
-                vert.rgba[0] = 1.0f;
-                vert.rgba[1] = 1.0f;
-                vert.rgba[2] = 1.0f;
-                vert.rgba[3] = 1.0f;
+                vert.rgba[0] = color[0];
+                vert.rgba[1] = color[1];
+                vert.rgba[2] = color[2];
+                vert.rgba[3] = color[3];
 
                 if (v == 0)
                 {

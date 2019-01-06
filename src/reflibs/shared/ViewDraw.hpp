@@ -104,7 +104,7 @@ private:
     void RecursiveWorldNode(const FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node);
     void MarkLeaves(ModelInstance & world_mdl);
     void DrawTextureChains(FrameData & frame_data);
-    void DrawAnimatedWaterPolys(const ModelSurface & surf, float frame_time);
+    void DrawAnimatedWaterPolys(const ModelSurface & surf, float frame_time, const vec4_t color);
 
     // Entity rendering:
     void DrawBrushModel(const FrameData & frame_data, const entity_t & entity);
@@ -145,6 +145,7 @@ private:
     CvarWrapper m_skip_draw_world;
     CvarWrapper m_skip_draw_sky;
     CvarWrapper m_skip_draw_entities;
+    CvarWrapper m_intensity;
 
     // Chain of world surfaces that draw with transparency (water/glass).
     const ModelSurface * m_alpha_world_surfaces = nullptr;

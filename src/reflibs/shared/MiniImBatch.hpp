@@ -97,7 +97,7 @@ public:
     }
 
     void PushVertex(const DrawVertex3D & vert);
-    void PushModelSurface(const ModelSurface & surf);
+    void PushModelSurface(const ModelSurface & surf, const vec4_t * opt_color_override = nullptr);
 
     int NumVerts()  const { return m_num_verts; }
     int UsedVerts() const { return m_used_verts; }

@@ -570,13 +570,13 @@ static void TriangulatePolygon(ModelPoly & poly)
         }
     }
 
-    // FIXME: I don't think this should be a hard error...
+    // TODO|FIXME? I don't think this is a hard error...
     // We should be outputting at most num_verts - 2 triangles
     // but the algorithm might still fail to produce that many tris.
     // better to keep a num_triangles member in the polygon struct instead!
     if (triangles_done != num_triangles)
     {
-        GameInterface::Errorf("BMod::TriangulatePolygon: Unexpected triangle count!");
+        GameInterface::Printf("WARNING - BMod::TriangulatePolygon: Unexpected triangle count!");
     }
 }
 
@@ -719,12 +719,12 @@ static void SubdividePolygon(ModelInstance & mdl, ModelSurface & surf, const int
         v = verts;
         for (j = 0; j < num_verts; ++j, v += 3)
         {
-            if (dist[j] >= 0)
+            if (dist[j] >= 0.0f)
             {
                 Vec3Copy(v, front[f]);
                 ++f;
             }
-            if (dist[j] <= 0)
+            if (dist[j] <= 0.0f)
             {
                 Vec3Copy(v, back[b]);
                 ++b;

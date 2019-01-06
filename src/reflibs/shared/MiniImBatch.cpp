@@ -59,7 +59,7 @@ void MiniImBatch::PushVertex(const DrawVertex3D & vert)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void MiniImBatch::PushModelSurface(const ModelSurface & surf)
+void MiniImBatch::PushModelSurface(const ModelSurface & surf, const vec4_t * const opt_color_override)
 {
     FASTASSERT(IsValid()); // Clear()ed?
 
@@ -88,11 +88,18 @@ void MiniImBatch::PushModelSurface(const ModelSurface & surf)
             verts_iter->uv[0] = poly_vert.texture_s;
             verts_iter->uv[1] = poly_vert.texture_t;
 
-            ColorFloats(surf.debug_color,
-                        verts_iter->rgba[0],
-                        verts_iter->rgba[1],
-                        verts_iter->rgba[2],
-                        verts_iter->rgba[3]);
+            if (opt_color_override != nullptr)
+            {
+                Vec4Copy(*opt_color_override, verts_iter->rgba);
+            }
+            else
+            {
+                ColorFloats(surf.debug_color,
+                            verts_iter->rgba[0],
+                            verts_iter->rgba[1],
+                            verts_iter->rgba[2],
+                            verts_iter->rgba[3]);
+            }
 
             ++verts_iter;
         }

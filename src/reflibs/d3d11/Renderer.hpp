@@ -188,19 +188,24 @@ public:
     ViewDrawStateImpl() = default;
     void Init(int max_verts, const ShaderProgram & sp, ID3D11Buffer * cbuff_vs, ID3D11Buffer * cbuff_ps);
 
+    void SetCurrentTexture(const TextureImage & tex)
+    {
+        m_current_texture = static_cast<const TextureImageImpl *>(&tex);
+    }
+
+    void SetCurrentViewProjMatrix(const DirectX::XMMATRIX & mtx)
+    {
+        m_current_viewproj_mtx = mtx;
+    }
+
     // Disallow copy.
     ViewDrawStateImpl(const ViewDrawStateImpl &) = delete;
     ViewDrawStateImpl & operator=(const ViewDrawStateImpl &) = delete;
 
 protected:
 
-    /*virtual*/ MiniImBatch BeginBatch(const BeginBatchArgs & args) override;
-    /*virtual*/ void EndBatch(MiniImBatch & batch) override;
-
-    void SetCurrentTexture(const TextureImage & tex)
-    {
-        m_current_texture = static_cast<const TextureImageImpl *>(&tex);
-    }
+    /*virtual*/ MiniImBatch BeginBatch(const BeginBatchArgs & args) override final;
+    /*virtual*/ void EndBatch(MiniImBatch & batch) override final;
 
 private:
 
@@ -213,6 +218,7 @@ private:
     bool m_batch_open = false;
     PrimitiveTopology m_current_topology;
     DirectX::XMMATRIX m_current_model_mtx;
+    DirectX::XMMATRIX m_current_viewproj_mtx;
 
     // Refs are owned by the parent Renderer.
     const TextureImageImpl * m_current_texture = nullptr;
@@ -245,8 +251,7 @@ public:
     void Init(int max_verts);
 
     void BeginFrame();
-    void EndFrame(const ShaderProgram & program, const TextureImageImpl * const tex,
-                  ID3D11BlendState * const blend_state, ID3D11Buffer * const cbuffer);
+    void EndFrame(const ShaderProgram & program, const TextureImageImpl * const tex, ID3D11Buffer * const cbuffer);
 
     DrawVertex2D * Increment(int count);
 
@@ -332,6 +337,9 @@ public:
     void EnableDepthTest();
     void DisableDepthTest();
 
+    void EnableAlphaBlending();
+    void DisableAlphaBlending();
+
     void DrawHelper(unsigned num_verts, unsigned first_vert, const ShaderProgram & program,
                     ID3D11Buffer * const vb, D3D11_PRIMITIVE_TOPOLOGY topology,
                     unsigned offset, unsigned stride);
@@ -392,13 +400,13 @@ private:
 
     // Shader programs / render states:
     ShaderProgram                      m_shader_ui_sprites;
-    ShaderProgram                      m_shader_solid_geom;
-    ComPtr<ID3D11BlendState>           m_blend_state_ui_sprites;
+    ShaderProgram                      m_shader_geometry;
+    ComPtr<ID3D11BlendState>           m_blend_state_alpha;
     ComPtr<ID3D11DepthStencilState>    m_dss_depth_test_enabled;
     ComPtr<ID3D11DepthStencilState>    m_dss_depth_test_disabled;
     ComPtr<ID3D11Buffer>               m_cbuffer_ui_sprites;
-    ComPtr<ID3D11Buffer>               m_cbuffer_solid_geom_vs;
-    ComPtr<ID3D11Buffer>               m_cbuffer_solid_geom_ps;
+    ComPtr<ID3D11Buffer>               m_cbuffer_geometry_vs;
+    ComPtr<ID3D11Buffer>               m_cbuffer_geometry_ps;
 
     // Cached Cvars:
     CvarWrapper                        m_disable_texturing;
