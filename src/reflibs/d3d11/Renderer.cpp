@@ -289,42 +289,75 @@ void ShaderProgram::CreateVertexLayout(const D3D11_INPUT_ELEMENT_DESC * const de
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// DepthStateHelper
+///////////////////////////////////////////////////////////////////////////////
+
+void DepthStateHelper::Init(const bool enabled_ztest,
+                            const D3D11_COMPARISON_FUNC enabled_func,
+                            const D3D11_DEPTH_WRITE_MASK enabled_write_mask,
+                            const bool disabled_ztest,
+                            const D3D11_COMPARISON_FUNC disabled_func,
+                            const D3D11_DEPTH_WRITE_MASK disabled_write_mask)
+{
+    D3D11_DEPTH_STENCIL_DESC ds_desc = {};
+
+    //
+    // Stencil test parameters (always OFF):
+    //
+
+    ds_desc.StencilEnable                = false;
+    ds_desc.StencilReadMask              = 0;
+    ds_desc.StencilWriteMask             = 0;
+    // Stencil operations if pixel is front-facing:
+    ds_desc.FrontFace.StencilFailOp      = D3D11_STENCIL_OP_KEEP;
+    ds_desc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
+    ds_desc.FrontFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP;
+    ds_desc.FrontFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
+    // Stencil operations if pixel is back-facing:
+    ds_desc.BackFace.StencilFailOp       = D3D11_STENCIL_OP_KEEP;
+    ds_desc.BackFace.StencilDepthFailOp  = D3D11_STENCIL_OP_DECR;
+    ds_desc.BackFace.StencilPassOp       = D3D11_STENCIL_OP_KEEP;
+    ds_desc.BackFace.StencilFunc         = D3D11_COMPARISON_ALWAYS;
+
+    //
+    // Depth test parameters:
+    //
+
+    // When ON:
+    ds_desc.DepthEnable    = enabled_ztest;
+    ds_desc.DepthFunc      = enabled_func;
+    ds_desc.DepthWriteMask = enabled_write_mask;
+    // Create depth stencil state for rendering with depth test ENABLED:
+    if (FAILED(g_Renderer->Device()->CreateDepthStencilState(&ds_desc, enabled_state.GetAddressOf())))
+    {
+        GameInterface::Errorf("CreateDepthStencilState failed!");
+    }
+
+    // When OFF:
+    ds_desc.DepthEnable    = disabled_ztest;
+    ds_desc.DepthFunc      = disabled_func;
+    ds_desc.DepthWriteMask = disabled_write_mask;
+    // Create depth stencil state for rendering with depth test DISABLED:
+    if (FAILED(g_Renderer->Device()->CreateDepthStencilState(&ds_desc, disabled_state.GetAddressOf())))
+    {
+        GameInterface::Errorf("CreateDepthStencilState failed!");
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // SpriteBatch
 ///////////////////////////////////////////////////////////////////////////////
 
 void SpriteBatch::Init(const int max_verts)
 {
-    m_num_verts = max_verts;
-
-    D3D11_BUFFER_DESC bd = {};
-    bd.Usage             = D3D11_USAGE_DYNAMIC;
-    bd.CPUAccessFlags    = D3D11_CPU_ACCESS_WRITE;
-    bd.ByteWidth         = sizeof(DrawVertex2D) * max_verts;
-    bd.BindFlags         = D3D11_BIND_VERTEX_BUFFER;
-
-    for (unsigned b = 0; b < m_vertex_buffers.size(); ++b)
-    {
-        if (FAILED(g_Renderer->Device()->CreateBuffer(&bd, nullptr, m_vertex_buffers[b].GetAddressOf())))
-        {
-            GameInterface::Errorf("Failed to create SpriteBatch vertex buffer %i", b);
-        }
-        m_mapping_info[b] = {};
-    }
-
-    MemTagsTrackAlloc(bd.ByteWidth * kNumSpriteBatchVertexBuffers, MemTag::kVertIndexBuffer);
-    GameInterface::Printf("SpriteBatch used %s", FormatMemoryUnit(bd.ByteWidth * kNumSpriteBatchVertexBuffers));
+    m_buffers.Init("SpriteBatch", max_verts, g_Renderer->Device(), g_Renderer->DeviceContext());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void SpriteBatch::BeginFrame()
 {
-    // Map the current buffer:
-    if (FAILED(g_Renderer->DeviceContext()->Map(m_vertex_buffers[m_buffer_index].Get(),
-               0, D3D11_MAP_WRITE_DISCARD, 0, &m_mapping_info[m_buffer_index])))
-    {
-        GameInterface::Errorf("Failed to map SpriteBatch vertex buffer %i", m_buffer_index);
-    }
+    m_buffers.Begin();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -332,11 +365,7 @@ void SpriteBatch::BeginFrame()
 void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl * const tex, ID3D11Buffer * const cbuffer)
 {
     ID3D11DeviceContext * const context = g_Renderer->DeviceContext();
-    ID3D11Buffer * const current_buffer = m_vertex_buffers[m_buffer_index].Get();
-
-    // Unmap current buffer:
-    context->Unmap(current_buffer, 0);
-    m_mapping_info[m_buffer_index] = {};
+    const auto draw_buf = m_buffers.End();
 
     // Constant buffer at register(b0)
     context->VSSetConstantBuffers(0, 1, &cbuffer);
@@ -352,7 +381,7 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl
         context->PSSetSamplers(0, 1, tex->sampler.GetAddressOf());
 
         // Draw with the current vertex buffer:
-        g_Renderer->DrawHelper(m_used_verts, 0, program, current_buffer,
+        g_Renderer->DrawHelper(draw_buf.used_verts, 0, program, draw_buf.buffer_ptr,
                                D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex2D));
     }
     else // Handle small unique textured draws:
@@ -367,7 +396,7 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl
                 previous_tex = d.tex;
             }
 
-            g_Renderer->DrawHelper(/*num_verts=*/ 6, d.quad_start_vtx, program, current_buffer,
+            g_Renderer->DrawHelper(/*num_verts=*/ 6, d.quad_start_vtx, program, draw_buf.buffer_ptr,
                                    D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex2D));
         }
     }
@@ -375,36 +404,11 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl
     // Restore default blend state.
     g_Renderer->DisableAlphaBlending();
 
-    // Move to the next buffer:
-    m_buffer_index = (m_buffer_index + 1) % kNumSpriteBatchVertexBuffers;
-    m_used_verts = 0;
-
+    // Clear cache for next frame:
     if (!m_deferred_textured_quads.empty())
     {
         m_deferred_textured_quads.clear();
     }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-DrawVertex2D * SpriteBatch::Increment(const int count)
-{
-    FASTASSERT(count > 0 && count <= m_num_verts);
-
-    auto * verts = static_cast<DrawVertex2D *>(m_mapping_info[m_buffer_index].pData);
-    FASTASSERT(verts != nullptr);
-    FASTASSERT_ALIGN16(verts);
-
-    verts += m_used_verts;
-    m_used_verts += count;
-
-    if (m_used_verts > m_num_verts)
-    {
-        GameInterface::Errorf("SpriteBatch overflowed! used_verts=%i, num_verts=%i. "
-                              "Increase size.", m_used_verts, m_num_verts);
-    }
-
-    return verts;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -477,7 +481,7 @@ void SpriteBatch::PushQuadTextured(const float x, const float y,
                                    const DirectX::XMFLOAT4A & color)
 {
     FASTASSERT(tex != nullptr);
-    const int quad_start_vtx = m_used_verts;
+    const int quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color);
     m_deferred_textured_quads.push_back({ quad_start_vtx, tex });
 }
@@ -492,7 +496,7 @@ void SpriteBatch::PushQuadTexturedUVs(const float x, const float y,
                                       const DirectX::XMFLOAT4A & color)
 {
     FASTASSERT(tex != nullptr);
-    const int quad_start_vtx = m_used_verts;
+    const int quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, u0, v0, u1, v1, color);
     m_deferred_textured_quads.push_back({ quad_start_vtx, tex });
 }
@@ -504,39 +508,57 @@ void SpriteBatch::PushQuadTexturedUVs(const float x, const float y,
 void ViewDrawStateImpl::Init(const int max_verts, const ShaderProgram & sp,
                              ID3D11Buffer * cbuff_vs, ID3D11Buffer * cbuff_ps)
 {
-    m_num_verts  = max_verts;
+    m_buffers.Init("ViewDrawStateImpl", max_verts,
+                   g_Renderer->Device(), g_Renderer->DeviceContext());
+
     m_program    = &sp;
     m_cbuffer_vs = cbuff_vs;
     m_cbuffer_ps = cbuff_ps;
 
-    D3D11_BUFFER_DESC bd = {};
-    bd.Usage             = D3D11_USAGE_DYNAMIC;
-    bd.CPUAccessFlags    = D3D11_CPU_ACCESS_WRITE;
-    bd.ByteWidth         = sizeof(DrawVertex3D) * max_verts;
-    bd.BindFlags         = D3D11_BIND_VERTEX_BUFFER;
-
-    for (unsigned b = 0; b < m_vertex_buffers.size(); ++b)
-    {
-        if (FAILED(g_Renderer->Device()->CreateBuffer(&bd, nullptr, m_vertex_buffers[b].GetAddressOf())))
-        {
-            GameInterface::Errorf("Failed to create ViewDrawStateImpl vertex buffer %i", b);
-        }
-        m_mapping_info[b] = {};
-    }
-
-    MemTagsTrackAlloc(bd.ByteWidth * kNumViewDrawVertexBuffers, MemTag::kVertIndexBuffer);
-    GameInterface::Printf("ViewDrawStateImpl used %s", FormatMemoryUnit(bd.ByteWidth * kNumViewDrawVertexBuffers));
+    m_draw_cmds = new(MemTag::kRenderer) DrawCmdList{};
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-//
-// TODO - PERFORMANCE: Would actually be better to just fill up the vertex buffer
-//  like we do with the sprite batch and do a single unmap/draw at the
-//  end of a frame. Begin/End calls only set the state markers and write
-//  verts to the currently mapped buffer. Needs a bigger VB but should
-//  be a lot more efficient.
-//
+void ViewDrawStateImpl::BeginRenderPass()
+{
+    FASTASSERT(m_batch_open == false);
+    FASTASSERT(m_draw_cmds->empty());
+
+    m_buffers.Begin();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawStateImpl::EndRenderPass()
+{
+    FASTASSERT(m_batch_open == false);
+
+    // Flush draw:
+    ID3D11DeviceContext * const context = g_Renderer->DeviceContext();
+    const auto draw_buf = m_buffers.End();
+
+    // Constant buffer at register(b0) (VS) and register(b1) (PS)
+    context->VSSetConstantBuffers(0, 1, &m_cbuffer_vs);
+    context->PSSetConstantBuffers(1, 1, &m_cbuffer_ps);
+
+    for (const DrawCmd & cmd : *m_draw_cmds)
+    {
+        const DirectX::XMMATRIX mvp_matrix = cmd.model_mtx * m_viewproj_mtx;
+        context->UpdateSubresource(m_cbuffer_vs, 0, nullptr, &mvp_matrix, 0, 0);
+
+        // Bind texture & sampler (t0, s0):
+        const auto * tex = static_cast<const TextureImageImpl *>(cmd.texture);
+        context->PSSetShaderResources(0, 1, tex->srv.GetAddressOf());
+        context->PSSetSamplers(0, 1, tex->sampler.GetAddressOf());
+
+        // Draw with the current vertex buffer:
+        g_Renderer->DrawHelper(cmd.num_verts, cmd.first_vert, *m_program, draw_buf.buffer_ptr,
+                               PrimitiveTopologyToD3D(cmd.topology), 0, sizeof(DrawVertex3D));
+    }
+
+    m_draw_cmds->clear();
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -545,64 +567,35 @@ MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
     FASTASSERT(m_batch_open == false);
     FASTASSERT_ALIGN16(args.model_matrix.floats);
 
-    // Map the current buffer:
-    if (FAILED(g_Renderer->DeviceContext()->Map(m_vertex_buffers[m_buffer_index].Get(),
-               0, D3D11_MAP_WRITE_DISCARD, 0, &m_mapping_info[m_buffer_index])))
-    {
-        GameInterface::Errorf("Failed to map ViewDrawStateImpl vertex buffer %i", m_buffer_index);
-    }
+    m_current_draw_cmd.model_mtx  = DirectX::XMMATRIX{ args.model_matrix.floats };
+    m_current_draw_cmd.texture    = args.optional_tex ? args.optional_tex : g_Renderer->TexStore()->tex_white2x2;
+    m_current_draw_cmd.topology   = args.topology;
+    m_current_draw_cmd.first_vert = 0;
+    m_current_draw_cmd.num_verts  = 0;
 
-    auto * verts = static_cast<DrawVertex3D *>(m_mapping_info[m_buffer_index].pData);
-    FASTASSERT(verts != nullptr);
-    FASTASSERT_ALIGN16(verts);
+    m_batch_open = true;
 
-    SetCurrentTexture(args.optional_tex ? *args.optional_tex : *(g_Renderer->TexStore()->tex_white2x2));
-
-    m_current_topology  = args.topology;
-    m_current_model_mtx = DirectX::XMMATRIX{ args.model_matrix.floats };
-    m_batch_open        = true;
-
-    return MiniImBatch{ verts, m_num_verts, m_current_topology };
+    return MiniImBatch{ m_buffers.CurrentVertexPtr(), m_buffers.NumVertsRemaining(), args.topology };
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void ViewDrawStateImpl::EndBatch(MiniImBatch & batch)
 {
+    FASTASSERT(batch.IsValid());
     FASTASSERT(m_batch_open == true);
-    FASTASSERT(m_current_texture != nullptr);
-    FASTASSERT(m_current_topology == batch.Topology());
-    FASTASSERT(m_program != nullptr && m_cbuffer_vs != nullptr && m_cbuffer_ps != nullptr);
+    FASTASSERT(m_current_draw_cmd.topology == batch.Topology());
 
-    ID3D11DeviceContext * const context = g_Renderer->DeviceContext();
-    ID3D11Buffer * const current_buffer = m_vertex_buffers[m_buffer_index].Get();
+    m_current_draw_cmd.first_vert = m_buffers.CurrentPosition();
+    m_current_draw_cmd.num_verts  = batch.UsedVerts();
 
-    // Unmap current buffer:
-    context->Unmap(current_buffer, 0);
-    m_mapping_info[m_buffer_index] = {};
+    m_buffers.Increment(batch.UsedVerts());
 
-    const DirectX::XMMATRIX mvp_matrix = m_current_model_mtx * m_current_viewproj_mtx;
-    context->UpdateSubresource(m_cbuffer_vs, 0, nullptr, &mvp_matrix, 0, 0);
-
-    // Constant buffer at register(b0) (VS) and register(b1) (PS)
-    context->VSSetConstantBuffers(0, 1, &m_cbuffer_vs);
-    context->PSSetConstantBuffers(1, 1, &m_cbuffer_ps);
-
-    // Bind texture & sampler (t0, s0):
-    context->PSSetShaderResources(0, 1, m_current_texture->srv.GetAddressOf());
-    context->PSSetSamplers(0, 1, m_current_texture->sampler.GetAddressOf());
-
-    // Draw with the current vertex buffer:
-    g_Renderer->DrawHelper(batch.UsedVerts(), 0, *m_program, current_buffer,
-                           PrimitiveTopologyToD3D(m_current_topology), 0, sizeof(DrawVertex3D));
-
-    // Move to the next buffer:
-    m_buffer_index = (m_buffer_index + 1) % kNumViewDrawVertexBuffers;
-
-    m_current_texture = nullptr;
-    m_batch_open = false;
+    m_draw_cmds->push_back(m_current_draw_cmd);
+    m_current_draw_cmd = {};
 
     batch.Clear();
+    m_batch_open = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -665,7 +658,7 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
     LoadShaders();
 
     // World geometry rendering helper
-    constexpr int kViewDrawBatchSize = 4096; // size in vertices
+    constexpr int kViewDrawBatchSize = 25000; // size in vertices
     m_view_draw_state.Init(kViewDrawBatchSize, m_shader_geometry,
                            m_cbuffer_geometry_vs.Get(), m_cbuffer_geometry_ps.Get());
 
@@ -677,43 +670,13 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
 
 void Renderer::CreateRSObjects()
 {
-    D3D11_DEPTH_STENCIL_DESC ds_desc = {};
+    m_depth_test_states.Init(
+        true,  D3D11_COMPARISON_LESS,   D3D11_DEPTH_WRITE_MASK_ALL,   // When ON
+        false, D3D11_COMPARISON_ALWAYS, D3D11_DEPTH_WRITE_MASK_ALL);  // When OFF
 
-    // Depth test parameters:
-    ds_desc.DepthEnable      = true;
-    ds_desc.DepthFunc        = D3D11_COMPARISON_LESS;
-    ds_desc.DepthWriteMask   = D3D11_DEPTH_WRITE_MASK_ALL;
-
-    // Stencil test parameters:
-    ds_desc.StencilEnable    = false;
-    ds_desc.StencilReadMask  = 0;
-    ds_desc.StencilWriteMask = 0;
-
-    // Stencil operations if pixel is front-facing:
-    ds_desc.FrontFace.StencilFailOp      = D3D11_STENCIL_OP_KEEP;
-    ds_desc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
-    ds_desc.FrontFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP;
-    ds_desc.FrontFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
-
-    // Stencil operations if pixel is back-facing:
-    ds_desc.BackFace.StencilFailOp       = D3D11_STENCIL_OP_KEEP;
-    ds_desc.BackFace.StencilDepthFailOp  = D3D11_STENCIL_OP_DECR;
-    ds_desc.BackFace.StencilPassOp       = D3D11_STENCIL_OP_KEEP;
-    ds_desc.BackFace.StencilFunc         = D3D11_COMPARISON_ALWAYS;
-
-    // Create depth stencil state for rendering with depth test ENABLED:
-    if (FAILED(Device()->CreateDepthStencilState(&ds_desc, m_dss_depth_test_enabled.GetAddressOf())))
-    {
-        GameInterface::Errorf("CreateDepthStencilState failed!");
-    }
-
-    // Create depth stencil state for rendering with depth test DISABLED:
-    ds_desc.DepthEnable = false;
-    ds_desc.DepthFunc   = D3D11_COMPARISON_ALWAYS;
-    if (FAILED(Device()->CreateDepthStencilState(&ds_desc, m_dss_depth_test_disabled.GetAddressOf())))
-    {
-        GameInterface::Errorf("CreateDepthStencilState failed!");
-    }
+    m_depth_write_states.Init(
+        true,  D3D11_COMPARISON_LESS,   D3D11_DEPTH_WRITE_MASK_ALL,   // When ON
+        true,  D3D11_COMPARISON_ALWAYS, D3D11_DEPTH_WRITE_MASK_ZERO); // When OFF
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -810,11 +773,13 @@ void Renderer::RenderView(const refdef_s & view_def)
     // Set the camera/world-view:
     FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
     const auto vp_mtx = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
-    m_view_draw_state.SetCurrentViewProjMatrix(vp_mtx);
+    m_view_draw_state.SetViewProjMatrix(vp_mtx);
 
     //
     // Render solid geometries (world and entities)
     //
+
+    m_view_draw_state.BeginRenderPass();
 
     PushEvent(L"RenderWorldModel");
     m_view_draw_state.RenderWorldModel(frame_data);
@@ -828,6 +793,8 @@ void Renderer::RenderView(const refdef_s & view_def)
     m_view_draw_state.RenderSolidEntities(frame_data);
     PopEvent(); // "RenderSolidEntities"
 
+    m_view_draw_state.EndRenderPass();
+
     //
     // Transparencies/alpha pass
     //
@@ -836,8 +803,18 @@ void Renderer::RenderView(const refdef_s & view_def)
     EnableAlphaBlending();
 
     PushEvent(L"RenderTranslucentSurfaces");
+    m_view_draw_state.BeginRenderPass();
     m_view_draw_state.RenderTranslucentSurfaces(frame_data);
+    m_view_draw_state.EndRenderPass();
     PopEvent(); // "RenderTranslucentSurfaces"
+
+    PushEvent(L"RenderTranslucentEntities");
+    DisableDepthWrites(); // Disable z writes in case they stack up
+    m_view_draw_state.BeginRenderPass();
+    m_view_draw_state.RenderTranslucentEntities(frame_data);
+    m_view_draw_state.EndRenderPass();
+    EnableDepthWrites();
+    PopEvent(); // "RenderTranslucentEntities"
 
     // Color Blend OFF
     DisableAlphaBlending();
@@ -881,14 +858,28 @@ void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& fram
 
 void Renderer::EnableDepthTest()
 {
-    DeviceContext()->OMSetDepthStencilState(m_dss_depth_test_enabled.Get(), 0);
+    DeviceContext()->OMSetDepthStencilState(m_depth_test_states.enabled_state.Get(), 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Renderer::DisableDepthTest()
 {
-    DeviceContext()->OMSetDepthStencilState(m_dss_depth_test_disabled.Get(), 0);
+    DeviceContext()->OMSetDepthStencilState(m_depth_test_states.disabled_state.Get(), 0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::EnableDepthWrites()
+{
+    DeviceContext()->OMSetDepthStencilState(m_depth_write_states.enabled_state.Get(), 0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::DisableDepthWrites()
+{
+    DeviceContext()->OMSetDepthStencilState(m_depth_write_states.disabled_state.Get(), 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -73,7 +73,165 @@ public:
 /*
 ===============================================================================
 
-    D3D11 TextureImageImpl / TextureStoreImpl
+    D3D11 DepthStateHelper
+
+===============================================================================
+*/
+class DepthStateHelper final
+{
+public:
+
+    ComPtr<ID3D11DepthStencilState> enabled_state;
+    ComPtr<ID3D11DepthStencilState> disabled_state;
+
+    void Init(bool enabled_ztest,
+              D3D11_COMPARISON_FUNC enabled_func,
+              D3D11_DEPTH_WRITE_MASK enabled_write_mask,
+              bool disabled_ztest,
+              D3D11_COMPARISON_FUNC disabled_func,
+              D3D11_DEPTH_WRITE_MASK disabled_write_mask);
+};
+
+/*
+===============================================================================
+
+    D3D11 VertexBuffersHelper
+
+===============================================================================
+*/
+template<typename VertexType, int kNumBuffers>
+class VertexBuffersHelper final
+{
+public:
+
+    VertexBuffersHelper() = default;
+
+    struct DrawBuffer
+    {
+        ID3D11Buffer * buffer_ptr;
+        int used_verts;
+    };
+
+    void Init(const char * const debug_name, const int max_verts, ID3D11Device * device, ID3D11DeviceContext * context)
+    {
+        FASTASSERT(device != nullptr && context != nullptr);
+
+        m_num_verts  = max_verts;
+        m_debug_name = debug_name;
+        m_context    = context;
+
+        D3D11_BUFFER_DESC bd = {};
+        bd.Usage             = D3D11_USAGE_DYNAMIC;
+        bd.CPUAccessFlags    = D3D11_CPU_ACCESS_WRITE;
+        bd.ByteWidth         = sizeof(VertexType) * max_verts;
+        bd.BindFlags         = D3D11_BIND_VERTEX_BUFFER;
+
+        for (unsigned b = 0; b < m_vertex_buffers.size(); ++b)
+        {
+            if (FAILED(device->CreateBuffer(&bd, nullptr, m_vertex_buffers[b].GetAddressOf())))
+            {
+                GameInterface::Errorf("Failed to create %s vertex buffer %u", debug_name, b);
+            }
+            m_mapped_ptrs[b] = nullptr;
+        }
+
+        MemTagsTrackAlloc(bd.ByteWidth * kNumBuffers, MemTag::kVertIndexBuffer);
+        GameInterface::Printf("%s used %s", debug_name, FormatMemoryUnit(bd.ByteWidth * kNumBuffers));
+    }
+
+    VertexType * Increment(const int count)
+    {
+        FASTASSERT(count > 0 && count <= m_num_verts);
+
+        VertexType * verts = m_mapped_ptrs[m_buffer_index];
+        FASTASSERT(verts != nullptr);
+        FASTASSERT_ALIGN16(verts);
+
+        verts += m_used_verts;
+        m_used_verts += count;
+
+        if (m_used_verts > m_num_verts)
+        {
+            GameInterface::Errorf("%s vertex buffer overflowed! used_verts=%i, num_verts=%i. "
+                                  "Increase size.", m_debug_name, m_used_verts, m_num_verts);
+        }
+
+        return verts;
+    }
+
+    int BufferSize() const 
+    {
+        return m_num_verts;
+    }
+
+    int NumVertsRemaining() const
+    {
+        FASTASSERT((m_num_verts - m_used_verts) > 0);
+        return m_num_verts - m_used_verts;
+    }
+
+    int CurrentPosition() const
+    {
+        return m_used_verts;
+    }
+
+    VertexType * CurrentVertexPtr() const
+    {
+        return m_mapped_ptrs[m_buffer_index] + m_used_verts;
+    }
+
+    void Begin()
+    {
+        FASTASSERT(m_used_verts == 0); // Missing End()?
+
+        // Map the current buffer:
+        D3D11_MAPPED_SUBRESOURCE mapping_info = {};
+        if (FAILED(m_context->Map(m_vertex_buffers[m_buffer_index].Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapping_info)))
+        {
+            GameInterface::Errorf("Failed to map %s vertex buffer %i", m_debug_name, m_buffer_index);
+        }
+
+        FASTASSERT(mapping_info.pData != nullptr);
+        FASTASSERT_ALIGN16(mapping_info.pData);
+
+        m_mapped_ptrs[m_buffer_index] = static_cast<VertexType *>(mapping_info.pData);
+    }
+
+    DrawBuffer End()
+    {
+        FASTASSERT(m_mapped_ptrs[m_buffer_index] != nullptr); // Missing Begin()?
+
+        ID3D11Buffer * const current_buffer = m_vertex_buffers[m_buffer_index].Get();
+        const int current_position = m_used_verts;
+
+        // Unmap current buffer so we can draw with it:
+        m_context->Unmap(current_buffer, 0);
+        m_mapped_ptrs[m_buffer_index] = nullptr;
+
+        // Move to the next buffer:
+        m_buffer_index = (m_buffer_index + 1) % kNumBuffers;
+        m_used_verts = 0;
+
+        return { current_buffer, current_position };
+    }
+
+private:
+
+    int m_num_verts    = 0;
+    int m_used_verts   = 0;
+    int m_buffer_index = 0;
+
+    ID3D11DeviceContext * m_context    = nullptr;
+    const char *          m_debug_name = nullptr;
+
+    std::array<ComPtr<ID3D11Buffer>, kNumBuffers> m_vertex_buffers{};
+    std::array<VertexType *,         kNumBuffers> m_mapped_ptrs{};
+};
+
+/*
+===============================================================================
+
+    D3D11 TextureImageImpl
 
 ===============================================================================
 */
@@ -93,8 +251,13 @@ public:
     static D3D11_FILTER FilterForTextureType(TextureType tt);
 };
 
-// ============================================================================
+/*
+===============================================================================
 
+    D3D11 TextureStoreImpl
+
+===============================================================================
+*/
 class TextureStoreImpl final
     : public TextureStore
 {
@@ -133,7 +296,7 @@ private:
 /*
 ===============================================================================
 
-    D3D11 ModelInstanceImpl / ModelStoreImpl
+    D3D11 ModelInstanceImpl
 
 ===============================================================================
 */
@@ -142,11 +305,16 @@ class ModelInstanceImpl final
 {
 public:
     using ModelInstance::ModelInstance;
-    // Nothing back-end specific for the Render Models.
+    // Nothing back-end specific for the Render Models for now.
 };
 
-// ============================================================================
+/*
+===============================================================================
 
+    D3D11 ModelStoreImpl
+
+===============================================================================
+*/
 class ModelStoreImpl final
     : public ModelStore
 {
@@ -186,17 +354,12 @@ class ViewDrawStateImpl final
 public:
 
     ViewDrawStateImpl() = default;
+    virtual ~ViewDrawStateImpl() { DeleteObject(m_draw_cmds, MemTag::kRenderer); }
+
     void Init(int max_verts, const ShaderProgram & sp, ID3D11Buffer * cbuff_vs, ID3D11Buffer * cbuff_ps);
-
-    void SetCurrentTexture(const TextureImage & tex)
-    {
-        m_current_texture = static_cast<const TextureImageImpl *>(&tex);
-    }
-
-    void SetCurrentViewProjMatrix(const DirectX::XMMATRIX & mtx)
-    {
-        m_current_viewproj_mtx = mtx;
-    }
+    void SetViewProjMatrix(const DirectX::XMMATRIX & mtx) { m_viewproj_mtx = mtx; }
+    void BeginRenderPass();
+    void EndRenderPass();
 
     // Disallow copy.
     ViewDrawStateImpl(const ViewDrawStateImpl &) = delete;
@@ -209,22 +372,27 @@ protected:
 
 private:
 
-    int m_num_verts    = 0;
-    int m_buffer_index = 0;
+    struct DrawCmd
+    {
+        DirectX::XMMATRIX    model_mtx;
+        const TextureImage * texture;
+        unsigned             first_vert;
+        unsigned             num_verts;
+        PrimitiveTopology    topology;
+    };
 
-    std::array<ComPtr<ID3D11Buffer>,     kNumViewDrawVertexBuffers> m_vertex_buffers;
-    std::array<D3D11_MAPPED_SUBRESOURCE, kNumViewDrawVertexBuffers> m_mapping_info;
+    using DrawCmdList = FixedSizeArray<DrawCmd, 2048>;
 
-    bool m_batch_open = false;
-    PrimitiveTopology m_current_topology;
-    DirectX::XMMATRIX m_current_model_mtx;
-    DirectX::XMMATRIX m_current_viewproj_mtx;
+    DrawCmd m_current_draw_cmd = {};
+    DrawCmdList * m_draw_cmds  = nullptr;
+    VertexBuffersHelper<DrawVertex3D, kNumViewDrawVertexBuffers> m_buffers;
 
     // Refs are owned by the parent Renderer.
-    const TextureImageImpl * m_current_texture = nullptr;
-    const ShaderProgram    * m_program         = nullptr;
-    ID3D11Buffer           * m_cbuffer_vs      = nullptr;
-    ID3D11Buffer           * m_cbuffer_ps      = nullptr;
+    DirectX::XMMATRIX     m_viewproj_mtx = {};
+    const ShaderProgram * m_program      = nullptr;
+    ID3D11Buffer        * m_cbuffer_vs   = nullptr;
+    ID3D11Buffer        * m_cbuffer_ps   = nullptr;
+    bool                  m_batch_open   = false;
 };
 
 /*
@@ -251,9 +419,9 @@ public:
     void Init(int max_verts);
 
     void BeginFrame();
-    void EndFrame(const ShaderProgram & program, const TextureImageImpl * const tex, ID3D11Buffer * const cbuffer);
+    void EndFrame(const ShaderProgram & program, const TextureImageImpl * tex, ID3D11Buffer * cbuffer);
 
-    DrawVertex2D * Increment(int count);
+    DrawVertex2D * Increment(const int count) { return m_buffers.Increment(count); }
 
     void PushTriVerts(const DrawVertex2D tri[3]);
     void PushQuadVerts(const DrawVertex2D quad[4]);
@@ -274,12 +442,7 @@ public:
 
 private:
 
-    int m_num_verts    = 0;
-    int m_used_verts   = 0;
-    int m_buffer_index = 0;
-
-    std::array<ComPtr<ID3D11Buffer>,     kNumSpriteBatchVertexBuffers> m_vertex_buffers;
-    std::array<D3D11_MAPPED_SUBRESOURCE, kNumSpriteBatchVertexBuffers> m_mapping_info;
+    VertexBuffersHelper<DrawVertex2D, kNumSpriteBatchVertexBuffers> m_buffers;
 
     struct DeferredTexQuad
     {
@@ -336,6 +499,9 @@ public:
 
     void EnableDepthTest();
     void DisableDepthTest();
+
+    void EnableDepthWrites();
+    void DisableDepthWrites();
 
     void EnableAlphaBlending();
     void DisableAlphaBlending();
@@ -402,8 +568,8 @@ private:
     ShaderProgram                      m_shader_ui_sprites;
     ShaderProgram                      m_shader_geometry;
     ComPtr<ID3D11BlendState>           m_blend_state_alpha;
-    ComPtr<ID3D11DepthStencilState>    m_dss_depth_test_enabled;
-    ComPtr<ID3D11DepthStencilState>    m_dss_depth_test_disabled;
+    DepthStateHelper                   m_depth_test_states;
+    DepthStateHelper                   m_depth_write_states;
     ComPtr<ID3D11Buffer>               m_cbuffer_ui_sprites;
     ComPtr<ID3D11Buffer>               m_cbuffer_geometry_vs;
     ComPtr<ID3D11Buffer>               m_cbuffer_geometry_ps;

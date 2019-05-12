@@ -641,6 +641,48 @@ void ViewDrawState::RenderTranslucentSurfaces(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void ViewDrawState::RenderTranslucentEntities(FrameData & frame_data)
+{
+    if (m_skip_draw_entities.IsSet())
+    {
+        return;
+    }
+
+    const bool force_null_entity_models = m_force_null_entity_models.IsSet();
+
+    for (const entity_t * entity : frame_data.translucent_entities)
+    {
+        if (!(entity->flags & RF_TRANSLUCENT))
+        {
+            continue; // Already done in the solid pass
+        }
+
+        if (entity->flags & RF_BEAM) // Special case beam model
+        {
+            DrawBeamModel(frame_data, *entity);
+            continue;
+        }
+
+        // entity_t::model is an opaque pointer outside the Refresh module, so we need the cast.
+        const auto * model = reinterpret_cast<const ModelInstance *>(entity->model);
+        if (model == nullptr || force_null_entity_models)
+        {
+            DrawNullModel(frame_data, *entity);
+            continue;
+        }
+
+        switch (model->type)
+        {
+        case ModelType::kBrush    : { DrawBrushModel(frame_data, *entity);    break; }
+        case ModelType::kSprite   : { DrawSpriteModel(frame_data, *entity);   break; }
+        case ModelType::kAliasMD2 : { DrawAliasMD2Model(frame_data, *entity); break; }
+        default : GameInterface::Errorf("RenderTranslucentEntities: Bad model type for '%s'!", model->name.CStr());
+        } // switch
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 constexpr float kTurbScale = (256.0f / (2.0f * M_PI));
 
 #ifdef _MSC_VER
@@ -975,7 +1017,68 @@ void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t 
 
 void ViewDrawState::DrawSpriteModel(const FrameData & frame_data, const entity_t & entity)
 {
-    //TODO
+    const auto * model = reinterpret_cast<const ModelInstance *>(entity.model);
+    const auto * p_sprite = model->hunk.ViewBaseAs<dsprite_t>();
+
+    const int frame_num = entity.frame % p_sprite->numframes;
+    const dsprframe_t* const frame = &p_sprite->frames[frame_num];
+    FASTASSERT(frame_num < kMaxMD2Skins);
+
+    const float * const up = frame_data.up_vec;
+    const float * const right = frame_data.right_vec;
+
+    float alpha = 1.0f;
+    if (entity.flags & RF_TRANSLUCENT)
+    {
+        alpha = entity.alpha;
+    }
+
+    // Camera facing billboarded quad:
+    DrawVertex3D quad[4];
+    const int indexes[6] = { 0,1,2, 2,3,0 };
+
+    quad[0].uv[0] = 0.0f;
+    quad[0].uv[1] = 1.0f;
+    MrQ2::VecSplatN(quad[0].rgba, 4, 1.0f);
+    quad[0].rgba[3] = alpha;
+    MrQ2::Vec3MAdd(entity.origin, -frame->origin_y, up, quad[0].position);
+    MrQ2::Vec3MAdd(quad[0].position, -frame->origin_x, right, quad[0].position);
+
+    quad[1].uv[0] = 0.0f;
+    quad[1].uv[1] = 0.0f;
+    MrQ2::VecSplatN(quad[1].rgba, 4, 1.0f);
+    quad[1].rgba[3] = alpha;
+    MrQ2::Vec3MAdd(entity.origin, frame->height - frame->origin_y, up, quad[1].position);
+    MrQ2::Vec3MAdd(quad[1].position, -frame->origin_x, right, quad[1].position);
+
+    quad[2].uv[0] = 1.0f;
+    quad[2].uv[1] = 0.0f;
+    MrQ2::VecSplatN(quad[2].rgba, 4, 1.0f);
+    quad[2].rgba[3] = alpha;
+    MrQ2::Vec3MAdd(entity.origin, frame->height - frame->origin_y, up, quad[2].position);
+    MrQ2::Vec3MAdd(quad[2].position, frame->width - frame->origin_x, right, quad[2].position);
+
+    quad[3].uv[0] = 1.0f;
+    quad[3].uv[1] = 1.0f;
+    MrQ2::VecSplatN(quad[3].rgba, 4, 1.0f);
+    quad[3].rgba[3] = alpha;
+    MrQ2::Vec3MAdd(entity.origin, -frame->origin_y, up, quad[3].position);
+    MrQ2::Vec3MAdd(quad[3].position, frame->width - frame->origin_x, right, quad[3].position);
+
+    BeginBatchArgs args;
+    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+    args.optional_tex = model->data.skins[frame_num];
+    args.topology = PrimitiveTopology::TriangleList;
+
+    MiniImBatch batch = BeginBatch(args);
+    {
+        DrawVertex3D * tri = batch.Increment(6);
+        for (int i = 0; i < 6; ++i)
+        {
+            tri[i] = quad[indexes[i]];
+        }
+    }
+    EndBatch(batch);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

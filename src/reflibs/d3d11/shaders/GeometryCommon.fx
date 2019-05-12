@@ -51,7 +51,7 @@ float4 PS_main(VertexOutput input) : SV_TARGET
     vert_color *= g_vertex_color_scaling;
 
     float4 frag_color = saturate(tex_color + vert_color);
-    frag_color.a = input.rgba.a; // Preserve the incoming alpha values for transparencies
+    frag_color.a = input.rgba.a * tex_color.a; // Preserve the incoming alpha values for transparencies
 
     return frag_color;
 }

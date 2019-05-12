@@ -77,6 +77,7 @@ public:
     void RenderSkyBox(FrameData & frame_data);
     void RenderSolidEntities(FrameData & frame_data);
     void RenderTranslucentSurfaces(FrameData & frame_data);
+    void RenderTranslucentEntities(FrameData & frame_data);
 
     // Assignable ref
     SkyBox & Sky() { return m_skybox; }

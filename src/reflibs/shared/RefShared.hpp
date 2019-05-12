@@ -90,6 +90,14 @@ constexpr float DegToRad(const float degrees)
     return degrees * (3.14159265358979323846f / 180.0f);
 }
 
+inline void VecSplatN(float* vec, const int dims, const float val)
+{
+    for (int i = 0; i < dims; ++i)
+    {
+        vec[i] = val;
+    }
+}
+
 inline void Vec3Zero(vec3_t v)
 {
     v[0] = v[1] = v[2] = 0.0f;
@@ -122,6 +130,13 @@ inline void Vec3Cross(const vec3_t v1, const vec3_t v2, vec3_t cross)
     cross[0] = (v1[1] * v2[2]) - (v1[2] * v2[1]);
     cross[1] = (v1[2] * v2[0]) - (v1[0] * v2[2]);
     cross[2] = (v1[0] * v2[1]) - (v1[1] * v2[0]);
+}
+
+inline void Vec3MAdd(const vec3_t veca, const float scale, const vec3_t vecb, vec3_t vecc)
+{
+    vecc[0] = veca[0] + (scale * vecb[0]);
+    vecc[1] = veca[1] + (scale * vecb[1]);
+    vecc[2] = veca[2] + (scale * vecb[2]);
 }
 
 inline void Vec3Add(const vec3_t a, const vec3_t b, vec3_t out)
