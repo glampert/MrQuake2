@@ -1,9 +1,9 @@
 //
-// RenderWindow.cpp
+// RenderWindow_D3D11.cpp
 //  D3D11 rendering window.
 //
 
-#include "RenderWindow.hpp"
+#include "RenderWindow_D3D11.hpp"
 #include "reflibs/shared/RefShared.hpp"
 
 #pragma comment(lib, "d3d11")

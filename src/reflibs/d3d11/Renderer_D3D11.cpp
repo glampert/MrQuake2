@@ -1,9 +1,9 @@
 //
-// Renderer.cpp
+// Renderer_D3D11.cpp
 //  D3D11 renderer interface for Quake2.
 //
 
-#include "Renderer.hpp"
+#include "Renderer_D3D11.hpp"
 
 // Debug markers need these.
 #include <cstdarg>

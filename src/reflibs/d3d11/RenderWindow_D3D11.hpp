@@ -1,5 +1,5 @@
 //
-// RenderWindow.hpp
+// RenderWindow_D3D11.hpp
 //  D3D11 rendering window.
 //
 #pragma once

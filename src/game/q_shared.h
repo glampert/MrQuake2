@@ -1168,6 +1168,7 @@ typedef enum
     VIDREF_GL,
     VIDREF_SOFT,
     VIDREF_D3D11,
+    VIDREF_D3D12,
 } vidref_type_t;
 
 extern vidref_type_t vidref_val;

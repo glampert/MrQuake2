@@ -9,35 +9,24 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{4a7db2fc-1cff-4573-bfc8-10681de0ff77}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\reflibs\d3d11\RefAPI_D3D11.cpp">
+    <ClCompile Include="..\..\src\reflibs\d3d12\RefAPI_D3D12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\reflibs\d3d11\Renderer_D3D11.cpp">
+    <ClCompile Include="..\..\src\reflibs\d3d12\Renderer_D3D12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\reflibs\d3d11\RenderWindow_D3D11.cpp">
+    <ClCompile Include="..\..\src\reflibs\d3d12\RenderWindow_D3D12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\reflibs\d3d11\Renderer_D3D11.hpp">
+    <ClInclude Include="..\..\src\reflibs\d3d12\Renderer_D3D12.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\reflibs\d3d11\RenderWindow_D3D11.hpp">
+    <ClInclude Include="..\..\src\reflibs\d3d12\RenderWindow_D3D12.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="..\..\src\reflibs\d3d11\shaders\UISprites2D.fx">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\..\src\reflibs\d3d11\shaders\GeometryCommon.fx">
-      <Filter>Shaders</Filter>
-    </FxCompile>
   </ItemGroup>
 </Project>

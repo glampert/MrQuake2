@@ -1,10 +1,10 @@
 //
-// RefAPI_D3D11.cpp
+// RefAPI_D3D12.cpp
 //  Exposes GetRefAPI as the DLL entry point for Quake and the function pointers
-//  required by refexport_t. Sets up the D3D11 refresh DLL.
+//  required by refexport_t. Sets up the D3D12 refresh DLL.
 //
 
-#include "Renderer_D3D11.hpp"
+#include "Renderer_D3D12.hpp"
 
 // Quake includes
 #include "client/ref.h"
@@ -19,7 +19,7 @@
 
 namespace MrQ2
 {
-namespace D3D11
+namespace D3D12
 {
 
 static int InitRefresh(void * hInstance, void * wndproc, int fullscreen)
@@ -49,7 +49,7 @@ static int InitRefresh(void * hInstance, void * wndproc, int fullscreen)
     }
 
     CreateRendererInstance();
-    g_Renderer->Init("MrQuake2 (D3D11)", (HINSTANCE)hInstance, (WNDPROC)wndproc, w, h, !!fullscreen, debug_validation);
+    g_Renderer->Init("MrQuake2 (D3D12)", (HINSTANCE)hInstance, (WNDPROC)wndproc, w, h, !!fullscreen, debug_validation);
     return true;
 }
 
@@ -73,7 +73,7 @@ static void AppActivate(int activate)
 
 static void BeginRegistration(const char * map_name)
 {
-    GameInterface::Printf("**** D3D11::BeginRegistration ****");
+    GameInterface::Printf("**** D3D12::BeginRegistration ****");
 
     g_Renderer->ViewState()->BeginRegistration();
     g_Renderer->TexStore()->BeginRegistration();
@@ -86,7 +86,7 @@ static void BeginRegistration(const char * map_name)
 
 static void EndRegistration()
 {
-    GameInterface::Printf("**** D3D11::EndRegistration ****");
+    GameInterface::Printf("**** D3D12::EndRegistration ****");
 
     g_Renderer->MdlStore()->EndRegistration();
     g_Renderer->TexStore()->EndRegistration();
@@ -262,7 +262,7 @@ static void DrawTileClear(int /*x*/, int /*y*/, int /*w*/, int /*h*/, const char
     FASTASSERT(g_Renderer->FrameStarted());
 
     // FIXME - Only used when letterboxing the screen for SW rendering, so not required.
-    GameInterface::Errorf("D3D11::DrawTileClear() not implemented!");
+    GameInterface::Errorf("D3D12::DrawTileClear() not implemented!");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -424,39 +424,39 @@ static void RenderFrame(refdef_t * view_def)
     g_Renderer->RenderView(*view_def);
 }
 
-} // D3D11
+} // D3D12
 } // MrQ2
 
 ///////////////////////////////////////////////////////////////////////////////
 
 extern "C" REFLIB_DLL_EXPORT refexport_t GetRefAPI(refimport_t ri)
 {
-    MrQ2::GameInterface::Initialize(ri, "D3D11");
+    MrQ2::GameInterface::Initialize(ri, "D3D12");
 
     refexport_t re;
     re.api_version         = REF_API_VERSION;
-    re.vidref              = VIDREF_D3D11;
-    re.Init                = MrQ2::D3D11::InitRefresh;
-    re.Shutdown            = MrQ2::D3D11::ShutdownRefresh;
-    re.BeginRegistration   = MrQ2::D3D11::BeginRegistration;
-    re.RegisterModel       = MrQ2::D3D11::RegisterModel;
-    re.RegisterSkin        = MrQ2::D3D11::RegisterSkin;
-    re.RegisterPic         = MrQ2::D3D11::RegisterPic;
-    re.SetSky              = MrQ2::D3D11::SetSky;
-    re.EndRegistration     = MrQ2::D3D11::EndRegistration;
-    re.RenderFrame         = MrQ2::D3D11::RenderFrame;
-    re.DrawGetPicSize      = MrQ2::D3D11::DrawGetPicSize;
-    re.DrawPic             = MrQ2::D3D11::DrawPic;
-    re.DrawStretchPic      = MrQ2::D3D11::DrawStretchPic;
-    re.DrawChar            = MrQ2::D3D11::DrawChar;
-    re.DrawTileClear       = MrQ2::D3D11::DrawTileClear;
-    re.DrawFill            = MrQ2::D3D11::DrawFill;
-    re.DrawFadeScreen      = MrQ2::D3D11::DrawFadeScreen;
-    re.DrawStretchRaw      = MrQ2::D3D11::DrawStretchRaw;
-    re.CinematicSetPalette = MrQ2::D3D11::CinematicSetPalette;
-    re.BeginFrame          = MrQ2::D3D11::BeginFrame;
-    re.EndFrame            = MrQ2::D3D11::EndFrame;
-    re.AppActivate         = MrQ2::D3D11::AppActivate;
+    re.vidref              = VIDREF_D3D12;
+    re.Init                = MrQ2::D3D12::InitRefresh;
+    re.Shutdown            = MrQ2::D3D12::ShutdownRefresh;
+    re.BeginRegistration   = MrQ2::D3D12::BeginRegistration;
+    re.RegisterModel       = MrQ2::D3D12::RegisterModel;
+    re.RegisterSkin        = MrQ2::D3D12::RegisterSkin;
+    re.RegisterPic         = MrQ2::D3D12::RegisterPic;
+    re.SetSky              = MrQ2::D3D12::SetSky;
+    re.EndRegistration     = MrQ2::D3D12::EndRegistration;
+    re.RenderFrame         = MrQ2::D3D12::RenderFrame;
+    re.DrawGetPicSize      = MrQ2::D3D12::DrawGetPicSize;
+    re.DrawPic             = MrQ2::D3D12::DrawPic;
+    re.DrawStretchPic      = MrQ2::D3D12::DrawStretchPic;
+    re.DrawChar            = MrQ2::D3D12::DrawChar;
+    re.DrawTileClear       = MrQ2::D3D12::DrawTileClear;
+    re.DrawFill            = MrQ2::D3D12::DrawFill;
+    re.DrawFadeScreen      = MrQ2::D3D12::DrawFadeScreen;
+    re.DrawStretchRaw      = MrQ2::D3D12::DrawStretchRaw;
+    re.CinematicSetPalette = MrQ2::D3D12::CinematicSetPalette;
+    re.BeginFrame          = MrQ2::D3D12::BeginFrame;
+    re.EndFrame            = MrQ2::D3D12::EndFrame;
+    re.AppActivate         = MrQ2::D3D12::AppActivate;
     return re;
 }
 

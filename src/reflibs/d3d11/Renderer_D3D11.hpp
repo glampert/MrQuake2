@@ -1,10 +1,10 @@
 //
-// Renderer.hpp
+// Renderer_D3D11.hpp
 //  D3D11 renderer interface for Quake2.
 //
 #pragma once
 
-#include "RenderWindow.hpp"
+#include "RenderWindow_D3D11.hpp"
 #include "reflibs/shared/Pool.hpp"
 #include "reflibs/shared/Memory.hpp"
 #include "reflibs/shared/ModelStore.hpp"
@@ -274,9 +274,9 @@ public:
     }
 
     void Init();
-    void UploadScrapIfNeeded();
-
     unsigned MultisampleQualityLevel(DXGI_FORMAT fmt) const;
+
+    void UploadScrapIfNeeded();
     const TextureImageImpl * ScrapImpl() const { return static_cast<const TextureImageImpl *>(tex_scrap); }
 
 protected:
