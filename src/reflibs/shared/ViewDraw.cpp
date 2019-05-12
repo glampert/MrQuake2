@@ -534,6 +534,7 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
     args.topology     = PrimitiveTopology::TriangleList;
+    args.depth_hack   = false;
 
     // Draw with sorting by texture:
     for (TextureImage * tex : tex_store)
@@ -627,6 +628,7 @@ void ViewDrawState::RenderTranslucentSurfaces(FrameData & frame_data)
             args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
             args.optional_tex = surf->texinfo->teximage;
             args.topology     = PrimitiveTopology::TriangleList;
+            args.depth_hack   = false;
 
             MiniImBatch batch = BeginBatch(args);
             {
@@ -718,6 +720,7 @@ void ViewDrawState::DrawAnimatedWaterPolys(const ModelSurface & surf, const floa
     args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
     args.optional_tex = surf.texinfo->teximage;
     args.topology     = PrimitiveTopology::TriangleFan;
+    args.depth_hack   = false;
 
     for (const ModelPoly * poly = surf.polys; poly; poly = poly->next)
     {
@@ -807,6 +810,7 @@ void ViewDrawState::RenderSkyBox(FrameData & frame_data)
                 args.model_matrix = sky_mtx;
                 args.optional_tex = sky_tex;
                 args.topology     = PrimitiveTopology::TriangleList;
+                args.depth_hack   = false;
 
                 MiniImBatch batch = BeginBatch(args);
                 for (unsigned v = 0; v < ArrayLength(sky_verts); ++v)
@@ -988,6 +992,7 @@ void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t 
                 args.model_matrix = mdl_mtx;
                 args.optional_tex = TextureAnimation(surf->texinfo);
                 args.topology     = PrimitiveTopology::TriangleList;
+                args.depth_hack   = false;
 
                 MiniImBatch batch = BeginBatch(args);
                 {
@@ -1068,7 +1073,8 @@ void ViewDrawState::DrawSpriteModel(const FrameData & frame_data, const entity_t
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
     args.optional_tex = model->data.skins[frame_num];
-    args.topology = PrimitiveTopology::TriangleList;
+    args.topology     = PrimitiveTopology::TriangleList;
+    args.depth_hack   = false;
 
     MiniImBatch batch = BeginBatch(args);
     {
@@ -1085,8 +1091,7 @@ void ViewDrawState::DrawSpriteModel(const FrameData & frame_data, const entity_t
 
 void ViewDrawState::DrawAliasMD2Model(const FrameData & frame_data, const entity_t & entity)
 {
-    // TODO - weapon depth hack
-    const vec3_t shade_light = { 1.0f, 1.0f, 1.0f }; // TODO - temp
+    const vec3_t shade_light = { 1.0f, 1.0f, 1.0f }; // TODO - temp, must be calculated
 
     const float  backlerp = (m_lerp_entity_models.IsSet() ? entity.backlerp : 0.0f);
     const auto   mdl_mtx  = MakeEntityModelMatrix(entity, /* flipUpV = */false);
@@ -1179,6 +1184,7 @@ void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t &
     args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
     args.optional_tex = nullptr; // No texture
     args.topology     = PrimitiveTopology::TriangleStrip;
+    args.depth_hack   = false;
 
     //TODO - missing states!
 //    qglDisable(GL_TEXTURE_2D);
@@ -1225,6 +1231,7 @@ void ViewDrawState::DrawNullModel(const FrameData & frame_data, const entity_t &
     args.model_matrix = MakeEntityModelMatrix(entity);
     args.optional_tex = frame_data.tex_store.tex_debug;
     args.topology     = PrimitiveTopology::TriangleFan;
+    args.depth_hack   = false;
 
     // Draw a small octahedron as a placeholder for the entity model:
     MiniImBatch batch = BeginBatch(args);

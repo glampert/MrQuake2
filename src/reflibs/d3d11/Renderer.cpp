@@ -542,8 +542,34 @@ void ViewDrawStateImpl::EndRenderPass()
     context->VSSetConstantBuffers(0, 1, &m_cbuffer_vs);
     context->PSSetConstantBuffers(1, 1, &m_cbuffer_ps);
 
+    constexpr float depth_min = 0.0f;
+    constexpr float depth_max = 1.0f;
+    const auto window_width   = static_cast<float>(g_Renderer->Width());
+    const auto window_height  = static_cast<float>(g_Renderer->Height());
+
+    auto SetDepthRange = [context, window_width, window_height](const float near_val, const float far_val)
+    {
+        D3D11_VIEWPORT vp;
+        vp.TopLeftX = 0.0f;
+        vp.TopLeftY = 0.0f;
+        vp.Width    = window_width;
+        vp.Height   = window_height;
+        vp.MinDepth = near_val;
+        vp.MaxDepth = far_val;
+        context->RSSetViewports(1, &vp);
+    };
+
     for (const DrawCmd & cmd : *m_draw_cmds)
     {
+        bool depth_range_changed = false;
+
+        // Depth hack to prevent weapons from poking into geometry.
+        if (cmd.depth_hack)
+        {
+            SetDepthRange(depth_min, depth_min + 0.3f * (depth_max - depth_min));
+            depth_range_changed = true;
+        }
+
         const DirectX::XMMATRIX mvp_matrix = cmd.model_mtx * m_viewproj_mtx;
         context->UpdateSubresource(m_cbuffer_vs, 0, nullptr, &mvp_matrix, 0, 0);
 
@@ -555,6 +581,12 @@ void ViewDrawStateImpl::EndRenderPass()
         // Draw with the current vertex buffer:
         g_Renderer->DrawHelper(cmd.num_verts, cmd.first_vert, *m_program, draw_buf.buffer_ptr,
                                PrimitiveTopologyToD3D(cmd.topology), 0, sizeof(DrawVertex3D));
+
+        // Restore to default if we did a depth hacked draw.
+        if (depth_range_changed)
+        {
+            SetDepthRange(depth_min, depth_max);
+        }
     }
 
     m_draw_cmds->clear();
@@ -570,6 +602,7 @@ MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
     m_current_draw_cmd.model_mtx  = DirectX::XMMATRIX{ args.model_matrix.floats };
     m_current_draw_cmd.texture    = args.optional_tex ? args.optional_tex : g_Renderer->TexStore()->tex_white2x2;
     m_current_draw_cmd.topology   = args.topology;
+    m_current_draw_cmd.depth_hack = args.depth_hack;
     m_current_draw_cmd.first_vert = 0;
     m_current_draw_cmd.num_verts  = 0;
 

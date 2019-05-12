@@ -379,6 +379,7 @@ private:
         unsigned             first_vert;
         unsigned             num_verts;
         PrimitiveTopology    topology;
+        bool                 depth_hack;
     };
 
     using DrawCmdList = FixedSizeArray<DrawCmd, 2048>;

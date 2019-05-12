@@ -89,6 +89,7 @@ protected:
         RenderMatrix         model_matrix;
         const TextureImage * optional_tex;
         PrimitiveTopology    topology;
+        bool                 depth_hack;
     };
 
     // Implemented by the renderer back-end:

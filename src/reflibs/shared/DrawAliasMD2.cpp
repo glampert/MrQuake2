@@ -160,6 +160,7 @@ void ViewDrawState::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t 
     BeginBatchArgs batch_args;
     batch_args.model_matrix = model_matrix;
     batch_args.optional_tex = model_skin;
+    batch_args.depth_hack   = (entity.flags & RF_DEPTHHACK) != 0;
 
     // Build the final model vertices:
     for (;;)
