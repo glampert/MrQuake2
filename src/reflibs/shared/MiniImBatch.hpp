@@ -32,9 +32,18 @@ struct DrawVertex2D
 
 enum class PrimitiveTopology : std::uint8_t
 {
-    TriangleList,
-    TriangleStrip,
-    TriangleFan,
+    kTriangleList,
+    kTriangleStrip,
+    kTriangleFan,
+};
+
+enum class SpriteBatchIdx
+{
+    kDrawChar, // Only used to draw console chars
+    kDrawPics, // Used by DrawPic, DrawStretchPic, etc
+
+    // Number of items in the enum - not a valid index.
+    kCount,
 };
 
 struct ModelSurface;

@@ -218,10 +218,10 @@ public:
                   const DirectX::XMFLOAT4A & color);
 
     void PushQuadTextured(float x, float y, float w, float h,
-                          const TextureImageImpl * tex, const DirectX::XMFLOAT4A & color);
+                          const TextureImage * tex, const DirectX::XMFLOAT4A & color);
 
     void PushQuadTexturedUVs(float x, float y, float w, float h, float u0, float v0, float u1, float v1,
-                             const TextureImageImpl * tex, const DirectX::XMFLOAT4A & color);
+                             const TextureImage * tex, const DirectX::XMFLOAT4A & color);
 
     // Disallow copy.
     SpriteBatch(const SpriteBatch &) = delete;
@@ -257,14 +257,14 @@ public:
     static const DirectX::XMFLOAT4A kFloat4One;  // All ones
 
     // Convenience getters
-    SpriteBatch       * SBatch(SpriteBatch::BatchId id) { return &m_sprite_batches[id];     }
-    TextureStoreImpl  * TexStore()                      { return &m_tex_store;              }
-    ModelStoreImpl    * MdlStore()                      { return &m_mdl_store;              }
-    ViewDrawStateImpl * ViewState()                     { return &m_view_draw_state;        }
-    bool                DebugValidation() const         { return m_window.debug_validation; }
-    bool                FrameStarted()    const         { return m_frame_started;           }
-    int                 Width()           const         { return m_window.width;            }
-    int                 Height()          const         { return m_window.height;           }
+    SpriteBatch       * SBatch(const SpriteBatchIdx id) { return &m_sprite_batches[size_t(id)]; }
+    TextureStoreImpl  * TexStore()                      { return &m_tex_store;                  }
+    ModelStoreImpl    * MdlStore()                      { return &m_mdl_store;                  }
+    ViewDrawStateImpl * ViewState()                     { return &m_view_draw_state;            }
+    bool                DebugValidation() const         { return m_window.debug_validation;     }
+    bool                FrameStarted()    const         { return m_frame_started;               }
+    int                 Width()           const         { return m_window.width;                }
+    int                 Height()          const         { return m_window.height;               }
 
     Renderer();
     ~Renderer();
@@ -286,7 +286,7 @@ public:
     void EnableAlphaBlending();
     void DisableAlphaBlending();
 
-    void UploadTexture(const TextureImageImpl * tex);
+    void UploadTexture(const TextureImage * tex);
 
     //
     // Debug frame annotations/makers

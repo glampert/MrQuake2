@@ -24,9 +24,9 @@ static D3D_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D(const PrimitiveTopology top
 {
     switch (topology)
     {
-    case PrimitiveTopology::TriangleList  : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-    case PrimitiveTopology::TriangleStrip : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
-    case PrimitiveTopology::TriangleFan   : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST; // Converted by the front-end
+    case PrimitiveTopology::kTriangleList  : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    case PrimitiveTopology::kTriangleStrip : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+    case PrimitiveTopology::kTriangleFan   : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST; // Converted by the front-end
     default : GameInterface::Errorf("Bad PrimitiveTopology enum!");
     } // switch
 }
@@ -477,13 +477,13 @@ void SpriteBatch::PushQuad(const float x, const float y, const float w, const fl
 
 void SpriteBatch::PushQuadTextured(const float x, const float y,
                                    const float w, const float h,
-                                   const TextureImageImpl * const tex,
+                                   const TextureImage * const tex,
                                    const DirectX::XMFLOAT4A & color)
 {
     FASTASSERT(tex != nullptr);
     const int quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color);
-    m_deferred_textured_quads.push_back({ quad_start_vtx, tex });
+    m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -492,13 +492,13 @@ void SpriteBatch::PushQuadTexturedUVs(const float x, const float y,
                                       const float w, const float h,
                                       const float u0, const float v0,
                                       const float u1, const float v1,
-                                      const TextureImageImpl * const tex,
+                                      const TextureImage * const tex,
                                       const DirectX::XMFLOAT4A & color)
 {
     FASTASSERT(tex != nullptr);
     const int quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, u0, v0, u1, v1, color);
-    m_deferred_textured_quads.push_back({ quad_start_vtx, tex });
+    m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -679,8 +679,8 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
     m_window.Init();
 
     // 2D sprite/UI batch setup
-    m_sprite_batches[SpriteBatch::kDrawChar].Init(6 * 5000); // 6 verts per quad (expand to 2 triangles each)
-    m_sprite_batches[SpriteBatch::kDrawPics].Init(6 * 128);
+    m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].Init(6 * 5000); // 6 verts per quad (expand to 2 triangles each)
+    m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].Init(6 * 128);
 
     // Initialize the stores/caches
     m_tex_store.Init();
@@ -949,8 +949,8 @@ void Renderer::BeginFrame()
     }
     PopEvent(); // "ClearRenderTargets"
 
-    m_sprite_batches[SpriteBatch::kDrawChar].BeginFrame();
-    m_sprite_batches[SpriteBatch::kDrawPics].BeginFrame();
+    m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].BeginFrame();
+    m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].BeginFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -986,11 +986,11 @@ void Renderer::Flush2D()
     }
 
     // Remaining 2D geometry:
-    m_sprite_batches[SpriteBatch::kDrawPics].EndFrame(m_shader_ui_sprites,
+    m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].EndFrame(m_shader_ui_sprites,
         nullptr, m_cbuffer_ui_sprites.Get());
 
     // Flush 2D text:
-    m_sprite_batches[SpriteBatch::kDrawChar].EndFrame(m_shader_ui_sprites,
+    m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].EndFrame(m_shader_ui_sprites,
         static_cast<const TextureImageImpl *>(m_tex_store.tex_conchars),
         m_cbuffer_ui_sprites.Get());
 
@@ -1042,12 +1042,15 @@ void Renderer::CompileShaderFromFile(const wchar_t * const filename, const char 
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Renderer::UploadTexture(const TextureImageImpl * const tex)
+void Renderer::UploadTexture(const TextureImage * const tex)
 {
     FASTASSERT(tex != nullptr);
+
+    const TextureImageImpl* const impl = static_cast<const TextureImageImpl *>(tex);
     const UINT subRsrc  = 0; // no mips/slices
-    const UINT rowPitch = tex->width * 4; // RGBA
-    DeviceContext()->UpdateSubresource(tex->tex_resource.Get(), subRsrc, nullptr, tex->pixels, rowPitch, 0);
+    const UINT rowPitch = impl->width * 4; // RGBA
+
+    DeviceContext()->UpdateSubresource(impl->tex_resource.Get(), subRsrc, nullptr, impl->pixels, rowPitch, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

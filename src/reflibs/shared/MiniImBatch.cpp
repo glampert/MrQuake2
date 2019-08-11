@@ -24,7 +24,7 @@ void MiniImBatch::PushVertex(const DrawVertex3D & vert)
 
     if (sm_emulated_triangle_fans)
     {
-        if (m_topology != PrimitiveTopology::TriangleFan)
+        if (m_topology != PrimitiveTopology::kTriangleFan)
         {
             *Increment(1) = vert;
         }

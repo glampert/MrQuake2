@@ -5,6 +5,7 @@
 //
 
 #include "Renderer_D3D12.hpp"
+#include "reflibs/shared/D3DCommon.hpp"
 
 // Quake includes
 #include "client/ref.h"
@@ -13,43 +14,28 @@
 // Refresh common lib
 #pragma comment(lib, "RefShared.lib")
 
-///////////////////////////////////////////////////////////////////////////////
-// Game => Renderer interface
-///////////////////////////////////////////////////////////////////////////////
-
 namespace MrQ2
 {
 namespace D3D12
 {
 
+static MrQ2::D3DRefAPICommon<D3D12::Renderer> g_RefAPI12;
+
+///////////////////////////////////////////////////////////////////////////////
+// Game => Renderer interface
+///////////////////////////////////////////////////////////////////////////////
+
 static int InitRefresh(void * hInstance, void * wndproc, int fullscreen)
 {
-    auto vid_mode = GameInterface::Cvar::Get("vid_mode", "6", CvarWrapper::kFlagArchive);
-    auto vid_width = GameInterface::Cvar::Get("vid_width", "1024", CvarWrapper::kFlagArchive);
-    auto vid_height = GameInterface::Cvar::Get("vid_height", "768", CvarWrapper::kFlagArchive);
-    auto r_renderdoc = GameInterface::Cvar::Get("r_renderdoc", "0", CvarWrapper::kFlagArchive);
-
-    int w, h;
-    if (!GameInterface::Video::GetModeInfo(w, h, vid_mode.AsInt()))
-    {
-        // An invalid vid_mode (i.e.: -1) uses the explicit size
-        w = vid_width.AsInt();
-        h = vid_height.AsInt();
-    }
-
     #if defined(DEBUG) || defined(_DEBUG)
     constexpr bool debug_validation = true;
     #else // DEBUG
     constexpr bool debug_validation = false;
     #endif // DEBUG
 
-    if (r_renderdoc.IsSet())
-    {
-        RenderDocUtils::Initialize();
-    }
-
     CreateRendererInstance();
-    g_Renderer->Init("MrQuake2 (D3D12)", (HINSTANCE)hInstance, (WNDPROC)wndproc, w, h, !!fullscreen, debug_validation);
+    g_RefAPI12.Init(g_Renderer, "MrQuake2 (D3D12)", (HINSTANCE)hInstance, (WNDPROC)wndproc, !!fullscreen, debug_validation);
+
     return true;
 }
 
@@ -58,15 +44,14 @@ static int InitRefresh(void * hInstance, void * wndproc, int fullscreen)
 static void ShutdownRefresh()
 {
     DestroyRendererInstance();
-    RenderDocUtils::Shutdown();
-    GameInterface::Shutdown();
+    g_RefAPI12.Shutdown();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void AppActivate(int activate)
 {
-    // TODO
+    g_RefAPI12.AppActivate(!!activate);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -74,12 +59,7 @@ static void AppActivate(int activate)
 static void BeginRegistration(const char * map_name)
 {
     GameInterface::Printf("**** D3D12::BeginRegistration ****");
-
-    g_Renderer->ViewState()->BeginRegistration();
-    g_Renderer->TexStore()->BeginRegistration();
-    g_Renderer->MdlStore()->BeginRegistration(map_name);
-
-    MemTagsPrintAll();
+    g_RefAPI12.BeginRegistration(map_name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -87,341 +67,119 @@ static void BeginRegistration(const char * map_name)
 static void EndRegistration()
 {
     GameInterface::Printf("**** D3D12::EndRegistration ****");
-
-    g_Renderer->MdlStore()->EndRegistration();
-    g_Renderer->TexStore()->EndRegistration();
-    g_Renderer->TexStore()->UploadScrapIfNeeded();
-    g_Renderer->ViewState()->EndRegistration();
-
-    MemTagsPrintAll();
+    g_RefAPI12.EndRegistration();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static model_s * RegisterModel(const char * name)
 {
-    // Returned as an opaque handle.
-    return (model_s *)g_Renderer->MdlStore()->FindOrLoad(name, ModelType::kAny);
+    return g_RefAPI12.RegisterModel(name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static image_s * RegisterSkin(const char * name)
 {
-    // Returned as an opaque handle.
-    return (image_s *)g_Renderer->TexStore()->FindOrLoad(name, TextureType::kSkin);
+    return g_RefAPI12.RegisterSkin(name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static image_s * RegisterPic(const char * name)
 {
-    // Returned as an opaque handle.
-    return (image_s *)g_Renderer->TexStore()->FindOrLoad(name, TextureType::kPic);
+    return g_RefAPI12.RegisterPic(name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void SetSky(const char * name, float rotate, vec3_t axis)
 {
-    g_Renderer->ViewState()->Sky() = SkyBox(*g_Renderer->TexStore(), name, rotate, axis);
+    g_RefAPI12.SetSky(name, rotate, axis);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void DrawGetPicSize(int * w, int * h, const char * name)
 {
-    // This can be called outside Begin/End frame.
-    const TextureImage * tex = g_Renderer->TexStore()->FindOrLoad(name, TextureType::kPic);
-    if (tex == nullptr)
-    {
-        GameInterface::Printf("WARNING: Can't find or load pic: '%s'", name);
-        *w = *h = -1;
-        return;
-    }
-
-    *w = tex->width;
-    *h = tex->height;
+    g_RefAPI12.GetPicSize(w, h, name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void DrawPic(int x, int y, const char * name)
 {
-    FASTASSERT(g_Renderer->FrameStarted());
-
-    const TextureImage * tex = g_Renderer->TexStore()->FindOrLoad(name, TextureType::kPic);
-    if (tex == nullptr)
-    {
-        GameInterface::Printf("WARNING: Can't find or load pic: '%s'", name);
-        return;
-    }
-
-    const auto fx = float(x);
-    const auto fy = float(y);
-    const auto fw = float(tex->width);
-    const auto fh = float(tex->height);
-
-    if (tex->from_scrap)
-    {
-        const auto u0 = float(tex->scrap_uv0.x) / TextureStore::kScrapSize;
-        const auto v0 = float(tex->scrap_uv0.y) / TextureStore::kScrapSize;
-        const auto u1 = float(tex->scrap_uv1.x) / TextureStore::kScrapSize;
-        const auto v1 = float(tex->scrap_uv1.y) / TextureStore::kScrapSize;
-
-        g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTexturedUVs(
-            fx, fy, fw, fh, u0, v0, u1, v1, static_cast<const TextureImageImpl *>(tex), Renderer::kColorWhite);
-    }
-    else
-    {
-        g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
-            fx, fy, fw, fh, static_cast<const TextureImageImpl *>(tex), Renderer::kColorWhite);
-    }
+    g_RefAPI12.DrawPic(x, y, name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void DrawStretchPic(int x, int y, int w, int h, const char * name)
 {
-    FASTASSERT(g_Renderer->FrameStarted());
-
-    const TextureImage * tex = g_Renderer->TexStore()->FindOrLoad(name, TextureType::kPic);
-    if (tex == nullptr)
-    {
-        GameInterface::Printf("WARNING: Can't find or load pic: '%s'", name);
-        return;
-    }
-
-    const auto fx = float(x);
-    const auto fy = float(y);
-    const auto fw = float(w);
-    const auto fh = float(h);
-
-    if (tex->from_scrap)
-    {
-        const auto u0 = float(tex->scrap_uv0.x) / TextureStore::kScrapSize;
-        const auto v0 = float(tex->scrap_uv0.y) / TextureStore::kScrapSize;
-        const auto u1 = float(tex->scrap_uv1.x) / TextureStore::kScrapSize;
-        const auto v1 = float(tex->scrap_uv1.y) / TextureStore::kScrapSize;
-
-        g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTexturedUVs(
-            fx, fy, fw, fh, u0, v0, u1, v1, static_cast<const TextureImageImpl *>(tex), Renderer::kColorWhite);
-    }
-    else
-    {
-        g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
-            fx, fy, fw, fh, static_cast<const TextureImageImpl *>(tex), Renderer::kColorWhite);
-    }
+    g_RefAPI12.DrawStretchPic(x, y, w, h, name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void DrawChar(int x, int y, int c)
 {
-    FASTASSERT(g_Renderer->FrameStarted());
-
-    // Draws one 8*8 console graphic character with 0 being transparent.
-    // It can be clipped to the top of the screen to allow the console
-    // to be smoothly scrolled off. Based on Draw_Char() from ref_gl.
-    constexpr int kGlyphSize = 8;
-    constexpr int kGlyphTextureSize = 128;
-    constexpr float kGlyphUVScale = float(kGlyphSize) / float(kGlyphTextureSize);
-
-    c &= 255;
-
-    if ((c & 127) == ' ')
-    {
-        return; // Whitespace
-    }
-    if (y <= -kGlyphSize)
-    {
-        return; // Totally off screen
-    }
-
-    const int row = c >> 4;
-    const int col = c & 15;
-    const float frow = row * kGlyphUVScale;
-    const float fcol = col * kGlyphUVScale;
-
-    g_Renderer->SBatch(SpriteBatch::kDrawChar)->PushQuad(
-        float(x),
-        float(y),
-        kGlyphSize,
-        kGlyphSize,
-        fcol,
-        frow,
-        fcol + kGlyphUVScale,
-        frow + kGlyphUVScale,
-        Renderer::kColorWhite);
+    g_RefAPI12.DrawChar(x, y, c);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void DrawTileClear(int /*x*/, int /*y*/, int /*w*/, int /*h*/, const char * /*name*/)
+static void DrawTileClear(int x, int y, int w, int h, const char * name)
 {
-    FASTASSERT(g_Renderer->FrameStarted());
-
-    // FIXME - Only used when letterboxing the screen for SW rendering, so not required.
-    GameInterface::Errorf("D3D12::DrawTileClear() not implemented!");
+    g_RefAPI12.DrawTileClear(x, y, w, h, name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void DrawFill(int x, int y, int w, int h, int c)
 {
-    FASTASSERT(g_Renderer->FrameStarted());
-
-    const ColorRGBA32 color = TextureStore::ColorForIndex(c & 0xFF);
-    const std::uint8_t r = (color & 0xFF);
-    const std::uint8_t g = (color >> 8)  & 0xFF;
-    const std::uint8_t b = (color >> 16) & 0xFF;
-
-    constexpr float scale = 1.0f / 255.0f;
-    const DirectX::XMFLOAT4A normalized_color{ r * scale, g * scale, b * scale, 1.0f };
-
-    auto * dummy_tex = static_cast<const TextureImageImpl *>(g_Renderer->TexStore()->tex_white2x2);
-
-    g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
-        float(x), float(y),
-        float(w), float(h),
-        dummy_tex,
-        normalized_color);
+    g_RefAPI12.DrawFill(x, y, w, h, c);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void DrawFadeScreen()
 {
-    // was 0.8 on ref_gl Draw_FadeScreen
-    constexpr float fade_alpha = 0.5f;
-
-    FASTASSERT(g_Renderer->FrameStarted());
-
-    // Use a dummy white texture as base
-    auto * dummy_tex = static_cast<const TextureImageImpl *>(g_Renderer->TexStore()->tex_white2x2);
-
-    // Full screen quad with alpha
-    g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
-        0.0f, 0.0f, g_Renderer->Width(), g_Renderer->Height(), 
-        dummy_tex, DirectX::XMFLOAT4A{ 0.0f, 0.0f, 0.0f, fade_alpha });
+    g_RefAPI12.DrawFadeScreen();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const qbyte * data)
 {
-    FASTASSERT(g_Renderer->FrameStarted());
-
-    //
-    // This function is only used by Quake2 to draw the cinematic frames, nothing else,
-    // so it could have a better name... We'll optimize for that and assume this is not
-    // a generic "draw pixels" kind of function.
-    //
-
-    const TextureImage * const cin_tex = g_Renderer->TexStore()->tex_cinframe;
-    FASTASSERT(cin_tex != nullptr);
-
-    ColorRGBA32 * const cinematic_buffer = const_cast<ColorRGBA32 *>(cin_tex->pixels);
-    FASTASSERT(cinematic_buffer != nullptr);
-
-    const ColorRGBA32 * const cinematic_palette = TextureStore::CinematicPalette();
-    float hscale;
-    int num_rows;
-
-    if (rows <= kQuakeCinematicImgSize)
-    {
-        hscale = 1.0f;
-        num_rows = rows;
-    }
-    else
-    {
-        hscale = float(rows) / float(kQuakeCinematicImgSize);
-        num_rows = kQuakeCinematicImgSize;
-    }
-
-    // Good idea to clear the buffer first, in case the
-    // following upsampling doesn't fill the whole thing.
-    for (int p = 0; p < (kQuakeCinematicImgSize * kQuakeCinematicImgSize); ++p)
-    {
-        //                        0xAABBGGRR
-        const ColorRGBA32 black = 0xFF000000;
-        cinematic_buffer[p] = black;
-    }
-
-    // Upsample to fill our 256*256 cinematic buffer.
-    // This is based on the algorithm applied by ref_gl.
-    for (int i = 0; i < num_rows; ++i)
-    {
-        const int row = static_cast<int>(i * hscale);
-        if (row > rows)
-        {
-            break;
-        }
-
-        const qbyte * source = &data[cols * row];
-        ColorRGBA32 * dest = &cinematic_buffer[i * kQuakeCinematicImgSize];
-
-        const int fracstep = (cols * 65536 / kQuakeCinematicImgSize);
-        int frac = fracstep >> 1;
-
-        for (int j = 0; j < kQuakeCinematicImgSize; ++j)
-        {
-            const ColorRGBA32 color = cinematic_palette[source[frac >> 16]];
-            dest[j] = color;
-            frac += fracstep;
-        }
-    }
-
-    h += 45; // FIXME HACK - Image scaling is probably broken.
-             // Cinematics are not filling up the buffer as they should...
-
-    // Update the cinematic GPU texture from our CPU buffer
-    g_Renderer->UploadTexture(static_cast<const TextureImageImpl *>(cin_tex));
-
-    // Draw a fullscreen quadrilateral with the cinematic texture applied to it
-    g_Renderer->SBatch(SpriteBatch::kDrawPics)->PushQuadTextured(
-        float(x), float(y), float(w), float(h), 
-        static_cast<const TextureImageImpl *>(cin_tex),
-        Renderer::kColorWhite);
+    g_RefAPI12.DrawStretchRaw(x, y, w, h, cols, rows, data);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void CinematicSetPalette(const qbyte * palette)
 {
-    TextureStore::SetCinematicPaletteFromRaw(palette);
+    g_RefAPI12.CinematicSetPalette(palette);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void BeginFrame(float /*camera_separation*/)
 {
-    FASTASSERT(!g_Renderer->FrameStarted());
-    g_Renderer->BeginFrame();
+    g_RefAPI12.BeginFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void EndFrame()
 {
-    FASTASSERT(g_Renderer->FrameStarted());
-    g_Renderer->EndFrame();
+    g_RefAPI12.EndFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static void RenderFrame(refdef_t * view_def)
 {
-    FASTASSERT(view_def != nullptr);
-    FASTASSERT(g_Renderer->FrameStarted());
-
-    // A world map should have been loaded already by BeginRegistration().
-    if (g_Renderer->MdlStore()->WorldModel() == nullptr && !(view_def->rdflags & RDF_NOWORLDMODEL))
-    {
-        GameInterface::Errorf("RenderFrame: Null world model!");
-    }
-
-    g_Renderer->RenderView(*view_def);
+    g_RefAPI12.RenderFrame(view_def);
 }
 
 } // D3D12

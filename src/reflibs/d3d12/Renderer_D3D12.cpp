@@ -232,13 +232,13 @@ void SpriteBatch::PushQuad(const float x, const float y, const float w, const fl
 
 void SpriteBatch::PushQuadTextured(const float x, const float y,
                                    const float w, const float h,
-                                   const TextureImageImpl * const tex,
+                                   const TextureImage * const tex,
                                    const DirectX::XMFLOAT4A & color)
 {
     FASTASSERT(tex != nullptr);
     const int quad_start_vtx = 0;//TODO m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color);
-    m_deferred_textured_quads.push_back({ quad_start_vtx, tex });
+    m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -247,13 +247,13 @@ void SpriteBatch::PushQuadTexturedUVs(const float x, const float y,
                                       const float w, const float h,
                                       const float u0, const float v0,
                                       const float u1, const float v1,
-                                      const TextureImageImpl * const tex,
+                                      const TextureImage * const tex,
                                       const DirectX::XMFLOAT4A & color)
 {
     FASTASSERT(tex != nullptr);
     const int quad_start_vtx = 0;//TODO m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, u0, v0, u1, v1, color);
-    m_deferred_textured_quads.push_back({ quad_start_vtx, tex });
+    m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -580,7 +580,7 @@ void Renderer::Flush2D()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Renderer::UploadTexture(const TextureImageImpl * const tex)
+void Renderer::UploadTexture(const TextureImage * const tex)
 {
     FASTASSERT(tex != nullptr);
     // TODO

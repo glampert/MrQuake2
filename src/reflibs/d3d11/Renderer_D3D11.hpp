@@ -407,15 +407,6 @@ class SpriteBatch final
 {
 public:
 
-    enum BatchId
-    {
-        kDrawChar, // Only used to draw console chars
-        kDrawPics, // Used by DrawPic, DrawStretchPic, etc
-
-        // Number of items in the enum - not a valid id.
-        kCount,
-    };
-
     SpriteBatch() = default;
     void Init(int max_verts);
 
@@ -432,10 +423,10 @@ public:
                   const DirectX::XMFLOAT4A & color);
 
     void PushQuadTextured(float x, float y, float w, float h,
-                          const TextureImageImpl * tex, const DirectX::XMFLOAT4A & color);
+                          const TextureImage * tex, const DirectX::XMFLOAT4A & color);
 
     void PushQuadTexturedUVs(float x, float y, float w, float h, float u0, float v0, float u1, float v1,
-                             const TextureImageImpl * tex, const DirectX::XMFLOAT4A & color);
+                             const TextureImage * tex, const DirectX::XMFLOAT4A & color);
 
     // Disallow copy.
     SpriteBatch(const SpriteBatch &) = delete;
@@ -453,7 +444,7 @@ private:
     std::vector<DeferredTexQuad> m_deferred_textured_quads;
 };
 
-using SpriteBatchSet = std::array<SpriteBatch, SpriteBatch::kCount>;
+using SpriteBatchSet = std::array<SpriteBatch, size_t(SpriteBatchIdx::kCount)>;
 
 /*
 ===============================================================================
@@ -473,7 +464,7 @@ public:
     static const DirectX::XMFLOAT4A kFloat4One;  // All ones
 
     // Convenience getters
-    SpriteBatch            * SBatch(SpriteBatch::BatchId id) { return &m_sprite_batches[id];              }
+    SpriteBatch            * SBatch(const SpriteBatchIdx id) { return &m_sprite_batches[size_t(id)];      }
     TextureStoreImpl       * TexStore()                      { return &m_tex_store;                       }
     ModelStoreImpl         * MdlStore()                      { return &m_mdl_store;                       }
     ViewDrawStateImpl      * ViewState()                     { return &m_view_draw_state;                 }
@@ -514,7 +505,7 @@ public:
     void CompileShaderFromFile(const wchar_t * filename, const char * entry_point,
                                const char * shader_model, ID3DBlob ** out_blob) const;
 
-    void UploadTexture(const TextureImageImpl * tex);
+    void UploadTexture(const TextureImage * tex);
 
     //
     // Debug frame annotations/makers

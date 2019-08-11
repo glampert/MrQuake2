@@ -176,12 +176,12 @@ void ViewDrawState::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t 
         if (count < 0)
         {
             count = -count;
-            batch_args.topology = PrimitiveTopology::TriangleFan;
+            batch_args.topology = PrimitiveTopology::kTriangleFan;
             doTriFanFirstVert   = true;
         }
         else
         {
-            batch_args.topology = PrimitiveTopology::TriangleStrip;
+            batch_args.topology = PrimitiveTopology::kTriangleStrip;
             doTriFanFirstVert   = false;
         }
 

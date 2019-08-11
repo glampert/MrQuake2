@@ -94,5 +94,8 @@
     <ClInclude Include="..\..\src\reflibs\shared\MiniImBatch.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\shared\D3DCommon.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
