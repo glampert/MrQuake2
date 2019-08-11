@@ -19,7 +19,8 @@ namespace MrQ2
 namespace D3D12
 {
 
-static MrQ2::D3DRefAPICommon<D3D12::Renderer> g_RefAPI12;
+//static MrQ2::D3DRefAPICommon<D3D12::Renderer> g_RefAPI12;
+static MrQ2::D3DRefAPICommon_NullDraw<D3D12::Renderer> g_RefAPI12;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Game => Renderer interface

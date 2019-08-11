@@ -15,7 +15,7 @@ namespace MrQ2
 // Code shared by both the D3D11 and D3D12 back-ends goes here.
 // This header is only included in the RefAPI_D3D[X].cpp file.
 template<typename RendererBackEndType>
-struct D3DRefAPICommon final
+struct D3DRefAPICommon
 {
     const DirectX::XMFLOAT4A kColorWhite = { 1.0f, 1.0f, 1.0f, 1.0f };
     RendererBackEndType *    m_renderer  = nullptr; // Set to the underlaying g_Renderer.
@@ -358,5 +358,22 @@ struct D3DRefAPICommon final
         TextureStore::SetCinematicPaletteFromRaw(palette);
     }
 };
+
+// Debug helper: Sends all draw calls to outer space but still doest all the rest.
+#if defined(DEBUG) || defined(_DEBUG)
+template<typename RendererBackEndType>
+struct D3DRefAPICommon_NullDraw final
+    : public D3DRefAPICommon<RendererBackEndType>
+{
+    void RenderFrame(const refdef_t *) {}
+    void DrawPic(int, int, const char *) {}
+    void DrawStretchPic(int, int, int, int, const char *) {}
+    void DrawChar(int, int, int) {}
+    void DrawTileClear(int, int, int, int, const char *) {}
+    void DrawFill(int, int, int, int, int) {}
+    void DrawFadeScreen() {}
+    void DrawStretchRaw(int, int, int, int, int, int, const qbyte *) {}
+};
+#endif // DEBUG || _DEBUG
 
 } // MrQ2
