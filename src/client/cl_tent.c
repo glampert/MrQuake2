@@ -1343,7 +1343,7 @@ void CL_AddPlayerBeams(void)
     float yaw, pitch;
     float forward;
     float len, steps;
-    int framenum;
+    int framenum = 1;
     float model_length;
 
     float hand_multiplier;

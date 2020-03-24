@@ -52,7 +52,7 @@ void TextureStoreImpl::UploadScrapIfNeeded()
 {
     if (m_scrap_dirty)
     {
-        g_Renderer->UploadTexture(ScrapImpl());
+        Renderer::UploadTexture(ScrapImpl());
         m_scrap_dirty = false;
     }
 }
@@ -294,7 +294,7 @@ MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
     FASTASSERT_ALIGN16(args.model_matrix.floats);
 
     m_current_draw_cmd.model_mtx  = DirectX::XMMATRIX{ args.model_matrix.floats };
-    m_current_draw_cmd.texture    = args.optional_tex ? args.optional_tex : g_Renderer->TexStore()->tex_white2x2;
+    m_current_draw_cmd.texture    = args.optional_tex ? args.optional_tex : Renderer::TexStore()->tex_white2x2;
     m_current_draw_cmd.topology   = args.topology;
     m_current_draw_cmd.depth_hack = args.depth_hack;
     m_current_draw_cmd.first_vert = 0;
@@ -337,57 +337,60 @@ const DirectX::XMFLOAT4A Renderer::kColorBlack{ 0.0f, 0.0f, 0.0f, 1.0f };
 const DirectX::XMFLOAT4A Renderer::kFloat4Zero{ 0.0f, 0.0f, 0.0f, 0.0f };
 const DirectX::XMFLOAT4A Renderer::kFloat4One { 1.0f, 1.0f, 1.0f, 1.0f };
 
-///////////////////////////////////////////////////////////////////////////////
-
-Renderer::Renderer() 
-    : m_tex_store{}
-    , m_mdl_store{ m_tex_store }
-{
-    GameInterface::Printf("D3D12 Renderer instance created.");
-}
+Renderer::State * Renderer::sm_state = nullptr;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-Renderer::~Renderer()
+void Renderer::Init(HINSTANCE hinst, WNDPROC wndproc, const int width, const int height, const bool fullscreen, const bool debug_validation)
 {
-    GameInterface::Printf("D3D12 Renderer shutting down.");
-}
+    if (sm_state != nullptr)
+    {
+        GameInterface::Errorf("D3D12 Renderer is already initialized!");
+    }
 
-///////////////////////////////////////////////////////////////////////////////
-
-void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wndproc,
-                    const int width, const int height, const bool fullscreen, const bool debug_validation)
-{
     GameInterface::Printf("D3D12 Renderer initializing.");
 
-    m_disable_texturing = GameInterface::Cvar::Get("r_disable_texturing", "0", 0);
-    m_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
+    sm_state = new(MemTag::kRenderer) State{};
+
+    sm_state->m_disable_texturing = GameInterface::Cvar::Get("r_disable_texturing", "0", 0);
+    sm_state->m_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
 
     // RenderWindow setup
-    m_window.window_name      = window_name;
-    m_window.class_name       = window_name;
-    m_window.hinst            = hinst;
-    m_window.wndproc          = wndproc;
-    m_window.width            = width;
-    m_window.height           = height;
-    m_window.fullscreen       = fullscreen;
-    m_window.debug_validation = debug_validation;
-    m_window.Init();
+	const char * window_name = "MrQuake2 (D3D12)";
+    sm_state->m_window.window_name      = window_name;
+    sm_state->m_window.class_name       = window_name;
+    sm_state->m_window.hinst            = hinst;
+    sm_state->m_window.wndproc          = wndproc;
+    sm_state->m_window.width            = width;
+    sm_state->m_window.height           = height;
+    sm_state->m_window.fullscreen       = fullscreen;
+    sm_state->m_window.debug_validation = debug_validation;
+    sm_state->m_window.Init();
 
     // 2D sprite/UI batch setup
-    m_sprite_batches[SpriteBatch::kDrawChar].Init(6 * 5000); // 6 verts per quad (expand to 2 triangles each)
-    m_sprite_batches[SpriteBatch::kDrawPics].Init(6 * 128);
+    sm_state->m_sprite_batches[SpriteBatch::kDrawChar].Init(6 * 5000); // 6 verts per quad (expand to 2 triangles each)
+    sm_state->m_sprite_batches[SpriteBatch::kDrawPics].Init(6 * 128);
 
     // Initialize the stores/caches
-    m_tex_store.Init();
-    m_mdl_store.Init();
+    sm_state->m_tex_store.Init();
+    sm_state->m_mdl_store.Init();
 
     // World geometry rendering helper
     constexpr int kViewDrawBatchSize = 25000; // size in vertices
-    m_view_draw_state.Init(kViewDrawBatchSize);
+    sm_state->m_view_draw_state.Init(kViewDrawBatchSize);
 
     // So we can annotate our RenderDoc captures
     InitDebugEvents();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::Shutdown()
+{
+    GameInterface::Printf("D3D12 Renderer shutting down.");
+
+    DeleteObject(sm_state, MemTag::kRenderer);
+    sm_state = nullptr;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -396,13 +399,13 @@ void Renderer::RenderView(const refdef_s & view_def)
 {
     PushEvent(L"Renderer::RenderView");
 
-    ViewDrawStateImpl::FrameData frame_data{ m_tex_store, *m_mdl_store.WorldModel(), view_def };
+    ViewDrawStateImpl::FrameData frame_data{ sm_state->m_tex_store, *sm_state->m_mdl_store.WorldModel(), view_def };
 
     // Enter 3D mode (depth test ON)
     EnableDepthTest();
 
     // Set up camera/view (fills frame_data)
-    m_view_draw_state.RenderViewSetup(frame_data);
+    sm_state->m_view_draw_state.RenderViewSetup(frame_data);
 
     // Update the constant buffers for this frame
     RenderViewUpdateCBuffers(frame_data);
@@ -410,27 +413,27 @@ void Renderer::RenderView(const refdef_s & view_def)
     // Set the camera/world-view:
     FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
     const auto vp_mtx = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
-    m_view_draw_state.SetViewProjMatrix(vp_mtx);
+    sm_state->m_view_draw_state.SetViewProjMatrix(vp_mtx);
 
     //
     // Render solid geometries (world and entities)
     //
 
-    m_view_draw_state.BeginRenderPass();
+    sm_state->m_view_draw_state.BeginRenderPass();
 
     PushEvent(L"RenderWorldModel");
-    m_view_draw_state.RenderWorldModel(frame_data);
+    sm_state->m_view_draw_state.RenderWorldModel(frame_data);
     PopEvent(); // "RenderWorldModel"
 
     PushEvent(L"RenderSkyBox");
-    m_view_draw_state.RenderSkyBox(frame_data);
+    sm_state->m_view_draw_state.RenderSkyBox(frame_data);
     PopEvent(); // "RenderSkyBox"
 
     PushEvent(L"RenderSolidEntities");
-    m_view_draw_state.RenderSolidEntities(frame_data);
+    sm_state->m_view_draw_state.RenderSolidEntities(frame_data);
     PopEvent(); // "RenderSolidEntities"
 
-    m_view_draw_state.EndRenderPass();
+    sm_state->m_view_draw_state.EndRenderPass();
 
     //
     // Transparencies/alpha pass
@@ -440,16 +443,16 @@ void Renderer::RenderView(const refdef_s & view_def)
     EnableAlphaBlending();
 
     PushEvent(L"RenderTranslucentSurfaces");
-    m_view_draw_state.BeginRenderPass();
-    m_view_draw_state.RenderTranslucentSurfaces(frame_data);
-    m_view_draw_state.EndRenderPass();
+    sm_state->m_view_draw_state.BeginRenderPass();
+    sm_state->m_view_draw_state.RenderTranslucentSurfaces(frame_data);
+    sm_state->m_view_draw_state.EndRenderPass();
     PopEvent(); // "RenderTranslucentSurfaces"
 
     PushEvent(L"RenderTranslucentEntities");
     DisableDepthWrites(); // Disable z writes in case they stack up
-    m_view_draw_state.BeginRenderPass();
-    m_view_draw_state.RenderTranslucentEntities(frame_data);
-    m_view_draw_state.EndRenderPass();
+    sm_state->m_view_draw_state.BeginRenderPass();
+    sm_state->m_view_draw_state.RenderTranslucentEntities(frame_data);
+    sm_state->m_view_draw_state.EndRenderPass();
     EnableDepthWrites();
     PopEvent(); // "RenderTranslucentEntities"
 
@@ -472,15 +475,15 @@ void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& fram
 
     ConstantBufferDataSGeomVS cbuffer_data_geometry_vs;
     cbuffer_data_geometry_vs.mvp_matrix = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
-//    DeviceContext()->UpdateSubresource(m_cbuffer_geometry_vs.Get(), 0, nullptr, &cbuffer_data_geometry_vs, 0, 0);
+//    DeviceContext()->UpdateSubresource(sm_state->m_cbuffer_geometry_vs.Get(), 0, nullptr, &cbuffer_data_geometry_vs, 0, 0);
 
     ConstantBufferDataSGeomPS cbuffer_data_geometry_ps;
-    if (m_disable_texturing.IsSet()) // Use only debug vertex color
+    if (sm_state->m_disable_texturing.IsSet()) // Use only debug vertex color
     {
         cbuffer_data_geometry_ps.texture_color_scaling = kFloat4Zero;
         cbuffer_data_geometry_ps.vertex_color_scaling  = kFloat4One;
     }
-    else if (m_blend_debug_color.IsSet()) // Blend debug vertex color with texture
+    else if (sm_state->m_blend_debug_color.IsSet()) // Blend debug vertex color with texture
     {
         cbuffer_data_geometry_ps.texture_color_scaling = kFloat4One;
         cbuffer_data_geometry_ps.vertex_color_scaling  = kFloat4One;
@@ -490,7 +493,7 @@ void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& fram
         cbuffer_data_geometry_ps.texture_color_scaling = kFloat4One;
         cbuffer_data_geometry_ps.vertex_color_scaling  = kFloat4Zero;
     }
-//    DeviceContext()->UpdateSubresource(m_cbuffer_geometry_ps.Get(), 0, nullptr, &cbuffer_data_geometry_ps, 0, 0);
+//    DeviceContext()->UpdateSubresource(sm_state->m_cbuffer_geometry_ps.Get(), 0, nullptr, &cbuffer_data_geometry_ps, 0, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -540,7 +543,7 @@ void Renderer::DisableAlphaBlending()
 void Renderer::BeginFrame()
 {
     PushEvent(L"Renderer::BeginFrame");
-    m_frame_started = true;
+    sm_state->m_frame_started = true;
 
     PushEvent(L"Renderer::ClearRenderTargets");
     {
@@ -548,8 +551,8 @@ void Renderer::BeginFrame()
     }
     PopEvent(); // "ClearRenderTargets"
 
-    m_sprite_batches[SpriteBatch::kDrawChar].BeginFrame();
-    m_sprite_batches[SpriteBatch::kDrawPics].BeginFrame();
+    sm_state->m_sprite_batches[SpriteBatch::kDrawChar].BeginFrame();
+    sm_state->m_sprite_batches[SpriteBatch::kDrawPics].BeginFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -559,10 +562,10 @@ void Renderer::EndFrame()
     Flush2D();
 
     // TODO
-//    m_window.swap_chain->Present(0, 0);
+//    sm_state->m_window.swap_chain->Present(0, 0);
 
-    m_frame_started  = false;
-    m_window_resized = false;
+    sm_state->m_frame_started  = false;
+    sm_state->m_window_resized = false;
 
     PopEvent(); // "Renderer::BeginFrame" 
 }
@@ -606,30 +609,6 @@ void Renderer::PushEventF(const wchar_t * format, ...)
     (void)format;
 }
 #endif // REFD3D12_WITH_DEBUG_FRAME_EVENTS
-
-///////////////////////////////////////////////////////////////////////////////
-// Global Renderer instance
-///////////////////////////////////////////////////////////////////////////////
-
-Renderer * g_Renderer = nullptr;
-
-///////////////////////////////////////////////////////////////////////////////
-
-void CreateRendererInstance()
-{
-    FASTASSERT(g_Renderer == nullptr);
-    g_Renderer = new(MemTag::kRenderer) Renderer{};
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void DestroyRendererInstance()
-{
-    DeleteObject(g_Renderer, MemTag::kRenderer);
-    g_Renderer = nullptr;
-}
-
-///////////////////////////////////////////////////////////////////////////////
 
 } // D3D12
 } // MrQ2

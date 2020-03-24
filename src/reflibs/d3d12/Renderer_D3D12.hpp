@@ -257,45 +257,42 @@ public:
     static const DirectX::XMFLOAT4A kFloat4One;  // All ones
 
     // Convenience getters
-    SpriteBatch       * SBatch(const SpriteBatchIdx id) { return &m_sprite_batches[size_t(id)]; }
-    TextureStoreImpl  * TexStore()                      { return &m_tex_store;                  }
-    ModelStoreImpl    * MdlStore()                      { return &m_mdl_store;                  }
-    ViewDrawStateImpl * ViewState()                     { return &m_view_draw_state;            }
-    bool                DebugValidation() const         { return m_window.debug_validation;     }
-    bool                FrameStarted()    const         { return m_frame_started;               }
-    int                 Width()           const         { return m_window.width;                }
-    int                 Height()          const         { return m_window.height;               }
+    static SpriteBatch       * SBatch(SpriteBatchIdx id) { return &sm_state->m_sprite_batches[size_t(id)]; }
+    static TextureStoreImpl  * TexStore()                { return &sm_state->m_tex_store;                  }
+    static ModelStoreImpl    * MdlStore()                { return &sm_state->m_mdl_store;                  }
+    static ViewDrawStateImpl * ViewState()               { return &sm_state->m_view_draw_state;            }
+    static bool                DebugValidation()         { return sm_state->m_window.debug_validation;     }
+    static bool                FrameStarted()            { return sm_state->m_frame_started;               }
+    static int                 Width()                   { return sm_state->m_window.width;                }
+    static int                 Height()                  { return sm_state->m_window.height;               }
 
-    Renderer();
-    ~Renderer();
+    static void Init(HINSTANCE hinst, WNDPROC wndproc, int width, int height, bool fullscreen, bool debug_validation);
+    static void Shutdown();
 
-    void Init(const char * window_name, HINSTANCE hinst, WNDPROC wndproc,
-              int width, int height, bool fullscreen, bool debug_validation);
+    static void RenderView(const refdef_s & view_def);
+    static void BeginFrame();
+    static void EndFrame();
+    static void Flush2D();
 
-    void RenderView(const refdef_s & view_def);
-    void BeginFrame();
-    void EndFrame();
-    void Flush2D();
+    static void EnableDepthTest();
+    static void DisableDepthTest();
 
-    void EnableDepthTest();
-    void DisableDepthTest();
+    static void EnableDepthWrites();
+    static void DisableDepthWrites();
 
-    void EnableDepthWrites();
-    void DisableDepthWrites();
+    static void EnableAlphaBlending();
+    static void DisableAlphaBlending();
 
-    void EnableAlphaBlending();
-    void DisableAlphaBlending();
-
-    void UploadTexture(const TextureImage * tex);
+    static void UploadTexture(const TextureImage * tex);
 
     //
     // Debug frame annotations/makers
     //
     #if REFD3D12_WITH_DEBUG_FRAME_EVENTS
-    void InitDebugEvents();
-    void PushEventF(const wchar_t * format, ...);
-    void PushEvent(const wchar_t * event_name)   { } // TODO
-    void PopEvent()                              { } // TODO
+    static void InitDebugEvents();
+    static void PushEventF(const wchar_t * format, ...);
+    static void PushEvent(const wchar_t * event_name)   { } // TODO
+    static void PopEvent()                              { } // TODO
     #else // REFD3D12_WITH_DEBUG_FRAME_EVENTS
     static void InitDebugEvents()                {}
     static void PushEventF(const wchar_t *, ...) {}
@@ -321,32 +318,27 @@ private:
         DirectX::XMFLOAT4A vertex_color_scaling;  // Multiplied with vertex color
     };
 
-    void RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& frame_data);
+    static void RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& frame_data);
 
 private:
 
-    // Renderer main data:
-    RenderWindow      m_window;
-    SpriteBatchSet    m_sprite_batches;
-    TextureStoreImpl  m_tex_store;
-    ModelStoreImpl    m_mdl_store;
-    ViewDrawStateImpl m_view_draw_state;
-    bool              m_frame_started  = false;
-    bool              m_window_resized = true;
+    struct State
+    {
+        // Renderer main data:
+        RenderWindow      m_window;
+        SpriteBatchSet    m_sprite_batches;
+        TextureStoreImpl  m_tex_store;
+        ModelStoreImpl    m_mdl_store{ m_tex_store };
+        ViewDrawStateImpl m_view_draw_state;
+        bool              m_frame_started  = false;
+        bool              m_window_resized = true;
 
-    // Cached Cvars:
-    CvarWrapper       m_disable_texturing;
-    CvarWrapper       m_blend_debug_color;
+        // Cached Cvars:
+        CvarWrapper       m_disable_texturing;
+        CvarWrapper       m_blend_debug_color;
+    };
+    static State * sm_state;
 };
-
-// ============================================================================
-
-// Global Renderer instance:
-extern Renderer * g_Renderer;
-void CreateRendererInstance();
-void DestroyRendererInstance();
-
-// ============================================================================
 
 } // D3D12
 } // MrQ2

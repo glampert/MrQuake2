@@ -82,7 +82,7 @@ void PF_cprintf(edict_t * ent, print_level_t level, const char * fmt, ...)
 {
     char msg[1024];
     va_list argptr;
-    int n;
+    int n = 0;
 
     if (ent)
     {
@@ -97,7 +97,7 @@ void PF_cprintf(edict_t * ent, print_level_t level, const char * fmt, ...)
     vsprintf(msg, fmt, argptr);
     va_end(argptr);
 
-    if (ent)
+    if (ent && n > 0)
     {
         SV_ClientPrintf(svs.clients + (n - 1), level, "%s", msg);
     }

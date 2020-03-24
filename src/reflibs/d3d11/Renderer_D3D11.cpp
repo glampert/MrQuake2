@@ -37,8 +37,8 @@ static D3D_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D(const PrimitiveTopology top
 
 void TextureImageImpl::InitD3DSpecific()
 {
-    ID3D11Device* const device = g_Renderer->Device();
-    const unsigned numQualityLevels = g_Renderer->TexStore()->MultisampleQualityLevel(DXGI_FORMAT_R8G8B8A8_UNORM);
+    ID3D11Device* const device = Renderer::Device();
+    const unsigned numQualityLevels = Renderer::TexStore()->MultisampleQualityLevel(DXGI_FORMAT_R8G8B8A8_UNORM);
 
     D3D11_TEXTURE2D_DESC tex2dDesc  = {};
     tex2dDesc.Usage                 = D3D11_USAGE_DEFAULT;
@@ -116,7 +116,7 @@ D3D11_FILTER TextureImageImpl::FilterForTextureType(const TextureType tt)
 
 void TextureStoreImpl::Init()
 {
-    ID3D11Device* const device = g_Renderer->Device();
+    ID3D11Device* const device = Renderer::Device();
     device->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM,
                               1, &m_multisample_quality_levels_rgba);
 
@@ -130,7 +130,7 @@ void TextureStoreImpl::UploadScrapIfNeeded()
 {
     if (m_scrap_dirty)
     {
-        g_Renderer->UploadTexture(ScrapImpl());
+        Renderer::UploadTexture(ScrapImpl());
         m_scrap_dirty = false;
     }
 }
@@ -242,15 +242,15 @@ void ShaderProgram::LoadFromFxFile(const wchar_t * const filename, const char * 
     FASTASSERT(ps_entry != nullptr && ps_entry[0] != '\0');
 
     ComPtr<ID3DBlob> vs_blob;
-    g_Renderer->CompileShaderFromFile(filename, vs_entry, "vs_4_0", vs_blob.GetAddressOf());
+    Renderer::CompileShaderFromFile(filename, vs_entry, "vs_4_0", vs_blob.GetAddressOf());
     FASTASSERT(vs_blob != nullptr);
 
     ComPtr<ID3DBlob> ps_blob;
-    g_Renderer->CompileShaderFromFile(filename, ps_entry, "ps_4_0", ps_blob.GetAddressOf());
+    Renderer::CompileShaderFromFile(filename, ps_entry, "ps_4_0", ps_blob.GetAddressOf());
     FASTASSERT(ps_blob != nullptr);
 
     HRESULT hr;
-    ID3D11Device * const device = g_Renderer->Device();
+    ID3D11Device * const device = Renderer::Device();
 
     // Create the vertex shader:
     hr = device->CreateVertexShader(vs_blob->GetBufferPointer(),
@@ -278,7 +278,7 @@ void ShaderProgram::CreateVertexLayout(const D3D11_INPUT_ELEMENT_DESC * const de
 {
     FASTASSERT(desc != nullptr && num_elements > 0);
 
-    HRESULT hr = g_Renderer->Device()->CreateInputLayout(
+    HRESULT hr = Renderer::Device()->CreateInputLayout(
             desc, num_elements, vs_blob.GetBufferPointer(),
             vs_blob.GetBufferSize(), vertex_layout.GetAddressOf());
 
@@ -328,7 +328,7 @@ void DepthStateHelper::Init(const bool enabled_ztest,
     ds_desc.DepthFunc      = enabled_func;
     ds_desc.DepthWriteMask = enabled_write_mask;
     // Create depth stencil state for rendering with depth test ENABLED:
-    if (FAILED(g_Renderer->Device()->CreateDepthStencilState(&ds_desc, enabled_state.GetAddressOf())))
+    if (FAILED(Renderer::Device()->CreateDepthStencilState(&ds_desc, enabled_state.GetAddressOf())))
     {
         GameInterface::Errorf("CreateDepthStencilState failed!");
     }
@@ -338,7 +338,7 @@ void DepthStateHelper::Init(const bool enabled_ztest,
     ds_desc.DepthFunc      = disabled_func;
     ds_desc.DepthWriteMask = disabled_write_mask;
     // Create depth stencil state for rendering with depth test DISABLED:
-    if (FAILED(g_Renderer->Device()->CreateDepthStencilState(&ds_desc, disabled_state.GetAddressOf())))
+    if (FAILED(Renderer::Device()->CreateDepthStencilState(&ds_desc, disabled_state.GetAddressOf())))
     {
         GameInterface::Errorf("CreateDepthStencilState failed!");
     }
@@ -350,7 +350,7 @@ void DepthStateHelper::Init(const bool enabled_ztest,
 
 void SpriteBatch::Init(const int max_verts)
 {
-    m_buffers.Init("SpriteBatch", max_verts, g_Renderer->Device(), g_Renderer->DeviceContext());
+    m_buffers.Init("SpriteBatch", max_verts, Renderer::Device(), Renderer::DeviceContext());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -364,14 +364,14 @@ void SpriteBatch::BeginFrame()
 
 void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl * const tex, ID3D11Buffer * const cbuffer)
 {
-    ID3D11DeviceContext * const context = g_Renderer->DeviceContext();
+    ID3D11DeviceContext * const context = Renderer::DeviceContext();
     const auto draw_buf = m_buffers.End();
 
     // Constant buffer at register(b0)
     context->VSSetConstantBuffers(0, 1, &cbuffer);
 
     // Set blending for transparency:
-    g_Renderer->EnableAlphaBlending();
+    Renderer::EnableAlphaBlending();
 
     // Fast path - one texture for the whole batch:
     if (tex != nullptr)
@@ -381,8 +381,8 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl
         context->PSSetSamplers(0, 1, tex->sampler.GetAddressOf());
 
         // Draw with the current vertex buffer:
-        g_Renderer->DrawHelper(draw_buf.used_verts, 0, program, draw_buf.buffer_ptr,
-                               D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex2D));
+        Renderer::DrawHelper(draw_buf.used_verts, 0, program, draw_buf.buffer_ptr,
+                             D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex2D));
     }
     else // Handle small unique textured draws:
     {
@@ -396,13 +396,13 @@ void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl
                 previous_tex = d.tex;
             }
 
-            g_Renderer->DrawHelper(/*num_verts=*/ 6, d.quad_start_vtx, program, draw_buf.buffer_ptr,
-                                   D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex2D));
+            Renderer::DrawHelper(/*num_verts=*/ 6, d.quad_start_vtx, program, draw_buf.buffer_ptr,
+                                 D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex2D));
         }
     }
 
     // Restore default blend state.
-    g_Renderer->DisableAlphaBlending();
+    Renderer::DisableAlphaBlending();
 
     // Clear cache for next frame:
     if (!m_deferred_textured_quads.empty())
@@ -509,7 +509,7 @@ void ViewDrawStateImpl::Init(const int max_verts, const ShaderProgram & sp,
                              ID3D11Buffer * cbuff_vs, ID3D11Buffer * cbuff_ps)
 {
     m_buffers.Init("ViewDrawStateImpl", max_verts,
-                   g_Renderer->Device(), g_Renderer->DeviceContext());
+                   Renderer::Device(), Renderer::DeviceContext());
 
     m_program    = &sp;
     m_cbuffer_vs = cbuff_vs;
@@ -535,7 +535,7 @@ void ViewDrawStateImpl::EndRenderPass()
     FASTASSERT(m_batch_open == false);
 
     // Flush draw:
-    ID3D11DeviceContext * const context = g_Renderer->DeviceContext();
+    ID3D11DeviceContext * const context = Renderer::DeviceContext();
     const auto draw_buf = m_buffers.End();
 
     // Constant buffer at register(b0) (VS) and register(b1) (PS)
@@ -544,8 +544,8 @@ void ViewDrawStateImpl::EndRenderPass()
 
     constexpr float depth_min = 0.0f;
     constexpr float depth_max = 1.0f;
-    const auto window_width   = static_cast<float>(g_Renderer->Width());
-    const auto window_height  = static_cast<float>(g_Renderer->Height());
+    const auto window_width   = static_cast<float>(Renderer::Width());
+    const auto window_height  = static_cast<float>(Renderer::Height());
 
     auto SetDepthRange = [context, window_width, window_height](const float near_val, const float far_val)
     {
@@ -579,8 +579,8 @@ void ViewDrawStateImpl::EndRenderPass()
         context->PSSetSamplers(0, 1, tex->sampler.GetAddressOf());
 
         // Draw with the current vertex buffer:
-        g_Renderer->DrawHelper(cmd.num_verts, cmd.first_vert, *m_program, draw_buf.buffer_ptr,
-                               PrimitiveTopologyToD3D(cmd.topology), 0, sizeof(DrawVertex3D));
+        Renderer::DrawHelper(cmd.num_verts, cmd.first_vert, *m_program, draw_buf.buffer_ptr,
+                             PrimitiveTopologyToD3D(cmd.topology), 0, sizeof(DrawVertex3D));
 
         // Restore to default if we did a depth hacked draw.
         if (depth_range_changed)
@@ -600,7 +600,7 @@ MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
     FASTASSERT_ALIGN16(args.model_matrix.floats);
 
     m_current_draw_cmd.model_mtx  = DirectX::XMMATRIX{ args.model_matrix.floats };
-    m_current_draw_cmd.texture    = args.optional_tex ? args.optional_tex : g_Renderer->TexStore()->tex_white2x2;
+    m_current_draw_cmd.texture    = args.optional_tex ? args.optional_tex : Renderer::TexStore()->tex_white2x2;
     m_current_draw_cmd.topology   = args.topology;
     m_current_draw_cmd.depth_hack = args.depth_hack;
     m_current_draw_cmd.first_vert = 0;
@@ -641,50 +641,43 @@ const DirectX::XMFLOAT4A Renderer::kColorBlack{ 0.0f, 0.0f, 0.0f, 1.0f };
 const DirectX::XMFLOAT4A Renderer::kFloat4Zero{ 0.0f, 0.0f, 0.0f, 0.0f };
 const DirectX::XMFLOAT4A Renderer::kFloat4One { 1.0f, 1.0f, 1.0f, 1.0f };
 
-///////////////////////////////////////////////////////////////////////////////
-
-Renderer::Renderer() 
-    : m_tex_store{}
-    , m_mdl_store{ m_tex_store }
-{
-    GameInterface::Printf("D3D11 Renderer instance created.");
-}
+Renderer::State * Renderer::sm_state = nullptr;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-Renderer::~Renderer()
+void Renderer::Init(HINSTANCE hinst, WNDPROC wndproc, const int width, const int height, const bool fullscreen, const bool debug_validation)
 {
-    GameInterface::Printf("D3D11 Renderer shutting down.");
-}
+    if (sm_state != nullptr)
+    {
+        GameInterface::Errorf("D3D11 Renderer is already initialized!");
+    }
 
-///////////////////////////////////////////////////////////////////////////////
-
-void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wndproc,
-                    const int width, const int height, const bool fullscreen, const bool debug_validation)
-{
     GameInterface::Printf("D3D11 Renderer initializing.");
 
-    m_disable_texturing = GameInterface::Cvar::Get("r_disable_texturing", "0", 0);
-    m_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
+    sm_state = new(MemTag::kRenderer) State{};
+
+    sm_state->m_disable_texturing = GameInterface::Cvar::Get("r_disable_texturing", "0", 0);
+    sm_state->m_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
 
     // RenderWindow setup
-    m_window.window_name      = window_name;
-    m_window.class_name       = window_name;
-    m_window.hinst            = hinst;
-    m_window.wndproc          = wndproc;
-    m_window.width            = width;
-    m_window.height           = height;
-    m_window.fullscreen       = fullscreen;
-    m_window.debug_validation = debug_validation;
-    m_window.Init();
+	const char * const window_name = "MrQuake2 (D3D11)";
+    sm_state->m_window.window_name      = window_name;
+    sm_state->m_window.class_name       = window_name;
+    sm_state->m_window.hinst            = hinst;
+    sm_state->m_window.wndproc          = wndproc;
+    sm_state->m_window.width            = width;
+    sm_state->m_window.height           = height;
+    sm_state->m_window.fullscreen       = fullscreen;
+    sm_state->m_window.debug_validation = debug_validation;
+    sm_state->m_window.Init();
 
     // 2D sprite/UI batch setup
-    m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].Init(6 * 5000); // 6 verts per quad (expand to 2 triangles each)
-    m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].Init(6 * 128);
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].Init(6 * 5000); // 6 verts per quad (expand to 2 triangles each)
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].Init(6 * 128);
 
     // Initialize the stores/caches
-    m_tex_store.Init();
-    m_mdl_store.Init();
+    sm_state->m_tex_store.Init();
+    sm_state->m_mdl_store.Init();
 
     // Load shader progs / render state objects
     CreateRSObjects();
@@ -692,8 +685,8 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
 
     // World geometry rendering helper
     constexpr int kViewDrawBatchSize = 25000; // size in vertices
-    m_view_draw_state.Init(kViewDrawBatchSize, m_shader_geometry,
-                           m_cbuffer_geometry_vs.Get(), m_cbuffer_geometry_ps.Get());
+    sm_state->m_view_draw_state.Init(kViewDrawBatchSize, sm_state->m_shader_geometry,
+                                     sm_state->m_cbuffer_geometry_vs.Get(), sm_state->m_cbuffer_geometry_ps.Get());
 
     // So we can annotate our RenderDoc captures
     InitDebugEvents();
@@ -701,13 +694,23 @@ void Renderer::Init(const char * const window_name, HINSTANCE hinst, WNDPROC wnd
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void Renderer::Shutdown()
+{
+    GameInterface::Printf("D3D11 Renderer shutting down.");
+
+    DeleteObject(sm_state, MemTag::kRenderer);
+    sm_state = nullptr;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void Renderer::CreateRSObjects()
 {
-    m_depth_test_states.Init(
+    sm_state->m_depth_test_states.Init(
         true,  D3D11_COMPARISON_LESS,   D3D11_DEPTH_WRITE_MASK_ALL,   // When ON
         false, D3D11_COMPARISON_ALWAYS, D3D11_DEPTH_WRITE_MASK_ALL);  // When OFF
 
-    m_depth_write_states.Init(
+    sm_state->m_depth_write_states.Init(
         true,  D3D11_COMPARISON_LESS,   D3D11_DEPTH_WRITE_MASK_ALL,   // When ON
         true,  D3D11_COMPARISON_ALWAYS, D3D11_DEPTH_WRITE_MASK_ZERO); // When OFF
 }
@@ -726,8 +729,8 @@ void Renderer::LoadShaders()
             { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex2D, rgba),  D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
         const int num_elements = ARRAYSIZE(layout);
-        m_shader_ui_sprites.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"UISprites2D.fx",
-                                           "VS_main", "PS_main", { layout, num_elements });
+        sm_state->m_shader_ui_sprites.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"UISprites2D.fx",
+                                                     "VS_main", "PS_main", { layout, num_elements });
 
         // Blend state for the screen text and transparencies:
         D3D11_BLEND_DESC bs_desc                      = {};
@@ -739,7 +742,7 @@ void Renderer::LoadShaders()
         bs_desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
         bs_desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
         bs_desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
-        if (FAILED(Device()->CreateBlendState(&bs_desc, m_blend_state_alpha.GetAddressOf())))
+        if (FAILED(Device()->CreateBlendState(&bs_desc, sm_state->m_blend_state_alpha.GetAddressOf())))
         {
             GameInterface::Errorf("CreateBlendState failed!");
         }
@@ -749,7 +752,7 @@ void Renderer::LoadShaders()
         buf_desc.Usage             = D3D11_USAGE_DEFAULT;
         buf_desc.ByteWidth         = sizeof(ConstantBufferDataUIVS);
         buf_desc.BindFlags         = D3D11_BIND_CONSTANT_BUFFER;
-        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_ui_sprites.GetAddressOf())))
+        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, sm_state->m_cbuffer_ui_sprites.GetAddressOf())))
         {
             GameInterface::Errorf("Failed to create shader constant buffer!");
         }
@@ -763,21 +766,21 @@ void Renderer::LoadShaders()
             { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex3D, rgba),     D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
         const int num_elements = ARRAYSIZE(layout);
-        m_shader_geometry.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"GeometryCommon.fx",
-                                         "VS_main", "PS_main", { layout, num_elements });
+        sm_state->m_shader_geometry.LoadFromFxFile(REFD3D11_SHADER_PATH_WIDE L"GeometryCommon.fx",
+                                                   "VS_main", "PS_main", { layout, num_elements });
 
         // Create the constant buffers:
         D3D11_BUFFER_DESC buf_desc = {};
         buf_desc.Usage             = D3D11_USAGE_DEFAULT;
         buf_desc.ByteWidth         = sizeof(ConstantBufferDataSGeomVS);
         buf_desc.BindFlags         = D3D11_BIND_CONSTANT_BUFFER;
-        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_geometry_vs.GetAddressOf())))
+        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, sm_state->m_cbuffer_geometry_vs.GetAddressOf())))
         {
             GameInterface::Errorf("Failed to create VS shader constant buffer!");
         }
 
         buf_desc.ByteWidth = sizeof(ConstantBufferDataSGeomPS);
-        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, m_cbuffer_geometry_ps.GetAddressOf())))
+        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, sm_state->m_cbuffer_geometry_ps.GetAddressOf())))
         {
             GameInterface::Errorf("Failed to create PS shader constant buffer!");
         }
@@ -792,13 +795,13 @@ void Renderer::RenderView(const refdef_s & view_def)
 {
     PushEvent(L"Renderer::RenderView");
 
-    ViewDrawStateImpl::FrameData frame_data{ m_tex_store, *m_mdl_store.WorldModel(), view_def };
+    ViewDrawStateImpl::FrameData frame_data{ sm_state->m_tex_store, *sm_state->m_mdl_store.WorldModel(), view_def };
 
     // Enter 3D mode (depth test ON)
     EnableDepthTest();
 
     // Set up camera/view (fills frame_data)
-    m_view_draw_state.RenderViewSetup(frame_data);
+    sm_state->m_view_draw_state.RenderViewSetup(frame_data);
 
     // Update the constant buffers for this frame
     RenderViewUpdateCBuffers(frame_data);
@@ -806,27 +809,27 @@ void Renderer::RenderView(const refdef_s & view_def)
     // Set the camera/world-view:
     FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
     const auto vp_mtx = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
-    m_view_draw_state.SetViewProjMatrix(vp_mtx);
+    sm_state->m_view_draw_state.SetViewProjMatrix(vp_mtx);
 
     //
     // Render solid geometries (world and entities)
     //
 
-    m_view_draw_state.BeginRenderPass();
+    sm_state->m_view_draw_state.BeginRenderPass();
 
     PushEvent(L"RenderWorldModel");
-    m_view_draw_state.RenderWorldModel(frame_data);
+    sm_state->m_view_draw_state.RenderWorldModel(frame_data);
     PopEvent(); // "RenderWorldModel"
 
     PushEvent(L"RenderSkyBox");
-    m_view_draw_state.RenderSkyBox(frame_data);
+    sm_state->m_view_draw_state.RenderSkyBox(frame_data);
     PopEvent(); // "RenderSkyBox"
 
     PushEvent(L"RenderSolidEntities");
-    m_view_draw_state.RenderSolidEntities(frame_data);
+    sm_state->m_view_draw_state.RenderSolidEntities(frame_data);
     PopEvent(); // "RenderSolidEntities"
 
-    m_view_draw_state.EndRenderPass();
+    sm_state->m_view_draw_state.EndRenderPass();
 
     //
     // Transparencies/alpha pass
@@ -836,16 +839,16 @@ void Renderer::RenderView(const refdef_s & view_def)
     EnableAlphaBlending();
 
     PushEvent(L"RenderTranslucentSurfaces");
-    m_view_draw_state.BeginRenderPass();
-    m_view_draw_state.RenderTranslucentSurfaces(frame_data);
-    m_view_draw_state.EndRenderPass();
+    sm_state->m_view_draw_state.BeginRenderPass();
+    sm_state->m_view_draw_state.RenderTranslucentSurfaces(frame_data);
+    sm_state->m_view_draw_state.EndRenderPass();
     PopEvent(); // "RenderTranslucentSurfaces"
 
     PushEvent(L"RenderTranslucentEntities");
     DisableDepthWrites(); // Disable z writes in case they stack up
-    m_view_draw_state.BeginRenderPass();
-    m_view_draw_state.RenderTranslucentEntities(frame_data);
-    m_view_draw_state.EndRenderPass();
+    sm_state->m_view_draw_state.BeginRenderPass();
+    sm_state->m_view_draw_state.RenderTranslucentEntities(frame_data);
+    sm_state->m_view_draw_state.EndRenderPass();
     EnableDepthWrites();
     PopEvent(); // "RenderTranslucentEntities"
 
@@ -860,21 +863,21 @@ void Renderer::RenderView(const refdef_s & view_def)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& frame_data)
+void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData & frame_data)
 {
     FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
 
     ConstantBufferDataSGeomVS cbuffer_data_geometry_vs;
     cbuffer_data_geometry_vs.mvp_matrix = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
-    DeviceContext()->UpdateSubresource(m_cbuffer_geometry_vs.Get(), 0, nullptr, &cbuffer_data_geometry_vs, 0, 0);
+    DeviceContext()->UpdateSubresource(sm_state->m_cbuffer_geometry_vs.Get(), 0, nullptr, &cbuffer_data_geometry_vs, 0, 0);
 
     ConstantBufferDataSGeomPS cbuffer_data_geometry_ps;
-    if (m_disable_texturing.IsSet()) // Use only debug vertex color
+    if (sm_state->m_disable_texturing.IsSet()) // Use only debug vertex color
     {
         cbuffer_data_geometry_ps.texture_color_scaling = kFloat4Zero;
         cbuffer_data_geometry_ps.vertex_color_scaling  = kFloat4One;
     }
-    else if (m_blend_debug_color.IsSet()) // Blend debug vertex color with texture
+    else if (sm_state->m_blend_debug_color.IsSet()) // Blend debug vertex color with texture
     {
         cbuffer_data_geometry_ps.texture_color_scaling = kFloat4One;
         cbuffer_data_geometry_ps.vertex_color_scaling  = kFloat4One;
@@ -884,35 +887,35 @@ void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& fram
         cbuffer_data_geometry_ps.texture_color_scaling = kFloat4One;
         cbuffer_data_geometry_ps.vertex_color_scaling  = kFloat4Zero;
     }
-    DeviceContext()->UpdateSubresource(m_cbuffer_geometry_ps.Get(), 0, nullptr, &cbuffer_data_geometry_ps, 0, 0);
+    DeviceContext()->UpdateSubresource(sm_state->m_cbuffer_geometry_ps.Get(), 0, nullptr, &cbuffer_data_geometry_ps, 0, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Renderer::EnableDepthTest()
 {
-    DeviceContext()->OMSetDepthStencilState(m_depth_test_states.enabled_state.Get(), 0);
+    DeviceContext()->OMSetDepthStencilState(sm_state->m_depth_test_states.enabled_state.Get(), 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Renderer::DisableDepthTest()
 {
-    DeviceContext()->OMSetDepthStencilState(m_depth_test_states.disabled_state.Get(), 0);
+    DeviceContext()->OMSetDepthStencilState(sm_state->m_depth_test_states.disabled_state.Get(), 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Renderer::EnableDepthWrites()
 {
-    DeviceContext()->OMSetDepthStencilState(m_depth_write_states.enabled_state.Get(), 0);
+    DeviceContext()->OMSetDepthStencilState(sm_state->m_depth_write_states.enabled_state.Get(), 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Renderer::DisableDepthWrites()
 {
-    DeviceContext()->OMSetDepthStencilState(m_depth_write_states.disabled_state.Get(), 0);
+    DeviceContext()->OMSetDepthStencilState(sm_state->m_depth_write_states.disabled_state.Get(), 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -920,7 +923,7 @@ void Renderer::DisableDepthWrites()
 void Renderer::EnableAlphaBlending()
 {
     const float blend_factor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    DeviceContext()->OMSetBlendState(m_blend_state_alpha.Get(), blend_factor, 0xFFFFFFFF);
+    DeviceContext()->OMSetBlendState(sm_state->m_blend_state_alpha.Get(), blend_factor, 0xFFFFFFFF);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -935,22 +938,22 @@ void Renderer::DisableAlphaBlending()
 void Renderer::BeginFrame()
 {
     PushEvent(L"Renderer::BeginFrame");
-    m_frame_started = true;
+    sm_state->m_frame_started = true;
 
     PushEvent(L"Renderer::ClearRenderTargets");
     {
-        m_window.device_context->ClearRenderTargetView(m_window.framebuffer_rtv.Get(), &kClearColor.x);
+        sm_state->m_window.device_context->ClearRenderTargetView(sm_state->m_window.framebuffer_rtv.Get(), &kClearColor.x);
 
         const float depth_clear = 1.0f;
         const std::uint8_t stencil_clear = 0;
-        m_window.device_context->ClearDepthStencilView(m_window.depth_stencil_view.Get(),
-                                                       D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
-                                                       depth_clear, stencil_clear);
+        sm_state->m_window.device_context->ClearDepthStencilView(sm_state->m_window.depth_stencil_view.Get(),
+                                                                 D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+                                                                 depth_clear, stencil_clear);
     }
     PopEvent(); // "ClearRenderTargets"
 
-    m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].BeginFrame();
-    m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].BeginFrame();
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].BeginFrame();
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].BeginFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -959,10 +962,10 @@ void Renderer::EndFrame()
 {
     Flush2D();
 
-    m_window.swap_chain->Present(0, 0);
+    sm_state->m_window.swap_chain->Present(0, 0);
 
-    m_frame_started  = false;
-    m_window_resized = false;
+    sm_state->m_frame_started  = false;
+    sm_state->m_window_resized = false;
 
     PopEvent(); // "Renderer::BeginFrame" 
 }
@@ -973,26 +976,25 @@ void Renderer::Flush2D()
 {
     PushEvent(L"Renderer::Flush2D");
 
-    FASTASSERT(m_tex_store.tex_conchars != nullptr);
-    FASTASSERT(m_cbuffer_ui_sprites != nullptr);
+    FASTASSERT(sm_state->m_cbuffer_ui_sprites != nullptr);
 
-    if (m_window_resized)
+    if (sm_state->m_window_resized)
     {
         ConstantBufferDataUIVS cbuffer_data_ui;
         cbuffer_data_ui.screen_dimensions = kFloat4Zero; // Set unused elements to zero
-        cbuffer_data_ui.screen_dimensions.x = static_cast<float>(m_window.width);
-        cbuffer_data_ui.screen_dimensions.y = static_cast<float>(m_window.height);
-        DeviceContext()->UpdateSubresource(m_cbuffer_ui_sprites.Get(), 0, nullptr, &cbuffer_data_ui, 0, 0);
+        cbuffer_data_ui.screen_dimensions.x = static_cast<float>(sm_state->m_window.width);
+        cbuffer_data_ui.screen_dimensions.y = static_cast<float>(sm_state->m_window.height);
+        DeviceContext()->UpdateSubresource(sm_state->m_cbuffer_ui_sprites.Get(), 0, nullptr, &cbuffer_data_ui, 0, 0);
     }
 
     // Remaining 2D geometry:
-    m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].EndFrame(m_shader_ui_sprites,
-        nullptr, m_cbuffer_ui_sprites.Get());
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].EndFrame(sm_state->m_shader_ui_sprites,
+        nullptr, sm_state->m_cbuffer_ui_sprites.Get());
 
     // Flush 2D text:
-    m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].EndFrame(m_shader_ui_sprites,
-        static_cast<const TextureImageImpl *>(m_tex_store.tex_conchars),
-        m_cbuffer_ui_sprites.Get());
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].EndFrame(sm_state->m_shader_ui_sprites,
+        static_cast<const TextureImageImpl *>(sm_state->m_tex_store.tex_conchars),
+        sm_state->m_cbuffer_ui_sprites.Get());
 
     PopEvent(); // "Renderer::Flush2D"
 }
@@ -1016,7 +1018,7 @@ void Renderer::DrawHelper(const unsigned num_verts, const unsigned first_vert, c
 ///////////////////////////////////////////////////////////////////////////////
 
 void Renderer::CompileShaderFromFile(const wchar_t * const filename, const char * const entry_point,
-                                     const char * const shader_model, ID3DBlob ** out_blob) const
+                                     const char * const shader_model, ID3DBlob ** out_blob)
 {
     UINT shader_flags = D3DCOMPILE_ENABLE_STRICTNESS;
 
@@ -1064,7 +1066,7 @@ void Renderer::InitDebugEvents()
         ID3DUserDefinedAnnotation * annotations = nullptr;
         if (SUCCEEDED(DeviceContext()->QueryInterface(__uuidof(annotations), (void **)&annotations)))
         {
-            m_annotations.Attach(annotations);
+            sm_state->m_annotations.Attach(annotations);
             GameInterface::Printf("Successfully created ID3DUserDefinedAnnotation.");
         }
         else
@@ -1078,7 +1080,7 @@ void Renderer::InitDebugEvents()
 
 void Renderer::PushEventF(const wchar_t * format, ...)
 {
-    if (m_annotations)
+    if (sm_state->m_annotations)
     {
         va_list args;
         wchar_t buffer[512];
@@ -1087,34 +1089,10 @@ void Renderer::PushEventF(const wchar_t * format, ...)
         std::vswprintf(buffer, ArrayLength(buffer), format, args);
         va_end(args);
 
-        m_annotations->BeginEvent(buffer);
+        sm_state->m_annotations->BeginEvent(buffer);
     }
 }
 #endif // REFD3D11_WITH_DEBUG_FRAME_EVENTS
-
-///////////////////////////////////////////////////////////////////////////////
-// Global Renderer instance
-///////////////////////////////////////////////////////////////////////////////
-
-Renderer * g_Renderer = nullptr;
-
-///////////////////////////////////////////////////////////////////////////////
-
-void CreateRendererInstance()
-{
-    FASTASSERT(g_Renderer == nullptr);
-    g_Renderer = new(MemTag::kRenderer) Renderer{};
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void DestroyRendererInstance()
-{
-    DeleteObject(g_Renderer, MemTag::kRenderer);
-    g_Renderer = nullptr;
-}
-
-///////////////////////////////////////////////////////////////////////////////
 
 } // D3D11
 } // MrQ2

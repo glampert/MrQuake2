@@ -830,6 +830,10 @@ bool TGALoadFromFile(const char * const filename, ColorRGBA32 ** pic, int * widt
                     *pixbuf++ = blue;
                     *pixbuf++ = alpha;
                     break;
+
+                default:
+                    FASTASSERT(false);
+                    return false;
                 } // switch
             }
         }
@@ -864,6 +868,10 @@ bool TGALoadFromFile(const char * const filename, ColorRGBA32 ** pic, int * widt
                         red   = *buf_p++;
                         alpha = *buf_p++;
                         break;
+
+                    default:
+                        FASTASSERT(false);
+                        return false;
                     } // switch
 
                     for (j = 0; j < packetSize; ++j)
@@ -915,6 +923,10 @@ bool TGALoadFromFile(const char * const filename, ColorRGBA32 ** pic, int * widt
                             *pixbuf++ = blue;
                             *pixbuf++ = alpha;
                             break;
+
+                        default:
+                            FASTASSERT(false);
+                            return false;
                         } // switch
 
                         ++column;

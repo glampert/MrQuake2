@@ -464,57 +464,54 @@ public:
     static const DirectX::XMFLOAT4A kFloat4One;  // All ones
 
     // Convenience getters
-    SpriteBatch            * SBatch(const SpriteBatchIdx id) { return &m_sprite_batches[size_t(id)];      }
-    TextureStoreImpl       * TexStore()                      { return &m_tex_store;                       }
-    ModelStoreImpl         * MdlStore()                      { return &m_mdl_store;                       }
-    ViewDrawStateImpl      * ViewState()                     { return &m_view_draw_state;                 }
-    ID3D11Device           * Device()          const         { return m_window.device.Get();              }
-    ID3D11DeviceContext    * DeviceContext()   const         { return m_window.device_context.Get();      }
-    IDXGISwapChain         * SwapChain()       const         { return m_window.swap_chain.Get();          }
-    ID3D11Texture2D        * FramebufferTex()  const         { return m_window.framebuffer_texture.Get(); }
-    ID3D11RenderTargetView * FramebufferRTV()  const         { return m_window.framebuffer_rtv.Get();     }
-    bool                     DebugValidation() const         { return m_window.debug_validation;          }
-    bool                     FrameStarted()    const         { return m_frame_started;                    }
-    int                      Width()           const         { return m_window.width;                     }
-    int                      Height()          const         { return m_window.height;                    }
+    static SpriteBatch            * SBatch(SpriteBatchIdx id) { return &sm_state->m_sprite_batches[size_t(id)];      }
+    static TextureStoreImpl       * TexStore()                { return &sm_state->m_tex_store;                       }
+    static ModelStoreImpl         * MdlStore()                { return &sm_state->m_mdl_store;                       }
+    static ViewDrawStateImpl      * ViewState()               { return &sm_state->m_view_draw_state;                 }
+    static ID3D11Device           * Device()                  { return sm_state->m_window.device.Get();              }
+    static ID3D11DeviceContext    * DeviceContext()           { return sm_state->m_window.device_context.Get();      }
+    static IDXGISwapChain         * SwapChain()               { return sm_state->m_window.swap_chain.Get();          }
+    static ID3D11Texture2D        * FramebufferTex()          { return sm_state->m_window.framebuffer_texture.Get(); }
+    static ID3D11RenderTargetView * FramebufferRTV()          { return sm_state->m_window.framebuffer_rtv.Get();     }
+    static bool                     DebugValidation()         { return sm_state->m_window.debug_validation;          }
+    static bool                     FrameStarted()            { return sm_state->m_frame_started;                    }
+    static int                      Width()                   { return sm_state->m_window.width;                     }
+    static int                      Height()                  { return sm_state->m_window.height;                    }
 
-    Renderer();
-    ~Renderer();
+    static void Init(HINSTANCE hinst, WNDPROC wndproc, int width, int height, bool fullscreen, bool debug_validation);
+    static void Shutdown();
 
-    void Init(const char * window_name, HINSTANCE hinst, WNDPROC wndproc,
-              int width, int height, bool fullscreen, bool debug_validation);
+    static void RenderView(const refdef_s & view_def);
+    static void BeginFrame();
+    static void EndFrame();
+    static void Flush2D();
 
-    void RenderView(const refdef_s & view_def);
-    void BeginFrame();
-    void EndFrame();
-    void Flush2D();
+    static void EnableDepthTest();
+    static void DisableDepthTest();
 
-    void EnableDepthTest();
-    void DisableDepthTest();
+    static void EnableDepthWrites();
+    static void DisableDepthWrites();
 
-    void EnableDepthWrites();
-    void DisableDepthWrites();
+    static void EnableAlphaBlending();
+    static void DisableAlphaBlending();
 
-    void EnableAlphaBlending();
-    void DisableAlphaBlending();
+    static void DrawHelper(unsigned num_verts, unsigned first_vert, const ShaderProgram & program,
+                           ID3D11Buffer * const vb, D3D11_PRIMITIVE_TOPOLOGY topology,
+                           unsigned offset, unsigned stride);
 
-    void DrawHelper(unsigned num_verts, unsigned first_vert, const ShaderProgram & program,
-                    ID3D11Buffer * const vb, D3D11_PRIMITIVE_TOPOLOGY topology,
-                    unsigned offset, unsigned stride);
+    static void CompileShaderFromFile(const wchar_t * filename, const char * entry_point,
+                                      const char * shader_model, ID3DBlob ** out_blob);
 
-    void CompileShaderFromFile(const wchar_t * filename, const char * entry_point,
-                               const char * shader_model, ID3DBlob ** out_blob) const;
-
-    void UploadTexture(const TextureImage * tex);
+    static void UploadTexture(const TextureImage * tex);
 
     //
     // Debug frame annotations/makers
     //
     #if REFD3D11_WITH_DEBUG_FRAME_EVENTS
-    void InitDebugEvents();
-    void PushEventF(const wchar_t * format, ...);
-    void PushEvent(const wchar_t * event_name)   { if (m_annotations) m_annotations->BeginEvent(event_name); }
-    void PopEvent()                              { if (m_annotations) m_annotations->EndEvent(); }
+    static void InitDebugEvents();
+    static void PushEventF(const wchar_t * format, ...);
+    static void PushEvent(const wchar_t * event_name) { if (sm_state->m_annotations) sm_state->m_annotations->BeginEvent(event_name); }
+    static void PopEvent()                            { if (sm_state->m_annotations) sm_state->m_annotations->EndEvent(); }
     #else // REFD3D11_WITH_DEBUG_FRAME_EVENTS
     static void InitDebugEvents()                {}
     static void PushEventF(const wchar_t *, ...) {}
@@ -540,45 +537,40 @@ private:
         DirectX::XMFLOAT4A vertex_color_scaling;  // Multiplied with vertex color
     };
 
-    void CreateRSObjects();
-    void LoadShaders();
-    void RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& frame_data);
+    static void CreateRSObjects();
+    static void LoadShaders();
+    static void RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData & frame_data);
 
 private:
 
-    // Renderer main data:
-    RenderWindow                       m_window;
-    SpriteBatchSet                     m_sprite_batches;
-    TextureStoreImpl                   m_tex_store;
-    ModelStoreImpl                     m_mdl_store;
-    ViewDrawStateImpl                  m_view_draw_state;
-    ComPtr<ID3DUserDefinedAnnotation>  m_annotations;
-    bool                               m_frame_started  = false;
-    bool                               m_window_resized = true;
+    struct State
+    {
+        // Renderer main data:
+        RenderWindow                       m_window;
+        SpriteBatchSet                     m_sprite_batches;
+        TextureStoreImpl                   m_tex_store;
+        ModelStoreImpl                     m_mdl_store{ m_tex_store };
+        ViewDrawStateImpl                  m_view_draw_state;
+        ComPtr<ID3DUserDefinedAnnotation>  m_annotations;
+        bool                               m_frame_started  = false;
+        bool                               m_window_resized = true;
 
-    // Shader programs / render states:
-    ShaderProgram                      m_shader_ui_sprites;
-    ShaderProgram                      m_shader_geometry;
-    ComPtr<ID3D11BlendState>           m_blend_state_alpha;
-    DepthStateHelper                   m_depth_test_states;
-    DepthStateHelper                   m_depth_write_states;
-    ComPtr<ID3D11Buffer>               m_cbuffer_ui_sprites;
-    ComPtr<ID3D11Buffer>               m_cbuffer_geometry_vs;
-    ComPtr<ID3D11Buffer>               m_cbuffer_geometry_ps;
+        // Shader programs / render states:
+        ShaderProgram                      m_shader_ui_sprites;
+        ShaderProgram                      m_shader_geometry;
+        ComPtr<ID3D11BlendState>           m_blend_state_alpha;
+        DepthStateHelper                   m_depth_test_states;
+        DepthStateHelper                   m_depth_write_states;
+        ComPtr<ID3D11Buffer>               m_cbuffer_ui_sprites;
+        ComPtr<ID3D11Buffer>               m_cbuffer_geometry_vs;
+        ComPtr<ID3D11Buffer>               m_cbuffer_geometry_ps;
 
-    // Cached Cvars:
-    CvarWrapper                        m_disable_texturing;
-    CvarWrapper                        m_blend_debug_color;
+        // Cached Cvars:
+        CvarWrapper                        m_disable_texturing;
+        CvarWrapper                        m_blend_debug_color;
+    };
+    static State * sm_state;
 };
-
-// ============================================================================
-
-// Global Renderer instance:
-extern Renderer * g_Renderer;
-void CreateRendererInstance();
-void DestroyRendererInstance();
-
-// ============================================================================
 
 } // D3D11
 } // MrQ2
