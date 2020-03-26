@@ -291,8 +291,8 @@ public:
     #if REFD3D12_WITH_DEBUG_FRAME_EVENTS
     static void InitDebugEvents();
     static void PushEventF(const wchar_t * format, ...);
-    static void PushEvent(const wchar_t * event_name)   { } // TODO
-    static void PopEvent()                              { } // TODO
+    static void PushEvent(const wchar_t * event_name) { } // TODO
+    static void PopEvent()                            { } // TODO
     #else // REFD3D12_WITH_DEBUG_FRAME_EVENTS
     static void InitDebugEvents()                {}
     static void PushEventF(const wchar_t *, ...) {}

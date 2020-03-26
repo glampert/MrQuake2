@@ -47,7 +47,7 @@ void RenderWindow::InitRenderWindow()
     const UINT num_feature_levels = ARRAYSIZE(feature_levels);
 
     DXGI_SWAP_CHAIN_DESC sd               = {};
-    sd.BufferCount                        = 1;
+    sd.BufferCount                        = 2;
     sd.BufferDesc.Width                   = width;
     sd.BufferDesc.Height                  = height;
     sd.BufferDesc.Format                  = DXGI_FORMAT_R8G8B8A8_UNORM;
