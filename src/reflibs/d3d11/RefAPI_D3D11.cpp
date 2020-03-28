@@ -5,7 +5,7 @@
 //
 
 #include "Renderer_D3D11.hpp"
-#include "reflibs/shared/D3DCommon.hpp"
+#include "reflibs/shared/d3d/D3DCommon.hpp"
 
 // Quake includes
 #include "client/ref.h"
@@ -13,6 +13,11 @@
 
 // Refresh common lib
 #pragma comment(lib, "RefShared.lib")
+
+// Dx11
+#pragma comment(lib, "d3d11")
+#pragma comment(lib, "dxguid")
+#pragma comment(lib, "d3dcompiler")
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -35,7 +35,8 @@
   <ItemGroup>
     <ClInclude Include="..\..\src\external\renderdoc\renderdoc_app.h" />
     <ClInclude Include="..\..\src\external\stb\stb_image_write.h" />
-    <ClInclude Include="..\..\src\reflibs\shared\D3DCommon.hpp" />
+    <ClInclude Include="..\..\src\reflibs\shared\d3d\D3DCommon.hpp" />
+    <ClInclude Include="..\..\src\reflibs\shared\d3d\D3DShader.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\FixedSizeArray.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\Memory.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\MiniImBatch.hpp" />

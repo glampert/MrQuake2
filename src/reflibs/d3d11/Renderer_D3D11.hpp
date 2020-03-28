@@ -11,9 +11,9 @@
 #include "reflibs/shared/TextureStore.hpp"
 #include "reflibs/shared/ViewDraw.hpp"
 #include "reflibs/shared/RenderDocUtils.hpp"
+#include "reflibs/shared/d3d/D3DShader.hpp"
 
 #include <array>
-#include <tuple>
 #include <DirectXMath.h>
 
 #ifndef NDEBUG
@@ -40,7 +40,11 @@ constexpr int kNumViewDrawVertexBuffers    = 2;
 constexpr int kNumSpriteBatchVertexBuffers = 2;
 
 // Input element desc array + count
-using InputLayoutDesc = std::tuple<const D3D11_INPUT_ELEMENT_DESC *, int>;
+struct InputLayoutDesc final
+{
+    const D3D11_INPUT_ELEMENT_DESC * desc;
+    int                              num_elements;
+};
 
 /*
 ===============================================================================
@@ -57,11 +61,10 @@ public:
     ComPtr<ID3D11PixelShader>  ps;
     ComPtr<ID3D11InputLayout>  vertex_layout;
 
-    void LoadFromFxFile(const wchar_t * filename, const char * vs_entry,
-                        const char * ps_entry, const InputLayoutDesc & layout);
-
-    void CreateVertexLayout(const D3D11_INPUT_ELEMENT_DESC * desc,
-                            int num_elements, ID3DBlob & vs_blob);
+    void LoadFromFxFile(const wchar_t * filename,
+                        const char * vs_entry,
+                        const char * ps_entry,
+                        const InputLayoutDesc & layout);
 
     ShaderProgram() = default;
 
@@ -464,19 +467,17 @@ public:
     static const DirectX::XMFLOAT4A kFloat4One;  // All ones
 
     // Convenience getters
-    static SpriteBatch            * SBatch(SpriteBatchIdx id) { return &sm_state->m_sprite_batches[size_t(id)];      }
-    static TextureStoreImpl       * TexStore()                { return &sm_state->m_tex_store;                       }
-    static ModelStoreImpl         * MdlStore()                { return &sm_state->m_mdl_store;                       }
-    static ViewDrawStateImpl      * ViewState()               { return &sm_state->m_view_draw_state;                 }
-    static ID3D11Device           * Device()                  { return sm_state->m_window.device.Get();              }
-    static ID3D11DeviceContext    * DeviceContext()           { return sm_state->m_window.device_context.Get();      }
-    static IDXGISwapChain         * SwapChain()               { return sm_state->m_window.swap_chain.Get();          }
-    static ID3D11Texture2D        * FramebufferTex()          { return sm_state->m_window.framebuffer_texture.Get(); }
-    static ID3D11RenderTargetView * FramebufferRTV()          { return sm_state->m_window.framebuffer_rtv.Get();     }
-    static bool                     DebugValidation()         { return sm_state->m_window.debug_validation;          }
-    static bool                     FrameStarted()            { return sm_state->m_frame_started;                    }
-    static int                      Width()                   { return sm_state->m_window.width;                     }
-    static int                      Height()                  { return sm_state->m_window.height;                    }
+    static SpriteBatch         * SBatch(SpriteBatchIdx id) { return &sm_state->m_sprite_batches[size_t(id)]; }
+    static TextureStoreImpl    * TexStore()                { return &sm_state->m_tex_store;                  }
+    static ModelStoreImpl      * MdlStore()                { return &sm_state->m_mdl_store;                  }
+    static ViewDrawStateImpl   * ViewState()               { return &sm_state->m_view_draw_state;            }
+    static ID3D11Device        * Device()                  { return sm_state->m_window.device.Get();         }
+    static ID3D11DeviceContext * DeviceContext()           { return sm_state->m_window.device_context.Get(); }
+    static IDXGISwapChain      * SwapChain()               { return sm_state->m_window.swap_chain.Get();     }
+    static bool                  DebugValidation()         { return sm_state->m_window.debug_validation;     }
+    static bool                  FrameStarted()            { return sm_state->m_frame_started;               }
+    static int                   Width()                   { return sm_state->m_window.width;                }
+    static int                   Height()                  { return sm_state->m_window.height;               }
 
     static void Init(HINSTANCE hinst, WNDPROC wndproc, int width, int height, bool fullscreen, bool debug_validation);
     static void Shutdown();
@@ -498,9 +499,6 @@ public:
     static void DrawHelper(unsigned num_verts, unsigned first_vert, const ShaderProgram & program,
                            ID3D11Buffer * const vb, D3D11_PRIMITIVE_TOPOLOGY topology,
                            unsigned offset, unsigned stride);
-
-    static void CompileShaderFromFile(const wchar_t * filename, const char * entry_point,
-                                      const char * shader_model, ID3DBlob ** out_blob);
 
     static void UploadTexture(const TextureImage * tex);
 

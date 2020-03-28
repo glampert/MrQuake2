@@ -5,7 +5,7 @@
 //
 
 #include "Renderer_D3D12.hpp"
-#include "reflibs/shared/D3DCommon.hpp"
+#include "reflibs/shared/d3d/D3DCommon.hpp"
 
 // Quake includes
 #include "client/ref.h"
@@ -13,6 +13,12 @@
 
 // Refresh common lib
 #pragma comment(lib, "RefShared.lib")
+
+// Dx12
+#pragma comment(lib, "dxgi")
+#pragma comment(lib, "d3d12")
+#pragma comment(lib, "dxguid")
+#pragma comment(lib, "d3dcompiler")
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -4,6 +4,7 @@
 //
 
 #include "Renderer_D3D12.hpp"
+#include <dxgidebug.h>
 
 // Debug markers need these.
 #include <cstdarg>
@@ -356,16 +357,7 @@ void Renderer::Init(HINSTANCE hinst, WNDPROC wndproc, const int width, const int
     sm_state->m_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
 
     // RenderWindow setup
-	const char * window_name = "MrQuake2 (D3D12)";
-    sm_state->m_window.window_name      = window_name;
-    sm_state->m_window.class_name       = window_name;
-    sm_state->m_window.hinst            = hinst;
-    sm_state->m_window.wndproc          = wndproc;
-    sm_state->m_window.width            = width;
-    sm_state->m_window.height           = height;
-    sm_state->m_window.fullscreen       = fullscreen;
-    sm_state->m_window.debug_validation = debug_validation;
-    sm_state->m_window.Init();
+    sm_state->m_window.Init("MrQuake2 (D3D12)", hinst, wndproc, width, height, fullscreen, debug_validation);
 
     // 2D sprite/UI batch setup
     sm_state->m_sprite_batches[SpriteBatch::kDrawChar].Init(6 * 5000); // 6 verts per quad (expand to 2 triangles each)
@@ -389,8 +381,20 @@ void Renderer::Shutdown()
 {
     GameInterface::Printf("D3D12 Renderer shutting down.");
 
+    const bool debug_check_live_objects = DebugValidation();
+
     DeleteObject(sm_state, MemTag::kRenderer);
     sm_state = nullptr;
+
+    // At this point there should be no D3D objects left.
+    if (debug_check_live_objects)
+    {
+        ComPtr<IDXGIDebug1> debug_interface;
+        if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug_interface))))
+        {
+            debug_interface->ReportLiveObjects(DXGI_DEBUG_ALL, (DXGI_DEBUG_RLO_FLAGS)(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -561,8 +565,11 @@ void Renderer::EndFrame()
 {
     Flush2D();
 
-    // TODO
-//    sm_state->m_window.swap_chain->Present(0, 0);
+    auto hr = SwapChain()->Present(0, 0);
+    if (FAILED(hr))
+    {
+        GameInterface::Errorf("SwapChain Present failed: %s", RenderWindow::ErrorToString(hr).c_str());
+    }
 
     sm_state->m_frame_started  = false;
     sm_state->m_window_resized = false;

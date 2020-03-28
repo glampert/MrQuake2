@@ -11,9 +11,9 @@
 #include "reflibs/shared/TextureStore.hpp"
 #include "reflibs/shared/ViewDraw.hpp"
 #include "reflibs/shared/RenderDocUtils.hpp"
+#include "reflibs/shared/d3d/D3DShader.hpp"
 
 #include <array>
-#include <tuple>
 #include <DirectXMath.h>
 
 #ifndef NDEBUG
@@ -257,14 +257,15 @@ public:
     static const DirectX::XMFLOAT4A kFloat4One;  // All ones
 
     // Convenience getters
-    static SpriteBatch       * SBatch(SpriteBatchIdx id) { return &sm_state->m_sprite_batches[size_t(id)]; }
-    static TextureStoreImpl  * TexStore()                { return &sm_state->m_tex_store;                  }
-    static ModelStoreImpl    * MdlStore()                { return &sm_state->m_mdl_store;                  }
-    static ViewDrawStateImpl * ViewState()               { return &sm_state->m_view_draw_state;            }
-    static bool                DebugValidation()         { return sm_state->m_window.debug_validation;     }
-    static bool                FrameStarted()            { return sm_state->m_frame_started;               }
-    static int                 Width()                   { return sm_state->m_window.width;                }
-    static int                 Height()                  { return sm_state->m_window.height;               }
+    static SpriteBatch       * SBatch(SpriteBatchIdx id) { return &sm_state->m_sprite_batches[size_t(id)];               }
+    static TextureStoreImpl  * TexStore()                { return &sm_state->m_tex_store;                                }
+    static ModelStoreImpl    * MdlStore()                { return &sm_state->m_mdl_store;                                }
+    static ViewDrawStateImpl * ViewState()               { return &sm_state->m_view_draw_state;                          }
+    static IDXGISwapChain4   * SwapChain()               { return sm_state->m_window.swap_chain_helper.swap_chain.Get(); }
+    static bool                DebugValidation()         { return sm_state->m_window.debug_validation;                   }
+    static bool                FrameStarted()            { return sm_state->m_frame_started;                             }
+    static int                 Width()                   { return sm_state->m_window.width;                              }
+    static int                 Height()                  { return sm_state->m_window.height;                             }
 
     static void Init(HINSTANCE hinst, WNDPROC wndproc, int width, int height, bool fullscreen, bool debug_validation);
     static void Shutdown();

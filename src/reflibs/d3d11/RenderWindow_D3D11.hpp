@@ -10,7 +10,6 @@
 #include <dxgi.h>
 #include <d3d11.h>
 #include <d3d11_1.h>
-#include <d3dcompiler.h>
 
 namespace MrQ2
 {
@@ -18,6 +17,7 @@ namespace D3D11
 {
 
 using Microsoft::WRL::ComPtr;
+constexpr uint32_t kNumFrameBuffers = 2;
 
 /*
 ===============================================================================
@@ -30,9 +30,6 @@ class RenderWindow final
     : public OSWindow
 {
 public:
-
-    // Enable D3D-level debug validation?
-    bool debug_validation = false;
 
     // Device/swap-chain:
     ComPtr<ID3D11Device>           device;

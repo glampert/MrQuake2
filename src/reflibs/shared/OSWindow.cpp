@@ -16,14 +16,30 @@ namespace MrQ2
 // OSWindow
 ///////////////////////////////////////////////////////////////////////////////
 
-void OSWindow::Init()
+void OSWindow::Init(const char * name, HINSTANCE hInst, WNDPROC wndProc,
+                    const int w, const int h, const bool fs, const bool debug)
+{
+    this->hinst            = hInst;
+    this->wndproc          = wndProc;
+    this->window_name      = name;
+    this->width            = w;
+    this->height           = h;
+    this->fullscreen       = fs;
+    this->debug_validation = debug;
+
+    Create();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void OSWindow::Create()
 {
     WNDCLASSEX wcex    = {0};
     wcex.cbSize        = sizeof(WNDCLASSEX);
     wcex.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wcex.lpfnWndProc   = wndproc;
     wcex.hInstance     = hinst;
-    wcex.lpszClassName = class_name.c_str();
+    wcex.lpszClassName = window_name.c_str();
     wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
     wcex.hIcon         = LoadIcon(nullptr, IDI_APPLICATION);
     wcex.hIconSm       = LoadIcon(nullptr, IDI_APPLICATION);
@@ -67,7 +83,7 @@ void OSWindow::Init()
         y = vid_ypos.AsInt();
     }
 
-    hwnd = CreateWindowEx(exstyle, class_name.c_str(), window_name.c_str(),
+    hwnd = CreateWindowEx(exstyle, window_name.c_str(), window_name.c_str(),
                           stylebits, x, y, w, h, nullptr, nullptr, hinst, nullptr);
     if (!hwnd)
     {
@@ -87,7 +103,7 @@ void OSWindow::Init()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void OSWindow::Shutdown()
+void OSWindow::Destroy()
 {
     if (hwnd != nullptr)
     {
@@ -96,24 +112,21 @@ void OSWindow::Shutdown()
     }
     if (hinst != nullptr)
     {
-        UnregisterClass(class_name.c_str(), hinst);
+        UnregisterClass(window_name.c_str(), hinst);
         hinst = nullptr;
     }
 
     wndproc = nullptr;
     window_name.clear();
-    class_name.clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 OSWindow::~OSWindow()
 {
-    Shutdown();
+    Destroy();
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// Helpers
 ///////////////////////////////////////////////////////////////////////////////
 
 std::string OSWindow::ErrorToString(HRESULT hr)

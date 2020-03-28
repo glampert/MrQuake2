@@ -26,20 +26,20 @@ class OSWindow
 {
 public:
 
-    HINSTANCE   hinst       = nullptr;
-    WNDPROC     wndproc     = nullptr;
-    HWND        hwnd        = nullptr;
-    std::string window_name = {};
-    std::string class_name  = {};
-    int         width       = 0;
-    int         height      = 0;
-    bool        fullscreen  = false;
+    HINSTANCE   hinst            = nullptr;
+    WNDPROC     wndproc          = nullptr;
+    HWND        hwnd             = nullptr;
+    std::string window_name      = {};
+    int         width            = 0;
+    int         height           = 0;
+    bool        fullscreen       = false;
+    bool        debug_validation = false; // Enable D3D-level debug validation?
 
     OSWindow() = default;
     virtual ~OSWindow();
 
-    void Init();
-    void Shutdown();
+    void Init(const char * name, HINSTANCE hInst, WNDPROC wndProc,
+              const int w, const int h, const bool fs, const bool debug);
 
     // Disallow copy.
     OSWindow(const OSWindow &) = delete;
@@ -51,8 +51,13 @@ public:
 
 protected:
 
-    // Implemented by the renderer.
+    // Implemented by the RenderWindow.
     virtual void InitRenderWindow() { }
+
+private:
+
+    void Create();
+    void Destroy();
 };
 
 } // MrQ2

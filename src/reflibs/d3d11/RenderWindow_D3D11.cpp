@@ -6,10 +6,6 @@
 #include "RenderWindow_D3D11.hpp"
 #include "reflibs/shared/RefShared.hpp"
 
-#pragma comment(lib, "d3d11")
-#pragma comment(lib, "dxguid")
-#pragma comment(lib, "d3dcompiler")
-
 namespace MrQ2
 {
 namespace D3D11
@@ -47,7 +43,7 @@ void RenderWindow::InitRenderWindow()
     const UINT num_feature_levels = ARRAYSIZE(feature_levels);
 
     DXGI_SWAP_CHAIN_DESC sd               = {};
-    sd.BufferCount                        = 2;
+    sd.BufferCount                        = kNumFrameBuffers;
     sd.BufferDesc.Width                   = width;
     sd.BufferDesc.Height                  = height;
     sd.BufferDesc.Format                  = DXGI_FORMAT_R8G8B8A8_UNORM;

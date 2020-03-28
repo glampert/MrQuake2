@@ -234,54 +234,45 @@ void ModelStoreImpl::DestroyModel(ModelInstance * mdl)
 // ShaderProgram
 ///////////////////////////////////////////////////////////////////////////////
 
-void ShaderProgram::LoadFromFxFile(const wchar_t * const filename, const char * const vs_entry,
-                                   const char * const ps_entry, const InputLayoutDesc & layout)
+void ShaderProgram::LoadFromFxFile(const wchar_t * const filename,
+                                   const char * const vs_entry,
+                                   const char * const ps_entry,
+                                   const InputLayoutDesc & layout)
 {
-    FASTASSERT(filename != nullptr && filename[0] != L'\0');
-    FASTASSERT(vs_entry != nullptr && vs_entry[0] != '\0');
-    FASTASSERT(ps_entry != nullptr && ps_entry[0] != '\0');
+    FASTASSERT(layout.desc != nullptr && layout.num_elements > 0);
 
-    ComPtr<ID3DBlob> vs_blob;
-    Renderer::CompileShaderFromFile(filename, vs_entry, "vs_4_0", vs_blob.GetAddressOf());
-    FASTASSERT(vs_blob != nullptr);
+    D3DShader::Info shader_info;
+    shader_info.vs_entry = vs_entry;
+    shader_info.vs_model = "vs_4_0";
+    shader_info.ps_entry = ps_entry;
+    shader_info.ps_model = "ps_4_0";
+    shader_info.debug    = Renderer::DebugValidation();
 
-    ComPtr<ID3DBlob> ps_blob;
-    Renderer::CompileShaderFromFile(filename, ps_entry, "ps_4_0", ps_blob.GetAddressOf());
-    FASTASSERT(ps_blob != nullptr);
+    D3DShader::Blobs shader_blobs;
+    D3DShader::LoadFromFxFile(filename, shader_info, &shader_blobs);
 
     HRESULT hr;
     ID3D11Device * const device = Renderer::Device();
 
     // Create the vertex shader:
-    hr = device->CreateVertexShader(vs_blob->GetBufferPointer(),
-                                    vs_blob->GetBufferSize(), nullptr, vs.GetAddressOf());
+    hr = device->CreateVertexShader(shader_blobs.vs_blob->GetBufferPointer(),
+                                    shader_blobs.vs_blob->GetBufferSize(), nullptr, vs.GetAddressOf());
     if (FAILED(hr))
     {
         GameInterface::Errorf("Failed to create vertex shader '%s'", vs_entry);
     }
 
     // Create the pixel shader:
-    hr = device->CreatePixelShader(ps_blob->GetBufferPointer(),
-                                   ps_blob->GetBufferSize(), nullptr, ps.GetAddressOf());
+    hr = device->CreatePixelShader(shader_blobs.ps_blob->GetBufferPointer(),
+                                   shader_blobs.ps_blob->GetBufferSize(), nullptr, ps.GetAddressOf());
     if (FAILED(hr))
     {
         GameInterface::Errorf("Failed to create pixel shader '%s'", ps_entry);
     }
 
-    CreateVertexLayout(std::get<0>(layout), std::get<1>(layout), *vs_blob.Get());
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void ShaderProgram::CreateVertexLayout(const D3D11_INPUT_ELEMENT_DESC * const desc,
-                                       const int num_elements, ID3DBlob & vs_blob)
-{
-    FASTASSERT(desc != nullptr && num_elements > 0);
-
-    HRESULT hr = Renderer::Device()->CreateInputLayout(
-            desc, num_elements, vs_blob.GetBufferPointer(),
-            vs_blob.GetBufferSize(), vertex_layout.GetAddressOf());
-
+    // Input Layout:
+    hr = device->CreateInputLayout(layout.desc, layout.num_elements, shader_blobs.vs_blob->GetBufferPointer(),
+                                   shader_blobs.vs_blob->GetBufferSize(), vertex_layout.GetAddressOf());
     if (FAILED(hr))
     {
         GameInterface::Errorf("Failed to create vertex layout!");
@@ -660,16 +651,7 @@ void Renderer::Init(HINSTANCE hinst, WNDPROC wndproc, const int width, const int
     sm_state->m_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
 
     // RenderWindow setup
-	const char * const window_name = "MrQuake2 (D3D11)";
-    sm_state->m_window.window_name      = window_name;
-    sm_state->m_window.class_name       = window_name;
-    sm_state->m_window.hinst            = hinst;
-    sm_state->m_window.wndproc          = wndproc;
-    sm_state->m_window.width            = width;
-    sm_state->m_window.height           = height;
-    sm_state->m_window.fullscreen       = fullscreen;
-    sm_state->m_window.debug_validation = debug_validation;
-    sm_state->m_window.Init();
+    sm_state->m_window.Init("MrQuake2 (D3D11)", hinst, wndproc, width, height, fullscreen, debug_validation);
 
     // 2D sprite/UI batch setup
     sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].Init(6 * 5000); // 6 verts per quad (expand to 2 triangles each)
@@ -962,7 +944,11 @@ void Renderer::EndFrame()
 {
     Flush2D();
 
-    sm_state->m_window.swap_chain->Present(0, 0);
+    auto hr = SwapChain()->Present(0, 0);
+    if (FAILED(hr))
+    {
+        GameInterface::Errorf("SwapChain Present failed: %s", RenderWindow::ErrorToString(hr).c_str());
+    }
 
     sm_state->m_frame_started  = false;
     sm_state->m_window_resized = false;
@@ -1013,33 +999,6 @@ void Renderer::DrawHelper(const unsigned num_verts, const unsigned first_vert, c
     context->VSSetShader(program.vs.Get(), nullptr, 0);
     context->PSSetShader(program.ps.Get(), nullptr, 0);
     context->Draw(num_verts, first_vert);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void Renderer::CompileShaderFromFile(const wchar_t * const filename, const char * const entry_point,
-                                     const char * const shader_model, ID3DBlob ** out_blob)
-{
-    UINT shader_flags = D3DCOMPILE_ENABLE_STRICTNESS;
-
-    // Set the D3DCOMPILE_DEBUG flag to embed debug information in the shaders.
-    // Setting this flag improves the shader debugging experience, but still allows
-    // the shaders to be optimized and to run exactly the way they will run in
-    // the release configuration.
-    if (DebugValidation())
-    {
-        shader_flags |= D3DCOMPILE_DEBUG;
-    }
-
-    ComPtr<ID3DBlob> error_blob;
-    HRESULT hr = D3DCompileFromFile(filename, nullptr, nullptr, entry_point, shader_model,
-                                    shader_flags, 0, out_blob, error_blob.GetAddressOf());
-
-    if (FAILED(hr))
-    {
-        auto * details = (error_blob ? static_cast<const char *>(error_blob->GetBufferPointer()) : "<no info>");
-        GameInterface::Errorf("Failed to compile shader: %s.\n\nError info: %s", OSWindow::ErrorToString(hr).c_str(), details);
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -12,6 +12,9 @@
     <Filter Include="External">
       <UniqueIdentifier>{7f1f4edd-25f6-48eb-b0b8-7fcb67d981a6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\d3d">
+      <UniqueIdentifier>{0601564d-7b31-4ccc-86e3-189c9fdb36e3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\reflibs\shared\RefShared.cpp">
@@ -94,8 +97,11 @@
     <ClInclude Include="..\..\src\reflibs\shared\MiniImBatch.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\reflibs\shared\D3DCommon.hpp">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="..\..\src\reflibs\shared\d3d\D3DCommon.hpp">
+      <Filter>Header Files\d3d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\shared\d3d\D3DShader.hpp">
+      <Filter>Header Files\d3d</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
