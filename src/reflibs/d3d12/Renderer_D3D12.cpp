@@ -12,7 +12,8 @@
 #include <cwchar>
 
 // Path from the project root where to find shaders for this renderer (wchar_t)
-#define REFD3D12_SHADER_PATH_WIDE L"src\\reflibs\\d3d12\\shaders\\"
+#define REFD3D12_SHADER_PATH_WIDE L"src\\reflibs\\d3d11\\shaders\\"
+//*** TODO - share these with the dx11 renderer??? put the in the RefShared proj i so ***
 
 namespace MrQ2
 {
@@ -20,321 +21,10 @@ namespace D3D12
 {
 
 ///////////////////////////////////////////////////////////////////////////////
-// TextureImageImpl
-///////////////////////////////////////////////////////////////////////////////
-
-void TextureImageImpl::InitD3DSpecific()
-{
-    // TODO
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void TextureImageImpl::InitFromScrap(const TextureImageImpl * const scrap_tex)
-{
-    FASTASSERT(scrap_tex != nullptr);
-
-    // TODO
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// TextureStoreImpl
-///////////////////////////////////////////////////////////////////////////////
-
-void TextureStoreImpl::Init()
-{
-    // Load the default resident textures now
-    TouchResidentTextures();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void TextureStoreImpl::UploadScrapIfNeeded()
-{
-    if (m_scrap_dirty)
-    {
-        Renderer::UploadTexture(ScrapImpl());
-        m_scrap_dirty = false;
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-TextureImage * TextureStoreImpl::CreateScrap(int size, const ColorRGBA32 * pix)
-{
-    TextureImageImpl * scrap_impl = m_teximages_pool.Allocate();
-    Construct(scrap_impl, pix, RegistrationNum(), TextureType::kPic, /*use_scrap =*/true,
-              size, size, Vec2u16{0,0}, Vec2u16{std::uint16_t(size), std::uint16_t(size)}, "pics/scrap.pcx");
-
-    scrap_impl->InitD3DSpecific();
-    return scrap_impl;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-TextureImage * TextureStoreImpl::CreateTexture(const ColorRGBA32 * pix, std::uint32_t regn, TextureType tt, bool use_scrap,
-                                               int w, int h, Vec2u16 scrap0, Vec2u16 scrap1, const char * name)
-{
-    TextureImageImpl * impl = m_teximages_pool.Allocate();
-    Construct(impl, pix, regn, tt, use_scrap, w, h, scrap0, scrap1, name);
-
-    if (use_scrap)
-    {
-        impl->InitFromScrap(ScrapImpl());
-        m_scrap_dirty = true; // Upload the D3D texture on next opportunity
-    }
-    else
-    {
-        impl->InitD3DSpecific();
-    }
-
-    return impl;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void TextureStoreImpl::DestroyTexture(TextureImage * tex)
-{
-    auto * impl = static_cast<TextureImageImpl *>(tex);
-    Destroy(impl);
-    m_teximages_pool.Deallocate(impl);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// ModelStoreImpl
-///////////////////////////////////////////////////////////////////////////////
-
-ModelStoreImpl::~ModelStoreImpl()
-{
-    for (ModelInstance * mdl : m_inline_models)
-    {
-        DestroyModel(mdl);
-    }
-
-    m_inline_models.clear();
-    DestroyAllLoadedModels();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void ModelStoreImpl::Init()
-{
-    CommonInitInlineModelsPool(m_inline_models,
-        [this]() -> ModelInstanceImpl * {
-            return m_models_pool.Allocate(); // First page in the pool will contain the inlines.
-        });
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-ModelInstance * ModelStoreImpl::CreateModel(const char * name, ModelType mt, std::uint32_t regn)
-{
-    ModelInstanceImpl * impl = m_models_pool.Allocate();
-    Construct(impl, name, mt, regn, /* inline_mdl = */false);
-    return impl;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void ModelStoreImpl::DestroyModel(ModelInstance * mdl)
-{
-    auto * impl = static_cast<ModelInstanceImpl *>(mdl);
-    Destroy(impl);
-    m_models_pool.Deallocate(impl);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// SpriteBatch
-///////////////////////////////////////////////////////////////////////////////
-
-void SpriteBatch::Init(const int max_verts)
-{
-    (void) max_verts;
-    // TODO
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void SpriteBatch::BeginFrame()
-{
-    // TODO
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void SpriteBatch::EndFrame()
-{
-    // TODO
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void SpriteBatch::PushTriVerts(const DrawVertex2D tri[3])
-{
-    DrawVertex2D * verts = Increment(3);
-    std::memcpy(verts, tri, sizeof(DrawVertex2D) * 3);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void SpriteBatch::PushQuadVerts(const DrawVertex2D quad[4])
-{
-    DrawVertex2D * tri = Increment(6);       // Expand quad into 2 triangles
-    const int indexes[6] = { 0,1,2, 2,3,0 }; // CW winding
-    for (int i = 0; i < 6; ++i)
-    {
-        tri[i] = quad[indexes[i]];
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void SpriteBatch::PushQuad(const float x, const float y, const float w, const float h,
-                           const float u0, const float v0, const float u1, const float v1,
-                           const DirectX::XMFLOAT4A & color)
-{
-    DrawVertex2D quad[4];
-    quad[0].xy_uv[0] = x;
-    quad[0].xy_uv[1] = y;
-    quad[0].xy_uv[2] = u0;
-    quad[0].xy_uv[3] = v0;
-    quad[0].rgba[0]  = color.x;
-    quad[0].rgba[1]  = color.y;
-    quad[0].rgba[2]  = color.z;
-    quad[0].rgba[3]  = color.w;
-    quad[1].xy_uv[0] = x + w;
-    quad[1].xy_uv[1] = y;
-    quad[1].xy_uv[2] = u1;
-    quad[1].xy_uv[3] = v0;
-    quad[1].rgba[0]  = color.x;
-    quad[1].rgba[1]  = color.y;
-    quad[1].rgba[2]  = color.z;
-    quad[1].rgba[3]  = color.w;
-    quad[2].xy_uv[0] = x + w;
-    quad[2].xy_uv[1] = y + h;
-    quad[2].xy_uv[2] = u1;
-    quad[2].xy_uv[3] = v1;
-    quad[2].rgba[0]  = color.x;
-    quad[2].rgba[1]  = color.y;
-    quad[2].rgba[2]  = color.z;
-    quad[2].rgba[3]  = color.w;
-    quad[3].xy_uv[0] = x;
-    quad[3].xy_uv[1] = y + h;
-    quad[3].xy_uv[2] = u0;
-    quad[3].xy_uv[3] = v1;
-    quad[3].rgba[0]  = color.x;
-    quad[3].rgba[1]  = color.y;
-    quad[3].rgba[2]  = color.z;
-    quad[3].rgba[3]  = color.w;
-    PushQuadVerts(quad);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void SpriteBatch::PushQuadTextured(const float x, const float y,
-                                   const float w, const float h,
-                                   const TextureImage * const tex,
-                                   const DirectX::XMFLOAT4A & color)
-{
-    FASTASSERT(tex != nullptr);
-    const int quad_start_vtx = 0;//TODO m_buffers.CurrentPosition();
-    PushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color);
-    m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void SpriteBatch::PushQuadTexturedUVs(const float x, const float y,
-                                      const float w, const float h,
-                                      const float u0, const float v0,
-                                      const float u1, const float v1,
-                                      const TextureImage * const tex,
-                                      const DirectX::XMFLOAT4A & color)
-{
-    FASTASSERT(tex != nullptr);
-    const int quad_start_vtx = 0;//TODO m_buffers.CurrentPosition();
-    PushQuad(x, y, w, h, u0, v0, u1, v1, color);
-    m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// ViewDrawStateImpl
-///////////////////////////////////////////////////////////////////////////////
-
-void ViewDrawStateImpl::Init(const int max_verts)
-{
-    m_draw_cmds = new(MemTag::kRenderer) DrawCmdList{};
-
-    // TODO
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void ViewDrawStateImpl::BeginRenderPass()
-{
-    FASTASSERT(m_batch_open == false);
-    FASTASSERT(m_draw_cmds->empty());
-
-    // TODO
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void ViewDrawStateImpl::EndRenderPass()
-{
-    FASTASSERT(m_batch_open == false);
-
-    // TODO
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
-{
-    FASTASSERT(m_batch_open == false);
-    FASTASSERT_ALIGN16(args.model_matrix.floats);
-
-    m_current_draw_cmd.model_mtx  = DirectX::XMMATRIX{ args.model_matrix.floats };
-    m_current_draw_cmd.texture    = args.optional_tex ? args.optional_tex : Renderer::TexStore()->tex_white2x2;
-    m_current_draw_cmd.topology   = args.topology;
-    m_current_draw_cmd.depth_hack = args.depth_hack;
-    m_current_draw_cmd.first_vert = 0;
-    m_current_draw_cmd.num_verts  = 0;
-
-    m_batch_open = true;
-
-    // TODO
-    //return MiniImBatch{ m_buffers.CurrentVertexPtr(), m_buffers.NumVertsRemaining(), args.topology };
-    return MiniImBatch{ nullptr, 0, args.topology };
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void ViewDrawStateImpl::EndBatch(MiniImBatch & batch)
-{
-    FASTASSERT(batch.IsValid());
-    FASTASSERT(m_batch_open == true);
-    FASTASSERT(m_current_draw_cmd.topology == batch.Topology());
-
-    m_current_draw_cmd.first_vert = 0;//TODO m_buffers.CurrentPosition();
-    m_current_draw_cmd.num_verts  = batch.UsedVerts();
-
-//    m_buffers.Increment(batch.UsedVerts());
-
-    m_draw_cmds->push_back(m_current_draw_cmd);
-    m_current_draw_cmd = {};
-
-    batch.Clear();
-    m_batch_open = false;
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // Renderer
 ///////////////////////////////////////////////////////////////////////////////
 
 const DirectX::XMFLOAT4A Renderer::kClearColor{ 0.0f, 0.0f, 0.0f, 1.0f };
-const DirectX::XMFLOAT4A Renderer::kColorWhite{ 1.0f, 1.0f, 1.0f, 1.0f };
-const DirectX::XMFLOAT4A Renderer::kColorBlack{ 0.0f, 0.0f, 0.0f, 1.0f };
 const DirectX::XMFLOAT4A Renderer::kFloat4Zero{ 0.0f, 0.0f, 0.0f, 0.0f };
 const DirectX::XMFLOAT4A Renderer::kFloat4One { 1.0f, 1.0f, 1.0f, 1.0f };
 
@@ -367,6 +57,8 @@ void Renderer::Init(HINSTANCE hinst, WNDPROC wndproc, const int width, const int
     sm_state->m_tex_store.Init();
     sm_state->m_mdl_store.Init();
 
+    LoadShaders();
+
     // World geometry rendering helper
     constexpr int kViewDrawBatchSize = 25000; // size in vertices
     sm_state->m_view_draw_state.Init(kViewDrawBatchSize);
@@ -395,6 +87,102 @@ void Renderer::Shutdown()
             debug_interface->ReportLiveObjects(DXGI_DEBUG_ALL, (DXGI_DEBUG_RLO_FLAGS)(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
         }
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::LoadShaders()
+{
+    GameInterface::Printf("CWD......: %s", OSWindow::CurrentWorkingDir().c_str());
+    GameInterface::Printf("GameDir..: %s", GameInterface::FS::GameDir());
+
+    // UI/2D sprites:
+    {
+        sm_state->m_shader_ui_sprites.LoadFromFxFile(REFD3D12_SHADER_PATH_WIDE L"UISprites2D.fx", "VS_main", "PS_main");
+
+        static const D3D12_INPUT_ELEMENT_DESC s_layout[] = { // DrawVertex2D
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex2D, xy_uv), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex2D, rgba),  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        };
+        //const int num_elements = ARRAYSIZE(s_layout);
+
+        //TODO PSO
+
+        /*
+        // Blend state for the screen text and transparencies:
+        D3D11_BLEND_DESC bs_desc                      = {};
+        bs_desc.RenderTarget[0].BlendEnable           = true;
+        bs_desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+        bs_desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+        bs_desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+        bs_desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+        bs_desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
+        bs_desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
+        bs_desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+        if (FAILED(Device()->CreateBlendState(&bs_desc, sm_state->m_blend_state_alpha.GetAddressOf())))
+        {
+            GameInterface::Errorf("CreateBlendState failed!");
+        }
+
+        // Create the constant buffer:
+        D3D11_BUFFER_DESC buf_desc = {};
+        buf_desc.Usage             = D3D11_USAGE_DEFAULT;
+        buf_desc.ByteWidth         = sizeof(ConstantBufferDataUIVS);
+        buf_desc.BindFlags         = D3D11_BIND_CONSTANT_BUFFER;
+        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, sm_state->m_cbuffer_ui_sprites.GetAddressOf())))
+        {
+            GameInterface::Errorf("Failed to create shader constant buffer!");
+        }
+        */
+    }
+
+    // Common 3D geometry:
+    {
+        sm_state->m_shader_geometry.LoadFromFxFile(REFD3D12_SHADER_PATH_WIDE L"GeometryCommon.fx", "VS_main", "PS_main");
+
+        static const D3D12_INPUT_ELEMENT_DESC s_layout[] = { // DrawVertex3D
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, offsetof(DrawVertex3D, position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(DrawVertex3D, uv),       D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex3D, rgba),     D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        };
+        //const int num_elements = ARRAYSIZE(s_layout);
+
+        //TODO PSO
+
+        /*
+        // Create the constant buffers:
+        D3D11_BUFFER_DESC buf_desc = {};
+        buf_desc.Usage             = D3D11_USAGE_DEFAULT;
+        buf_desc.ByteWidth         = sizeof(ConstantBufferDataSGeomVS);
+        buf_desc.BindFlags         = D3D11_BIND_CONSTANT_BUFFER;
+        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, sm_state->m_cbuffer_geometry_vs.GetAddressOf())))
+        {
+            GameInterface::Errorf("Failed to create VS shader constant buffer!");
+        }
+
+        buf_desc.ByteWidth = sizeof(ConstantBufferDataSGeomPS);
+        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, sm_state->m_cbuffer_geometry_ps.GetAddressOf())))
+        {
+            GameInterface::Errorf("Failed to create PS shader constant buffer!");
+        }
+        */
+    }
+
+    GameInterface::Printf("Shaders loaded successfully.");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Renderer::CreatePipelineStates()
+{
+    /*
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc = {}; // TODO
+
+    if (FAILED(Renderer::Device()->CreateGraphicsPipelineState(&pso_desc, IID_PPV_ARGS(&pso))))
+    {
+        GameInterface::Errorf("Failed to create graphics pipeline state!");
+    }
+	*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -616,6 +404,8 @@ void Renderer::PushEventF(const wchar_t * format, ...)
     (void)format;
 }
 #endif // REFD3D12_WITH_DEBUG_FRAME_EVENTS
+
+///////////////////////////////////////////////////////////////////////////////
 
 } // D3D12
 } // MrQ2

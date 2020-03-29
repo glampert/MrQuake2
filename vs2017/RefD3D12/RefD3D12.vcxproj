@@ -158,11 +158,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\reflibs\d3d12\Helpers_D3D12.cpp" />
+    <ClCompile Include="..\..\src\reflibs\d3d12\Impl_D3D12.cpp" />
     <ClCompile Include="..\..\src\reflibs\d3d12\RefAPI_D3D12.cpp" />
     <ClCompile Include="..\..\src\reflibs\d3d12\Renderer_D3D12.cpp" />
     <ClCompile Include="..\..\src\reflibs\d3d12\RenderWindow_D3D12.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\reflibs\d3d12\Helpers_D3D12.hpp" />
+    <ClInclude Include="..\..\src\reflibs\d3d12\Impl_D3D12.hpp" />
     <ClInclude Include="..\..\src\reflibs\d3d12\Renderer_D3D12.hpp" />
     <ClInclude Include="..\..\src\reflibs\d3d12\RenderWindow_D3D12.hpp" />
   </ItemGroup>

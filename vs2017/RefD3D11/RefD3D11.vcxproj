@@ -182,11 +182,15 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\reflibs\d3d11\Helpers_D3D11.cpp" />
+    <ClCompile Include="..\..\src\reflibs\d3d11\Impl_D3D11.cpp" />
     <ClCompile Include="..\..\src\reflibs\d3d11\RefAPI_D3D11.cpp" />
     <ClCompile Include="..\..\src\reflibs\d3d11\Renderer_D3D11.cpp" />
     <ClCompile Include="..\..\src\reflibs\d3d11\RenderWindow_D3D11.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\reflibs\d3d11\Helpers_D3D11.hpp" />
+    <ClInclude Include="..\..\src\reflibs\d3d11\Impl_D3D11.hpp" />
     <ClInclude Include="..\..\src\reflibs\d3d11\Renderer_D3D11.hpp" />
     <ClInclude Include="..\..\src\reflibs\d3d11\RenderWindow_D3D11.hpp" />
   </ItemGroup>

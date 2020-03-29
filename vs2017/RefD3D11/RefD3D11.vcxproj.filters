@@ -23,12 +23,24 @@
     <ClCompile Include="..\..\src\reflibs\d3d11\RenderWindow_D3D11.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\d3d11\Impl_D3D11.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\d3d11\Helpers_D3D11.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\reflibs\d3d11\Renderer_D3D11.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\reflibs\d3d11\RenderWindow_D3D11.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d11\Impl_D3D11.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d11\Helpers_D3D11.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
