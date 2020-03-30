@@ -50,8 +50,8 @@ void Renderer::Init(HINSTANCE hinst, WNDPROC wndproc, const int width, const int
     sm_state->m_window.Init("MrQuake2 (D3D12)", hinst, wndproc, width, height, fullscreen, debug_validation);
 
     // 2D sprite/UI batch setup
-    sm_state->m_sprite_batches[SpriteBatch::kDrawChar].Init(6 * 5000); // 6 verts per quad (expand to 2 triangles each)
-    sm_state->m_sprite_batches[SpriteBatch::kDrawPics].Init(6 * 128);
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].Init(Device(), 6 * 5000); // 6 verts per quad (expand to 2 triangles each)
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].Init(Device(), 6 * 128);
 
     // Initialize the stores/caches
     sm_state->m_tex_store.Init();
@@ -98,7 +98,7 @@ void Renderer::LoadShaders()
 
     // UI/2D sprites:
     {
-        sm_state->m_shader_ui_sprites.LoadFromFxFile(REFD3D12_SHADER_PATH_WIDE L"UISprites2D.fx", "VS_main", "PS_main");
+        sm_state->m_shader_ui_sprites.LoadFromFxFile(REFD3D12_SHADER_PATH_WIDE L"UISprites2D.fx", "VS_main", "PS_main", DebugValidation());
 
         static const D3D12_INPUT_ELEMENT_DESC s_layout[] = { // DrawVertex2D
             { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex2D, xy_uv), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -138,7 +138,7 @@ void Renderer::LoadShaders()
 
     // Common 3D geometry:
     {
-        sm_state->m_shader_geometry.LoadFromFxFile(REFD3D12_SHADER_PATH_WIDE L"GeometryCommon.fx", "VS_main", "PS_main");
+        sm_state->m_shader_geometry.LoadFromFxFile(REFD3D12_SHADER_PATH_WIDE L"GeometryCommon.fx", "VS_main", "PS_main", DebugValidation());
 
         static const D3D12_INPUT_ELEMENT_DESC s_layout[] = { // DrawVertex3D
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, offsetof(DrawVertex3D, position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -343,8 +343,8 @@ void Renderer::BeginFrame()
     }
     PopEvent(); // "ClearRenderTargets"
 
-    sm_state->m_sprite_batches[SpriteBatch::kDrawChar].BeginFrame();
-    sm_state->m_sprite_batches[SpriteBatch::kDrawPics].BeginFrame();
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].BeginFrame();
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].BeginFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

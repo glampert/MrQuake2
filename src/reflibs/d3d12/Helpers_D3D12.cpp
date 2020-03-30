@@ -4,7 +4,7 @@
 //
 
 #include "Helpers_D3D12.hpp"
-#include "Renderer_D3D12.hpp"
+#include "Impl_D3D12.hpp"
 
 namespace MrQ2
 {
@@ -15,19 +15,21 @@ namespace D3D12
 // ShaderProgram
 ///////////////////////////////////////////////////////////////////////////////
 
-void ShaderProgram::LoadFromFxFile(const wchar_t * const filename, const char * const vs_entry, const char * const ps_entry)
+void ShaderProgram::LoadFromFxFile(const wchar_t * filename, const char * vs_entry, const char * ps_entry, const bool debug)
 {
     D3DShader::Info shader_info;
     shader_info.vs_entry = vs_entry;
     shader_info.vs_model = "vs_5_0";
     shader_info.ps_entry = ps_entry;
     shader_info.ps_model = "ps_5_0";
-    shader_info.debug    = Renderer::DebugValidation();
+    shader_info.debug    = debug;
 
     D3DShader::LoadFromFxFile(filename, shader_info, &shader_bytecode);
 }
 
-void ShaderProgram::CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& rootsig_desc)
+///////////////////////////////////////////////////////////////////////////////
+
+void ShaderProgram::CreateRootSignature(ID3D12Device5 * device, const D3D12_ROOT_SIGNATURE_DESC& rootsig_desc)
 {
     ComPtr<ID3DBlob> blob;
     if (FAILED(D3D12SerializeRootSignature(&rootsig_desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr)))
@@ -35,34 +37,134 @@ void ShaderProgram::CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& rootsig
         GameInterface::Errorf("Failed to serialize RootSignature!");
     }
 
-    if (FAILED(Renderer::Device()->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&rootsig))))
+    if (FAILED(device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&rootsig))))
     {
         GameInterface::Errorf("Failed to create RootSignature!");
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Buffer
+///////////////////////////////////////////////////////////////////////////////
+
+bool Buffer::Init(ID3D12Device5 * device, const std::size_t size_in_bytes)
+{
+    D3D12_HEAP_PROPERTIES heap_props = {};
+    heap_props.Type                  = D3D12_HEAP_TYPE_UPLOAD; // Mappable buffer.
+    heap_props.CPUPageProperty       = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heap_props.MemoryPoolPreference  = D3D12_MEMORY_POOL_UNKNOWN;
+    heap_props.CreationNodeMask      = 1;
+    heap_props.VisibleNodeMask       = 1;
+
+    D3D12_RESOURCE_DESC res_desc     = {};
+    res_desc.Dimension               = D3D12_RESOURCE_DIMENSION_BUFFER;
+    res_desc.Alignment               = 0; // Must be zero for buffers.
+    res_desc.Width                   = size_in_bytes;
+    res_desc.Height                  = 1;
+    res_desc.DepthOrArraySize        = 1;
+    res_desc.MipLevels               = 1;
+    res_desc.SampleDesc              = { 1, 0 };
+    res_desc.Layout                  = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    res_desc.Format                  = DXGI_FORMAT_UNKNOWN;
+    res_desc.Flags                   = D3D12_RESOURCE_FLAG_NONE;
+
+    const D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_GENERIC_READ;
+
+    if (FAILED(device->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &res_desc, states, nullptr, IID_PPV_ARGS(&resource))))
+    {
+        GameInterface::Printf("WARNING: CreateCommittedResource failed for new buffer resource!");
+        return false;
+    }
+
+    // TODO shader resource view (SRV) ???
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void * Buffer::Map()
+{
+    D3D12_RANGE range = {}; // No range specified.
+    void * memory = nullptr;
+    resource->Map(0, &range, &memory);
+    return memory;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Buffer::Unmap()
+{
+    D3D12_RANGE range = {}; // No range specified.
+    resource->Unmap(0, &range);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // SpriteBatch
 ///////////////////////////////////////////////////////////////////////////////
 
-void SpriteBatch::Init(const int max_verts)
+void SpriteBatch::Init(ID3D12Device5 * device, const int max_verts)
 {
-    (void)max_verts;
-    // TODO
+    m_buffers.Init(device, "SpriteBatch", max_verts);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void SpriteBatch::BeginFrame()
 {
-    // TODO
+    m_buffers.Begin();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SpriteBatch::EndFrame()
+void SpriteBatch::EndFrame(const ShaderProgram & program, const TextureImageImpl * const tex)
 {
-    // TODO
+	(void)program;
+//    ID3D11DeviceContext * const context = Renderer::DeviceContext();
+    const auto draw_buf = m_buffers.End();
+
+    // Constant buffer at register(b0)
+//    context->VSSetConstantBuffers(0, 1, &cbuffer);
+
+    // Set blending for transparency:
+//    Renderer::EnableAlphaBlending();
+
+    // Fast path - one texture for the whole batch:
+    if (tex != nullptr)
+    {
+        // Bind texture & sampler (t0, s0):
+//        context->PSSetShaderResources(0, 1, tex->srv.GetAddressOf());
+//        context->PSSetSamplers(0, 1, tex->sampler.GetAddressOf());
+
+        // Draw with the current vertex buffer:
+//        Renderer::DrawHelper(draw_buf.used_verts, 0, program, draw_buf.buffer_ptr,
+//                             D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex2D));
+    }
+    else // Handle small unique textured draws:
+    {
+        const TextureImageImpl * previous_tex = nullptr;
+        for (const auto & d : m_deferred_textured_quads)
+        {
+            if (previous_tex != d.tex)
+            {
+//                context->PSSetShaderResources(0, 1, d.tex->srv.GetAddressOf());
+//                context->PSSetSamplers(0, 1, d.tex->sampler.GetAddressOf());
+                previous_tex = d.tex;
+            }
+
+//            Renderer::DrawHelper(/*num_verts=*/ 6, d.quad_start_vtx, program, draw_buf.buffer_ptr,
+//                                 D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 0, sizeof(DrawVertex2D));
+        }
+    }
+
+    // Restore default blend state.
+//    Renderer::DisableAlphaBlending();
+
+    // Clear cache for next frame:
+    if (!m_deferred_textured_quads.empty())
+    {
+        m_deferred_textured_quads.clear();
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -135,7 +237,7 @@ void SpriteBatch::PushQuadTextured(const float x, const float y,
                                    const DirectX::XMFLOAT4A & color)
 {
     FASTASSERT(tex != nullptr);
-    const int quad_start_vtx = 0;//TODO m_buffers.CurrentPosition();
+    const int quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color);
     m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });
 }
@@ -150,7 +252,7 @@ void SpriteBatch::PushQuadTexturedUVs(const float x, const float y,
                                       const DirectX::XMFLOAT4A & color)
 {
     FASTASSERT(tex != nullptr);
-    const int quad_start_vtx = 0;//TODO m_buffers.CurrentPosition();
+    const int quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, u0, v0, u1, v1, color);
     m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });
 }

@@ -80,7 +80,7 @@ public:
 
 private:
 
-    using SpriteBatchSet = std::array<SpriteBatch, SpriteBatch::kCount>;
+    using SpriteBatchSet = std::array<SpriteBatch, size_t(SpriteBatchIdx::kCount)>;
 
     struct ConstantBufferDataUIVS
     {

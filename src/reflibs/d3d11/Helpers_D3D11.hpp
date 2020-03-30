@@ -143,7 +143,7 @@ public:
         return verts;
     }
 
-    int BufferSize() const 
+    int BufferSize() const
     {
         return m_num_verts;
     }
