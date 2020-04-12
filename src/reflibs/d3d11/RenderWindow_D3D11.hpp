@@ -44,6 +44,8 @@ public:
     ComPtr<ID3D11Texture2D>        depth_stencil_texture;
     ComPtr<ID3D11DepthStencilView> depth_stencil_view;
 
+    // TODO: Multi-buffer rendering (multiple frambuffers/RTVs like in the Dx12 impl, for kNumFrameBuffers).
+
 private:
 
     void InitRenderWindow() override;

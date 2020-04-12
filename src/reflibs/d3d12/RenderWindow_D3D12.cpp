@@ -172,6 +172,7 @@ void SwapChainHelper::InitSwapChain(IDXGIFactory6 * factory, ID3D12Device5 * dev
     }
 
     InitSyncFence(device);
+    InitCmdList(device);
 
     GameInterface::Printf("D3D12 SwapChain created.");
 }
@@ -194,6 +195,27 @@ void SwapChainHelper::InitSyncFence(ID3D12Device5 * device)
     }
 
     GameInterface::Printf("Frame sync fence created.");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void SwapChainHelper::InitCmdList(ID3D12Device5 * device)
+{
+    for (uint32_t i = 0; i < kNumFrameBuffers; ++i)
+    {
+        if (FAILED(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&command_allocators[i]))))
+        {
+            GameInterface::Errorf("Failed to create a command allocator!");
+        }
+    }
+
+    if (FAILED(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, command_allocators[0].Get(), nullptr, IID_PPV_ARGS(&gfx_command_list))) ||
+        FAILED(gfx_command_list->Close()))
+    {
+        GameInterface::Errorf("Failed to create a command list!");
+    }
+
+    gfx_command_list->SetName(L"GlobalGfxCommandList");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -244,6 +266,48 @@ SwapChainHelper::~SwapChainHelper()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// RenderTargets
+///////////////////////////////////////////////////////////////////////////////
+
+void RenderTargets::InitRTVs(ID3D12Device5 * device, IDXGISwapChain4 * swap_chain)
+{
+    D3D12_DESCRIPTOR_HEAP_DESC heap_desc = {};
+    heap_desc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+    heap_desc.NumDescriptors = kNumFrameBuffers;
+    heap_desc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    heap_desc.NodeMask       = 1;
+
+    if (FAILED(device->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&rtv_descriptor_heap))))
+    {
+        GameInterface::Errorf("RenderTargets - CreateDescriptorHeap failed!");
+    }
+
+    const UINT rtv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle = rtv_descriptor_heap->GetCPUDescriptorHandleForHeapStart();
+
+    static wchar_t s_buffer_names[kNumFrameBuffers][32];
+
+    for (uint32_t i = 0; i < kNumFrameBuffers; ++i)
+    {
+        render_target_descriptors[i] = rtv_handle;
+        rtv_handle.ptr += rtv_descriptor_size;
+
+        ComPtr<ID3D12Resource> back_buffer;
+        if (FAILED(swap_chain->GetBuffer(i, IID_PPV_ARGS(&back_buffer))))
+        {
+            GameInterface::Errorf("SwapChain GetBuffer %u failed!", i);
+        }
+
+        // Debug name displayed in the SDK validation messages.
+        swprintf_s(s_buffer_names[i], L"BackBuffer[%u]", i);
+        back_buffer->SetName(s_buffer_names[i]);
+
+        device->CreateRenderTargetView(back_buffer.Get(), nullptr, render_target_descriptors[i]);
+        render_rarget_resources[i] = back_buffer;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // RenderWindow
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -253,6 +317,7 @@ void RenderWindow::InitRenderWindow()
 
     device_helper.InitAdapterAndDevice(debug_validation);
     swap_chain_helper.InitSwapChain(device_helper.factory.Get(), device_helper.device.Get(), hwnd, fullscreen, width, height);
+    render_targets.InitRTVs(device_helper.device.Get(), swap_chain_helper.swap_chain.Get());
 
     GameInterface::Printf("D3D12 RenderWindow initialized.");
 }

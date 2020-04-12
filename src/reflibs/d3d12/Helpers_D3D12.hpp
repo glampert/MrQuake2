@@ -41,13 +41,30 @@ struct ShaderProgram final
 
 ===============================================================================
 */
-struct Buffer final
+struct Buffer
 {
     ComPtr<ID3D12Resource> resource;
 
-    bool Init(ID3D12Device5 * device, const std::size_t size_in_bytes);
+    bool Init(ID3D12Device5 * device, const uint32_t size_in_bytes);
     void * Map();
     void Unmap();
+};
+
+struct VertexBuffer final : public Buffer
+{
+    D3D12_VERTEX_BUFFER_VIEW view = {};
+
+    bool Init(ID3D12Device5 * device, const uint32_t buffer_size_in_bytes, const uint32_t vertex_stride_in_bytes)
+    {
+        const bool buffer_ok = Buffer::Init(device, buffer_size_in_bytes);
+        if (buffer_ok)
+        {
+            view.BufferLocation = resource->GetGPUVirtualAddress();
+            view.SizeInBytes    = buffer_size_in_bytes;
+            view.StrideInBytes  = vertex_stride_in_bytes;
+        }
+        return buffer_ok;
+    }
 };
 
 /*
@@ -57,7 +74,7 @@ struct Buffer final
 
 ===============================================================================
 */
-template<typename VertexType, int kNumBuffers>
+template<typename VertexType, uint32_t kNumBuffers>
 class VertexBuffers final
 {
 public:
@@ -66,8 +83,8 @@ public:
 
     struct DrawBuffer
     {
-        Buffer * buffer_ptr;
-        int      used_verts;
+        VertexBuffer * buffer_ptr;
+        int            used_verts;
     };
 
     void Init(ID3D12Device5 * device, const char * const debug_name, const int max_verts)
@@ -77,19 +94,20 @@ public:
         m_num_verts  = max_verts;
         m_debug_name = debug_name;
 
-        const std::size_t size_in_bytes = sizeof(VertexType) * max_verts;
+        const uint32_t buffer_size_in_bytes   = sizeof(VertexType) * max_verts;
+        const uint32_t vertex_stride_in_bytes = sizeof(VertexType);
 
         for (unsigned b = 0; b < m_vertex_buffers.size(); ++b)
         {
-            if (!m_vertex_buffers[b].Init(device, size_in_bytes))
+            if (!m_vertex_buffers[b].Init(device, buffer_size_in_bytes, vertex_stride_in_bytes))
             {
                 GameInterface::Errorf("Failed to create %s vertex buffer %u", debug_name, b);
             }
             m_mapped_ptrs[b] = nullptr;
         }
 
-        MemTagsTrackAlloc(size_in_bytes * kNumBuffers, MemTag::kVertIndexBuffer);
-        GameInterface::Printf("%s used %s", debug_name, FormatMemoryUnit(size_in_bytes * kNumBuffers));
+        MemTagsTrackAlloc(buffer_size_in_bytes * kNumBuffers, MemTag::kVertIndexBuffer);
+        GameInterface::Printf("%s used %s", debug_name, FormatMemoryUnit(buffer_size_in_bytes * kNumBuffers));
     }
 
     VertexType * Increment(const int count)
@@ -152,7 +170,7 @@ public:
     {
         FASTASSERT(m_mapped_ptrs[m_buffer_index] != nullptr); // Missing Begin()?
 
-        Buffer & current_buffer = m_vertex_buffers[m_buffer_index];
+        VertexBuffer & current_buffer = m_vertex_buffers[m_buffer_index];
         const int current_position = m_used_verts;
 
         // Unmap current buffer so we can draw with it:
@@ -172,7 +190,7 @@ private:
     int m_used_verts   = 0;
     int m_buffer_index = 0;
 
-    std::array<Buffer,       kNumBuffers> m_vertex_buffers{};
+    std::array<VertexBuffer, kNumBuffers> m_vertex_buffers{};
     std::array<VertexType *, kNumBuffers> m_mapped_ptrs{};
 
     const char * m_debug_name = nullptr;
@@ -188,8 +206,6 @@ private:
 class SpriteBatch final
 {
 public:
-
-    static constexpr int kNumSpriteBatchVertexBuffers = 2;
 
     SpriteBatch() = default;
     void Init(ID3D12Device5 * device, int max_verts);
@@ -218,7 +234,7 @@ public:
 
 private:
 
-    VertexBuffers<DrawVertex2D, kNumSpriteBatchVertexBuffers> m_buffers;
+    VertexBuffers<DrawVertex2D, kNumFrameBuffers> m_buffers;
 
     struct DeferredTexQuad
     {

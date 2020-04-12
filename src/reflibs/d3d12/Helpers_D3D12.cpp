@@ -47,7 +47,7 @@ void ShaderProgram::CreateRootSignature(ID3D12Device5 * device, const D3D12_ROOT
 // Buffer
 ///////////////////////////////////////////////////////////////////////////////
 
-bool Buffer::Init(ID3D12Device5 * device, const std::size_t size_in_bytes)
+bool Buffer::Init(ID3D12Device5 * device, const uint32_t size_in_bytes)
 {
     D3D12_HEAP_PROPERTIES heap_props = {};
     heap_props.Type                  = D3D12_HEAP_TYPE_UPLOAD; // Mappable buffer.
@@ -75,8 +75,6 @@ bool Buffer::Init(ID3D12Device5 * device, const std::size_t size_in_bytes)
         GameInterface::Printf("WARNING: CreateCommittedResource failed for new buffer resource!");
         return false;
     }
-
-    // TODO shader resource view (SRV) ???
 
     return true;
 }

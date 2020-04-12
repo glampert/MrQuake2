@@ -6,6 +6,73 @@
 #include "Impl_D3D11.hpp"
 #include "Renderer_D3D11.hpp"
 
+/* FUTURE refactoring plan:
+
+We have a set of callbacks the back-end implements.
+struct RenderBackEnd
+{
+	virtual TextureImage * CreateTexture(...) = 0;
+	virtual void DestroyTexture(...) = 0;
+
+	virtual ModelInstance * CreateModel(...) = 0;
+	virtual void DestroyModel(...) = 0;
+
+	virtual Buffer* CreateBuffer(...) = 0;
+	virtual void DestroyBuffer(...) = 0;
+
+	virtual GraphicsContext& GetGraphicsContext() = 0;
+	virtual UploadContext& GetUploadContext() = 0;
+};
+
+D3DCommon becomes Quake2RenderAPI<RB> and has the ModelStore, TextureStore, ViewDrawState statics.
+struct Quake2RenderAPI<RB>
+{
+	// or maybe wrap then in a single State struct that we fwd declare and dynamically allocate...
+	// struct State {
+	// ...
+	// } * sm_state;
+	static RenderBackEnd* sm_backend;
+	static TextureStore   sm_texture_store;
+	static ModelStore     sm_model_store;
+	static ViewDrawState  sm_view_state;
+
+	... static Ref api functions ...
+
+	void Init()
+	{
+		sm_backend = RB::Init(...);
+	}
+};
+
+Then we just need a few common types implemented by the renderer back end.
+The rest of the utilities can be shared by all D3D/Vk/etc impls (sprite batch, vertexbuffers, etc, all shareable).
+
+Probably will need the following virtuals, besides TextureImage and ModelInstance:
+
+class Buffer
+{
+	// vertex buffer helper for the batches/ViewState
+	virtual void * Map() = 0;
+	virtual void Unmap() = 0;
+};
+
+class GraphicsContext
+{
+	virtual void Draw(...) = 0;
+	virtual void EnableAlphaBlending() = 0;
+	virtual void DisableAlphaBlending() = 0;
+	... all the draw calls and state changes...
+};
+
+// might need this for texture uploads???
+class UploadContext
+{
+};
+
+// TODO: Need some sort of global factory for these... Expose that together with the RenderBackEndCallbacks?
+
+*/
+
 namespace MrQ2
 {
 namespace D3D11

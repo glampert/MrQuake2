@@ -16,7 +16,7 @@ namespace D3D12
 {
 
 using Microsoft::WRL::ComPtr;
-constexpr uint32_t kNumFrameBuffers = 2;
+constexpr uint32_t kNumFrameBuffers = 3; // Triple-buffering
 
 /*
 ===============================================================================
@@ -42,13 +42,15 @@ struct DeviceHelper final
 
 struct SwapChainHelper final
 {
-    HANDLE                     fence_event = nullptr;
-    uint64_t                   fence_values[kNumFrameBuffers] = {};
-    uint64_t                   frame_count = 0;
-    uint32_t                   frame_index = 0;
-    ComPtr<ID3D12Fence>        fence;
-    ComPtr<ID3D12CommandQueue> command_queue;
-    ComPtr<IDXGISwapChain4>    swap_chain;
+    HANDLE                            fence_event = nullptr;
+    uint64_t                          fence_values[kNumFrameBuffers] = {};
+    uint64_t                          frame_count = 0;
+    uint32_t                          frame_index = 0;
+    ComPtr<ID3D12Fence>               fence;
+    ComPtr<ID3D12CommandQueue>        command_queue;
+    ComPtr<ID3D12GraphicsCommandList> gfx_command_list;
+    ComPtr<ID3D12CommandAllocator>    command_allocators[kNumFrameBuffers];
+    ComPtr<IDXGISwapChain4>           swap_chain;
 
     void InitSwapChain(IDXGIFactory6 * factory, ID3D12Device5 * device, HWND hwnd,
                        const bool fullscreen, const int width, const int height);
@@ -61,6 +63,16 @@ struct SwapChainHelper final
 private:
 
     void InitSyncFence(ID3D12Device5 * device);
+    void InitCmdList(ID3D12Device5 * device);
+};
+
+struct RenderTargets final
+{
+    ComPtr<ID3D12DescriptorHeap> rtv_descriptor_heap; // Render Target View (RTV) heap
+    ComPtr<ID3D12Resource>       render_rarget_resources[kNumFrameBuffers]   = {};
+    D3D12_CPU_DESCRIPTOR_HANDLE  render_target_descriptors[kNumFrameBuffers] = {};
+
+    void InitRTVs(ID3D12Device5 * device, IDXGISwapChain4 * swap_chain);
 };
 
 /*
@@ -77,6 +89,7 @@ public:
 
     DeviceHelper    device_helper;
     SwapChainHelper swap_chain_helper;
+    RenderTargets   render_targets;
 
 private:
 

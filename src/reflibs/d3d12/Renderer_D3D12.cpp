@@ -13,7 +13,7 @@
 
 // Path from the project root where to find shaders for this renderer (wchar_t)
 #define REFD3D12_SHADER_PATH_WIDE L"src\\reflibs\\d3d11\\shaders\\"
-//*** TODO - share these with the dx11 renderer??? put the in the RefShared proj i so ***
+//*** TODO - share these with the dx11 renderer??? put the in the RefShared proj i guess so? ***
 
 namespace MrQ2
 {
@@ -24,7 +24,7 @@ namespace D3D12
 // Renderer
 ///////////////////////////////////////////////////////////////////////////////
 
-const DirectX::XMFLOAT4A Renderer::kClearColor{ 0.0f, 0.0f, 0.0f, 1.0f };
+const DirectX::XMFLOAT4A Renderer::kClearColor{ 0.0f, 0.5f, 0.0f, 1.0f };
 const DirectX::XMFLOAT4A Renderer::kFloat4Zero{ 0.0f, 0.0f, 0.0f, 0.0f };
 const DirectX::XMFLOAT4A Renderer::kFloat4One { 1.0f, 1.0f, 1.0f, 1.0f };
 
@@ -95,6 +95,18 @@ void Renderer::LoadShaders()
 {
     GameInterface::Printf("CWD......: %s", OSWindow::CurrentWorkingDir().c_str());
     GameInterface::Printf("GameDir..: %s", GameInterface::FS::GameDir());
+
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC heap_desc = {};
+        heap_desc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        heap_desc.NumDescriptors = 1;
+        heap_desc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+        if (FAILED(Device()->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&sm_state->m_srv_descriptor_heap))))
+        {
+            GameInterface::Errorf("Failed to create SRV descriptor heap!");
+        }
+    }
 
     // UI/2D sprites:
     {
@@ -337,14 +349,32 @@ void Renderer::BeginFrame()
     PushEvent(L"Renderer::BeginFrame");
     sm_state->m_frame_started = true;
 
-    PushEvent(L"Renderer::ClearRenderTargets");
-    {
-        // TODO
-    }
-    PopEvent(); // "ClearRenderTargets"
+    const auto frame_index = sm_state->m_window.swap_chain_helper.frame_index;
+    const auto back_buffer_index = sm_state->m_window.swap_chain_helper.swap_chain->GetCurrentBackBufferIndex();
 
-    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].BeginFrame();
-    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].BeginFrame();
+    ID3D12CommandAllocator * cmd_allocator = sm_state->m_window.swap_chain_helper.command_allocators[frame_index].Get();
+    ID3D12GraphicsCommandList * gfx_cmd_list = sm_state->m_window.swap_chain_helper.gfx_command_list.Get();
+
+    auto back_buffer_rtv = sm_state->m_window.render_targets.render_target_descriptors[back_buffer_index];
+    ID3D12Resource * back_buffer_resource = sm_state->m_window.render_targets.render_rarget_resources[back_buffer_index].Get();
+
+    // Set back buffer to render target
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = back_buffer_resource;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+    gfx_cmd_list->Reset(cmd_allocator, nullptr);
+    gfx_cmd_list->ResourceBarrier(1, &barrier);
+    gfx_cmd_list->ClearRenderTargetView(back_buffer_rtv, reinterpret_cast<const float *>(&kClearColor), 0, nullptr);
+    gfx_cmd_list->OMSetRenderTargets(1, &back_buffer_rtv, false, nullptr);
+    gfx_cmd_list->SetDescriptorHeaps(1, sm_state->m_srv_descriptor_heap.GetAddressOf());
+
+    //sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].BeginFrame();
+    //sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].BeginFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -353,7 +383,27 @@ void Renderer::EndFrame()
 {
     Flush2D();
 
-    auto hr = SwapChain()->Present(0, 0);
+    ID3D12GraphicsCommandList * gfx_cmd_list = sm_state->m_window.swap_chain_helper.gfx_command_list.Get();
+    ID3D12CommandList * cmd_lists[] = { gfx_cmd_list };
+
+    const auto back_buffer_index = sm_state->m_window.swap_chain_helper.swap_chain->GetCurrentBackBufferIndex();
+    ID3D12Resource * back_buffer_resource = sm_state->m_window.render_targets.render_rarget_resources[back_buffer_index].Get();
+
+    // Set back buffer to present
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = back_buffer_resource;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+
+    gfx_cmd_list->ResourceBarrier(1, &barrier);
+    gfx_cmd_list->Close();
+
+    CmdQueue()->ExecuteCommandLists(1, cmd_lists);
+
+    auto hr = SwapChain()->Present(0, 0); // Present(0, 0): without vsync; Present(1, 0): with vsync
     if (FAILED(hr))
     {
         GameInterface::Errorf("SwapChain Present failed: %s", RenderWindow::ErrorToString(hr).c_str());
@@ -362,7 +412,9 @@ void Renderer::EndFrame()
     sm_state->m_frame_started  = false;
     sm_state->m_window_resized = false;
 
-    PopEvent(); // "Renderer::BeginFrame" 
+    PopEvent(); // "Renderer::BeginFrame"
+
+    sm_state->m_window.swap_chain_helper.MoveToNextFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
