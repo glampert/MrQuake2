@@ -33,17 +33,19 @@ public:
     static const DirectX::XMFLOAT4A kFloat4One;  // All ones
 
     // Convenience getters
-    static SpriteBatch        * SBatch(SpriteBatchIdx id) { return &sm_state->m_sprite_batches[size_t(id)];                  }
-    static TextureStoreImpl   * TexStore()                { return &sm_state->m_tex_store;                                   }
-    static ModelStoreImpl     * MdlStore()                { return &sm_state->m_mdl_store;                                   }
-    static ViewDrawStateImpl  * ViewState()               { return &sm_state->m_view_draw_state;                             }
-    static ID3D12Device5      * Device()                  { return sm_state->m_window.device_helper.device.Get();            }
-    static IDXGISwapChain4    * SwapChain()               { return sm_state->m_window.swap_chain_helper.swap_chain.Get();    }
-	static ID3D12CommandQueue * CmdQueue()                { return sm_state->m_window.swap_chain_helper.command_queue.Get(); }
-    static bool                 DebugValidation()         { return sm_state->m_window.debug_validation;                      }
-    static bool                 FrameStarted()            { return sm_state->m_frame_started;                                }
-    static int                  Width()                   { return sm_state->m_window.width;                                 }
-    static int                  Height()                  { return sm_state->m_window.height;                                }
+    static SpriteBatch          * SBatch(SpriteBatchIdx id) { return &sm_state->m_sprite_batches[size_t(id)]; }
+    static TextureStoreImpl     * TexStore()                { return &sm_state->m_tex_store;                  }
+    static ModelStoreImpl       * MdlStore()                { return &sm_state->m_mdl_store;                  }
+    static ViewDrawStateImpl    * ViewState()               { return &sm_state->m_view_draw_state;            }
+    static ID3D12Device5        * Device()                  { return sm_state->m_window.device.Get();         }
+    static IDXGISwapChain4      * SwapChain()               { return sm_state->m_window.swap_chain.Get();     }
+    static ID3D12CommandQueue   * CmdQueue()                { return sm_state->m_window.command_queue.Get();  }
+    static DescriptorHeap       * SrvDescriptorHeap()       { return &sm_state->m_srv_descriptor_heap;        }
+    static UploadContext        * UploadCtx()               { return &sm_state->m_upload_ctx;                 }
+    static bool                   DebugValidation()         { return sm_state->m_window.debug_validation;     }
+    static bool                   FrameStarted()            { return sm_state->m_frame_started;               }
+    static int                    Width()                   { return sm_state->m_window.width;                }
+    static int                    Height()                  { return sm_state->m_window.height;               }
 
     static void Init(HINSTANCE hinst, WNDPROC wndproc, int width, int height, bool fullscreen, bool debug_validation);
     static void Shutdown();
@@ -99,6 +101,9 @@ private:
         DirectX::XMFLOAT4A vertex_color_scaling;  // Multiplied with vertex color
     };
 
+    static void CreateFontsTexture_Temp();
+    static void CreateDeviceObjects_Temp();
+
     static void LoadShaders();
     static void CreatePipelineStates();
     static void RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& frame_data);
@@ -120,7 +125,11 @@ private:
         ShaderProgram     m_shader_ui_sprites;
         ShaderProgram     m_shader_geometry;
 
-        ComPtr<ID3D12DescriptorHeap> m_srv_descriptor_heap; // Shader Resource View (SRV) heap
+        UploadContext m_upload_ctx;
+        DescriptorHeap m_srv_descriptor_heap;
+        ComPtr<ID3D12PipelineState> m_pipeline_state_draw2d;
+
+        ComPtr<ID3D12RootSignature> m_root_signature; // TEMP, part of ShaderProgram
 
         // Cached Cvars:
         CvarWrapper       m_disable_texturing;

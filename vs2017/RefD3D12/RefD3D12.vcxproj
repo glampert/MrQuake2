@@ -118,6 +118,13 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>RefShared.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <FxCompile>
+      <EntryPointName>PS_main</EntryPointName>
+    </FxCompile>
+    <FxCompile>
+      <ShaderModel>5.0</ShaderModel>
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -156,6 +163,13 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>RefShared.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <FxCompile>
+      <EntryPointName>PS_main</EntryPointName>
+    </FxCompile>
+    <FxCompile>
+      <ShaderModel>5.0</ShaderModel>
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\reflibs\d3d12\Helpers_D3D12.cpp" />
@@ -169,6 +183,10 @@
     <ClInclude Include="..\..\src\reflibs\d3d12\Impl_D3D12.hpp" />
     <ClInclude Include="..\..\src\reflibs\d3d12\Renderer_D3D12.hpp" />
     <ClInclude Include="..\..\src\reflibs\d3d12\RenderWindow_D3D12.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\src\reflibs\d3d12\shaders\GeometryCommon.fx" />
+    <FxCompile Include="..\..\src\reflibs\d3d12\shaders\UISprites2D.fx" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

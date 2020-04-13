@@ -17,7 +17,42 @@ namespace D3D12
 
 void TextureImageImpl::InitD3DSpecific()
 {
-    // TODO
+    auto * device  = Renderer::Device();
+    srv_descriptor = Renderer::SrvDescriptorHeap()->AllocateSrvDescriptor();
+
+    // Texture resource:
+    D3D12_HEAP_PROPERTIES heap_props = {};
+    heap_props.Type                  = D3D12_HEAP_TYPE_DEFAULT;
+    heap_props.CPUPageProperty       = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heap_props.MemoryPoolPreference  = D3D12_MEMORY_POOL_UNKNOWN;
+
+	D3D12_RESOURCE_DESC res_desc     = {};
+    res_desc.Dimension               = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    res_desc.Alignment               = 0;
+    res_desc.Width                   = width;
+    res_desc.Height                  = height;
+    res_desc.DepthOrArraySize        = 1;
+    res_desc.MipLevels               = 1;
+    res_desc.Format                  = DXGI_FORMAT_R8G8B8A8_UNORM;
+    res_desc.SampleDesc.Count        = 1;
+    res_desc.SampleDesc.Quality      = 0;
+    res_desc.Layout                  = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    res_desc.Flags                   = D3D12_RESOURCE_FLAG_NONE;
+
+    Dx12Check(device->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&resource)));
+    Dx12SetDebugName(resource, L"Texture2D");
+
+    // Upload texture pixels:
+    Renderer::UploadCtx()->UploadTextureSync(*this, device);
+
+    // Create texture view:
+    D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
+    srv_desc.Format                          = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srv_desc.ViewDimension                   = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srv_desc.Texture2D.MipLevels             = res_desc.MipLevels;
+    srv_desc.Texture2D.MostDetailedMip       = 0;
+    srv_desc.Shader4ComponentMapping         = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    device->CreateShaderResourceView(resource.Get(), &srv_desc, srv_descriptor.cpu_handle);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -25,8 +60,11 @@ void TextureImageImpl::InitD3DSpecific()
 void TextureImageImpl::InitFromScrap(const TextureImageImpl * const scrap_tex)
 {
     FASTASSERT(scrap_tex != nullptr);
+    FASTASSERT(scrap_tex->from_scrap);
 
-    // TODO
+    // Share the scrap texture resource(s)
+    resource       = scrap_tex->resource;
+    srv_descriptor = scrap_tex->srv_descriptor;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -45,7 +83,7 @@ void TextureStoreImpl::UploadScrapIfNeeded()
 {
     if (m_scrap_dirty)
     {
-        Renderer::UploadTexture(ScrapImpl());
+        Renderer::UploadCtx()->UploadTextureSync(*ScrapImpl(), Renderer::Device());
         m_scrap_dirty = false;
     }
 }

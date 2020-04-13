@@ -12,10 +12,10 @@ namespace D3D12
 {
 
 ///////////////////////////////////////////////////////////////////////////////
-// DeviceHelper
+// DeviceData
 ///////////////////////////////////////////////////////////////////////////////
 
-void DeviceHelper::InitAdapterAndDevice(const bool debug_validation)
+void DeviceData::InitAdapterAndDevice(const bool debug_validation)
 {
     uint32_t dxgi_factory_flags = 0;
 
@@ -118,10 +118,10 @@ void DeviceHelper::InitAdapterAndDevice(const bool debug_validation)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// SwapChainHelper
+// SwapChainData
 ///////////////////////////////////////////////////////////////////////////////
 
-void SwapChainHelper::InitSwapChain(IDXGIFactory6 * factory, ID3D12Device5 * device, HWND hwnd, const bool fullscreen, const int width, const int height)
+void SwapChainData::InitSwapChain(IDXGIFactory6 * factory, ID3D12Device5 * device, HWND hwnd, const bool fullscreen, const int width, const int height)
 {
     // Describe and create the swap chain
     DXGI_SWAP_CHAIN_DESC1 sd = {};
@@ -179,7 +179,7 @@ void SwapChainHelper::InitSwapChain(IDXGIFactory6 * factory, ID3D12Device5 * dev
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SwapChainHelper::InitSyncFence(ID3D12Device5 * device)
+void SwapChainData::InitSyncFence(ID3D12Device5 * device)
 {
     if (FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))))
     {
@@ -188,7 +188,7 @@ void SwapChainHelper::InitSyncFence(ID3D12Device5 * device)
 
     fence_values[frame_index]++;
 
-    fence_event = CreateEventEx(nullptr, L"SwapChainHelperFence", FALSE, EVENT_ALL_ACCESS);
+    fence_event = CreateEventEx(nullptr, L"SwapChainFence", FALSE, EVENT_ALL_ACCESS);
     if (fence_event == nullptr)
     {
         GameInterface::Errorf("Failed to create fence event.");
@@ -199,7 +199,7 @@ void SwapChainHelper::InitSyncFence(ID3D12Device5 * device)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SwapChainHelper::InitCmdList(ID3D12Device5 * device)
+void SwapChainData::InitCmdList(ID3D12Device5 * device)
 {
     for (uint32_t i = 0; i < kNumFrameBuffers; ++i)
     {
@@ -215,12 +215,13 @@ void SwapChainHelper::InitCmdList(ID3D12Device5 * device)
         GameInterface::Errorf("Failed to create a command list!");
     }
 
-    gfx_command_list->SetName(L"GlobalGfxCommandList");
+    Dx12SetDebugName(command_queue, L"SwapChainCmdQueue");
+    Dx12SetDebugName(gfx_command_list, L"SwapChainGfxCmdList");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SwapChainHelper::MoveToNextFrame()
+void SwapChainData::MoveToNextFrame()
 {
     // Schedule a Signal command in the queue
     FASTASSERT(frame_index < kNumFrameBuffers);
@@ -244,7 +245,7 @@ void SwapChainHelper::MoveToNextFrame()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SwapChainHelper::FullGpuSynch()
+void SwapChainData::FullGpuSynch()
 {
     for (uint32_t i = 0; i < kNumFrameBuffers; ++i)
     {
@@ -254,7 +255,7 @@ void SwapChainHelper::FullGpuSynch()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-SwapChainHelper::~SwapChainHelper()
+SwapChainData::~SwapChainData()
 {
     // Make sure all rendering operations are synchronized at this point before we can release the D3D resources.
     FullGpuSynch();
@@ -266,10 +267,10 @@ SwapChainHelper::~SwapChainHelper()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// RenderTargets
+// RenderTargetData
 ///////////////////////////////////////////////////////////////////////////////
 
-void RenderTargets::InitRTVs(ID3D12Device5 * device, IDXGISwapChain4 * swap_chain)
+void RenderTargetData::InitRTVs(ID3D12Device5 * device, IDXGISwapChain4 * swap_chain)
 {
     D3D12_DESCRIPTOR_HEAP_DESC heap_desc = {};
     heap_desc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
@@ -279,7 +280,7 @@ void RenderTargets::InitRTVs(ID3D12Device5 * device, IDXGISwapChain4 * swap_chai
 
     if (FAILED(device->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&rtv_descriptor_heap))))
     {
-        GameInterface::Errorf("RenderTargets - CreateDescriptorHeap failed!");
+        GameInterface::Errorf("RenderTargetData - CreateDescriptorHeap failed!");
     }
 
     const UINT rtv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -300,7 +301,7 @@ void RenderTargets::InitRTVs(ID3D12Device5 * device, IDXGISwapChain4 * swap_chai
 
         // Debug name displayed in the SDK validation messages.
         swprintf_s(s_buffer_names[i], L"BackBuffer[%u]", i);
-        back_buffer->SetName(s_buffer_names[i]);
+        Dx12SetDebugName(back_buffer, s_buffer_names[i]);
 
         device->CreateRenderTargetView(back_buffer.Get(), nullptr, render_target_descriptors[i]);
         render_rarget_resources[i] = back_buffer;
@@ -315,9 +316,9 @@ void RenderWindow::InitRenderWindow()
 {
     GameInterface::Printf("D3D12 Setting up the RenderWindow...");
 
-    device_helper.InitAdapterAndDevice(debug_validation);
-    swap_chain_helper.InitSwapChain(device_helper.factory.Get(), device_helper.device.Get(), hwnd, fullscreen, width, height);
-    render_targets.InitRTVs(device_helper.device.Get(), swap_chain_helper.swap_chain.Get());
+    DeviceData::InitAdapterAndDevice(debug_validation);
+    SwapChainData::InitSwapChain(factory.Get(), device.Get(), hwnd, fullscreen, width, height);
+    RenderTargetData::InitRTVs(device.Get(), swap_chain.Get());
 
     GameInterface::Printf("D3D12 RenderWindow initialized.");
 }

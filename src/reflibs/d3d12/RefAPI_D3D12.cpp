@@ -26,7 +26,7 @@ extern "C" REFLIB_DLL_EXPORT refexport_t GetRefAPI(refimport_t ri)
 {
     MrQ2::GameInterface::Initialize(ri, "D3D12");
 
-    using RefAPI12 = MrQ2::D3DCommon_NullDraw<MrQ2::D3D12::Renderer>;
+    using RefAPI12 = MrQ2::D3DCommon<MrQ2::D3D12::Renderer>;
 
     refexport_t re;
     re.api_version         = REF_API_VERSION;

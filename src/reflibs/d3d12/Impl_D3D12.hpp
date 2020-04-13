@@ -28,6 +28,9 @@ class TextureImageImpl final
 public:
     using TextureImage::TextureImage;
 
+    ComPtr<ID3D12Resource> resource;
+    Descriptor             srv_descriptor = {};
+
     void InitD3DSpecific();
     void InitFromScrap(const TextureImageImpl * scrap_tex);
 };

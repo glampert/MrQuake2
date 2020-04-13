@@ -16,7 +16,9 @@ namespace MrQ2
 namespace D3D12
 {
 
+// TODO: TEMP - rename
 class TextureImageImpl;
+using Texture = TextureImageImpl;
 
 /*
 ===============================================================================
@@ -27,7 +29,7 @@ class TextureImageImpl;
 */
 struct ShaderProgram final
 {
-    ComPtr<ID3D12RootSignature> rootsig;
+    ComPtr<ID3D12RootSignature> root_signature;
     D3DShader::Blobs            shader_bytecode;
 
     void LoadFromFxFile(const wchar_t * filename, const char * vs_entry, const char * ps_entry, const bool debug);
@@ -65,6 +67,137 @@ struct VertexBuffer final : public Buffer
         }
         return buffer_ok;
     }
+};
+
+struct ConstantBuffer final : Buffer
+{
+	D3D12_CONSTANT_BUFFER_VIEW_DESC view = {};
+
+	// void Init() ...
+};
+
+class GraphicsCmdList final
+{
+public:
+
+    // Frame start/end
+    void BeginFrame(const float clear_color[4], const float clear_depth, const uint8_t clear_stencil);
+    void EndFrame();
+
+    // Render states
+    void SetVertexBuffer(const VertexBuffer & vb);
+    void SetConstantBuffer(const ConstantBuffer & cb);
+    void SetShaderProgram(const ShaderProgram & shader);
+    void SetTexture(const Texture & tex);
+    void SetPrimitiveTopology(const PrimitiveTopology topology);
+    void SetViewport(const uint32_t x, const uint32_t y, const uint32_t w, const uint32_t h);
+    void SetScissorRect(const uint32_t x, const uint32_t y, const uint32_t w, const uint32_t h);
+
+	/* this would actually be part of the PipelineState...
+    void EnableAlphaBlending();
+    void DisableAlphaBlending();
+    void EnableDepthTest();
+    void DisableDepthTest();
+    void EnableDepthWrites();
+    void DisableDepthWrites();
+	*/
+
+    // Draw calls
+    void Draw(const uint32_t first_vertex, const uint32_t vertex_count);
+
+    // GPU data uploads
+//   void UploadTextureData(const Texture & tex);
+
+    // Debug markers
+    void PushMarkerf(const wchar_t * format, ...);
+    void PushMarker(const wchar_t * name);
+    void PopMarker();
+};
+
+class UploadContext final
+{
+public:
+
+    void Init(ID3D12Device5 * device);
+
+    //void UploadTextureSync(const D3D12_TEXTURE_COPY_LOCATION & src_location, const D3D12_TEXTURE_COPY_LOCATION & dst_location, const D3D12_RESOURCE_BARRIER & barrier);
+
+    void UploadTextureSync(const Texture & tex_to_upload, ID3D12Device5 * device);
+
+    // TODO: UploadTextureAsync variant that enqueues the upload buffer and does not sync until later on?
+
+    ~UploadContext();
+
+private:
+
+    ComPtr<ID3D12Fence>               m_fence;
+    ComPtr<ID3D12CommandQueue>        m_cmd_queue;
+    ComPtr<ID3D12CommandAllocator>    m_cmd_allocator;
+    ComPtr<ID3D12GraphicsCommandList> m_gfx_cmd_list;
+    HANDLE                            m_fence_event = nullptr;
+    uint64_t                          m_next_fence_value = 1;
+};
+
+struct Descriptor final
+{
+    D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
+    D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle;
+};
+
+// Shader Resource View (SRV) descriptor heap
+class DescriptorHeap final
+{
+public:
+
+    void Init(ID3D12Device5 * device, const uint32_t num_srv_descriptors)
+    {
+        FASTASSERT(num_srv_descriptors != 0);
+
+        D3D12_DESCRIPTOR_HEAP_DESC heap_desc = {};
+        heap_desc.Type                       = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        heap_desc.NumDescriptors             = num_srv_descriptors;
+        heap_desc.Flags                      = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+        Dx12Check(device->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&m_srv_descriptor_heap)));
+
+        m_srv_cpu_heap_start   = m_srv_descriptor_heap->GetCPUDescriptorHandleForHeapStart();
+        m_srv_gpu_heap_start   = m_srv_descriptor_heap->GetGPUDescriptorHandleForHeapStart();
+        m_srv_descriptor_size  = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        m_srv_descriptor_count = num_srv_descriptors;
+    }
+
+    Descriptor AllocateSrvDescriptor()
+    {
+        FASTASSERT(m_srv_descriptor_heap != nullptr);
+
+        if (m_srv_descriptors_used == m_srv_descriptor_count)
+        {
+            GameInterface::Errorf("Out of SRV descriptors! Max = %u", m_srv_descriptor_count);
+        }
+
+        Descriptor d;
+
+        d.cpu_handle = m_srv_cpu_heap_start;
+        m_srv_cpu_heap_start.ptr += m_srv_descriptor_size;
+
+        d.gpu_handle = m_srv_gpu_heap_start;
+        m_srv_gpu_heap_start.ptr += m_srv_descriptor_size;
+
+        ++m_srv_descriptors_used;
+
+        return d;
+    }
+
+    ID3D12DescriptorHeap * const * GetHeapAddr() const { return m_srv_descriptor_heap.GetAddressOf(); }
+
+private:
+
+    ComPtr<ID3D12DescriptorHeap> m_srv_descriptor_heap;
+    D3D12_CPU_DESCRIPTOR_HANDLE  m_srv_cpu_heap_start   = {};
+    D3D12_GPU_DESCRIPTOR_HANDLE  m_srv_gpu_heap_start   = {};
+    uint32_t                     m_srv_descriptor_size  = 0;
+    uint32_t                     m_srv_descriptor_count = 0;
+    uint32_t                     m_srv_descriptors_used = 0;
 };
 
 /*
@@ -211,7 +344,7 @@ public:
     void Init(ID3D12Device5 * device, int max_verts);
 
     void BeginFrame();
-    void EndFrame(const ShaderProgram & program, const TextureImageImpl * tex);
+	void EndFrame(ID3D12GraphicsCommandList * gfx_cmd_list, ID3D12PipelineState * pipeline_state, const Texture * opt_tex_atlas = nullptr);
 
     DrawVertex2D * Increment(const int count) { return m_buffers.Increment(count); }
 
