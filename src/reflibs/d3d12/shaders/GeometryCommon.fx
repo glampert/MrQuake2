@@ -1,20 +1,6 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-Texture2D    g_diffuse_texture : register(t0);
-SamplerState g_diffuse_sampler : register(s0);
-
-cbuffer ConstantBufferDataSGeomVS : register(b0)
-{
-    matrix g_mvp_matrix;
-};
-
-cbuffer ConstantBufferDataSGeomPS : register(b1)
-{
-    float4 g_texture_color_scaling;
-    float4 g_vertex_color_scaling;
-};
-
 struct VertexInput
 {
     float3 position : POSITION;
@@ -30,25 +16,41 @@ struct VertexOutput
 };
 
 ///////////////////////////////////////////////////////////////////////////////
+// Vertex Shader:
+
+cbuffer VertexShaderConstants : register(b0)
+{
+    matrix mvp_matrix;
+};
 
 VertexOutput VS_main(VertexInput input)
 {
     VertexOutput output;
-    output.vpos = mul(g_mvp_matrix, float4(input.position, 1.0f));
+    output.vpos = mul(mvp_matrix, float4(input.position, 1.0f));
     output.uv   = input.uv;
     output.rgba = input.rgba;
     return output;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Pixel Shader:
+
+cbuffer PixelShaderConstants : register(b1)
+{
+    float4 texture_color_scaling;
+    float4 vertex_color_scaling;
+};
+
+Texture2D    diffuse_texture : register(t0);
+SamplerState diffuse_sampler : register(s0);
 
 float4 PS_main(VertexOutput input) : SV_TARGET
 {
-    float4 tex_color = g_diffuse_texture.Sample(g_diffuse_sampler, input.uv);
-    tex_color *= g_texture_color_scaling;
+    float4 tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
+    tex_color *= texture_color_scaling;
 
     float4 vert_color = input.rgba;
-    vert_color *= g_vertex_color_scaling;
+    vert_color *= vertex_color_scaling;
 
     float4 frag_color = saturate(tex_color + vert_color);
     frag_color.a = input.rgba.a * tex_color.a; // Preserve the incoming alpha values for transparencies

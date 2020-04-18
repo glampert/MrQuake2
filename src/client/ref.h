@@ -226,6 +226,8 @@ typedef struct refimport_s
     void (*Sys_SetMemoryHooks)(void (*allocHook)(void *, size_t, game_memtag_t),
                                void (*freeHook) (void *, size_t, game_memtag_t));
 
+    int (*Sys_Milliseconds)(void);
+
 } refimport_t;
 
 // This is the only function actually exported at the linker level

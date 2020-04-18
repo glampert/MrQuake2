@@ -53,16 +53,6 @@ public:
     static void RenderView(const refdef_s & view_def);
     static void BeginFrame();
     static void EndFrame();
-    static void Flush2D();
-
-    static void EnableDepthTest();
-    static void DisableDepthTest();
-
-    static void EnableDepthWrites();
-    static void DisableDepthWrites();
-
-    static void EnableAlphaBlending();
-    static void DisableAlphaBlending();
 
     static void UploadTexture(const TextureImage * tex);
 
@@ -85,27 +75,21 @@ private:
 
     using SpriteBatchSet = std::array<SpriteBatch, size_t(SpriteBatchIdx::kCount)>;
 
-    struct ConstantBufferDataUIVS
+    struct GeometryCommonShaderConstants
     {
-        DirectX::XMFLOAT4A screen_dimensions;
-    };
+        struct VertexShaderConstants
+        {
+            DirectX::XMMATRIX mvp_matrix;
+        } vs;
 
-    struct ConstantBufferDataSGeomVS
-    {
-        DirectX::XMMATRIX mvp_matrix;
+        struct PixelShaderConstants
+        {
+            DirectX::XMFLOAT4A texture_color_scaling; // Multiplied with texture color
+            DirectX::XMFLOAT4A vertex_color_scaling;  // Multiplied with vertex color
+        } ps;
     };
-
-    struct ConstantBufferDataSGeomPS
-    {
-        DirectX::XMFLOAT4A texture_color_scaling; // Multiplied with texture color
-        DirectX::XMFLOAT4A vertex_color_scaling;  // Multiplied with vertex color
-    };
-
-    static void CreateFontsTexture_Temp();
-    static void CreateDeviceObjects_Temp();
 
     static void LoadShaders();
-    static void CreatePipelineStates();
     static void RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData& frame_data);
 
 private:
@@ -124,12 +108,10 @@ private:
         // Shader programs / render states:
         ShaderProgram     m_shader_ui_sprites;
         ShaderProgram     m_shader_geometry;
-
-        UploadContext m_upload_ctx;
-        DescriptorHeap m_srv_descriptor_heap;
-        ComPtr<ID3D12PipelineState> m_pipeline_state_draw2d;
-
-        ComPtr<ID3D12RootSignature> m_root_signature; // TEMP, part of ShaderProgram
+        ConstantBuffer    m_cbuffer_geometry;
+        PipelineState     m_pipeline_state_draw2d;
+        UploadContext     m_upload_ctx;
+        DescriptorHeap    m_srv_descriptor_heap;
 
         // Cached Cvars:
         CvarWrapper       m_disable_texturing;

@@ -85,7 +85,7 @@ void * Buffer::Map()
 {
     D3D12_RANGE range = {}; // No range specified.
     void * memory = nullptr;
-    resource->Map(0, &range, &memory);
+    Dx12Check(resource->Map(0, &range, &memory));
     return memory;
 }
 

@@ -219,6 +219,7 @@ static void VID_LoadRefreshDLL(const char * dll_name)
     ri.Vid_NewWindow      = VID_NewWindow;
     ri.Vid_GetModeInfo    = VID_GetModeInfo;
     ri.Sys_SetMemoryHooks = Sys_SetMemoryHooks;
+    ri.Sys_Milliseconds   = Sys_Milliseconds;
 
     re = GetRefAPI(ri);
 

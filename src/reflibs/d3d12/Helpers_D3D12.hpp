@@ -36,6 +36,16 @@ struct ShaderProgram final
     void CreateRootSignature(ID3D12Device5 * device, const D3D12_ROOT_SIGNATURE_DESC & rootsig_desc);
 };
 
+struct PipelineState final
+{
+    ComPtr<ID3D12PipelineState> pso;
+
+    void CreatePso(ID3D12Device5 * device, const D3D12_GRAPHICS_PIPELINE_STATE_DESC & pso_desc)
+    {
+        Dx12Check(device->CreateGraphicsPipelineState(&pso_desc, IID_PPV_ARGS(&pso)));
+    }
+};
+
 /*
 ===============================================================================
 
@@ -71,11 +81,29 @@ struct VertexBuffer final : public Buffer
 
 struct ConstantBuffer final : Buffer
 {
-	D3D12_CONSTANT_BUFFER_VIEW_DESC view = {};
+    D3D12_CONSTANT_BUFFER_VIEW_DESC view = {};
 
-	// void Init() ...
+    bool Init(ID3D12Device5 * device, const uint32_t buffer_size_in_bytes)
+    {
+        const bool buffer_ok = Buffer::Init(device, buffer_size_in_bytes);
+        if (buffer_ok)
+        {
+            view.BufferLocation = resource->GetGPUVirtualAddress();
+            view.SizeInBytes    = buffer_size_in_bytes;
+        }
+        return buffer_ok;
+    }
+
+    template<typename T>
+    void WriteStruct(const T & cbuffer_data)
+    {
+        void * cbuffer_upload_mem = Map();
+        std::memcpy(cbuffer_upload_mem, &cbuffer_data, sizeof(T));
+        Unmap();
+    }
 };
 
+/*
 class GraphicsCmdList final
 {
 public:
@@ -87,32 +115,29 @@ public:
     // Render states
     void SetVertexBuffer(const VertexBuffer & vb);
     void SetConstantBuffer(const ConstantBuffer & cb);
-    void SetShaderProgram(const ShaderProgram & shader);
     void SetTexture(const Texture & tex);
-    void SetPrimitiveTopology(const PrimitiveTopology topology);
     void SetViewport(const uint32_t x, const uint32_t y, const uint32_t w, const uint32_t h);
     void SetScissorRect(const uint32_t x, const uint32_t y, const uint32_t w, const uint32_t h);
 
-	/* this would actually be part of the PipelineState...
-    void EnableAlphaBlending();
-    void DisableAlphaBlending();
-    void EnableDepthTest();
-    void DisableDepthTest();
-    void EnableDepthWrites();
-    void DisableDepthWrites();
-	*/
+    // this would actually be part of the PipelineState...
+//    void SetShaderProgram(const ShaderProgram & shader);
+//    void SetPrimitiveTopology(const PrimitiveTopology topology);
+//    void EnableAlphaBlending();
+//    void DisableAlphaBlending();
+//    void EnableDepthTest();
+//    void DisableDepthTest();
+//    void EnableDepthWrites();
+//    void DisableDepthWrites();
 
     // Draw calls
     void Draw(const uint32_t first_vertex, const uint32_t vertex_count);
-
-    // GPU data uploads
-//   void UploadTextureData(const Texture & tex);
 
     // Debug markers
     void PushMarkerf(const wchar_t * format, ...);
     void PushMarker(const wchar_t * name);
     void PopMarker();
 };
+*/
 
 class UploadContext final
 {
@@ -166,7 +191,7 @@ public:
         m_srv_descriptor_count = num_srv_descriptors;
     }
 
-    Descriptor AllocateSrvDescriptor()
+    Descriptor AllocateShaderVisibleDescriptor()
     {
         FASTASSERT(m_srv_descriptor_heap != nullptr);
 

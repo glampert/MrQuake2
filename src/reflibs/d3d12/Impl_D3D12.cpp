@@ -18,7 +18,7 @@ namespace D3D12
 void TextureImageImpl::InitD3DSpecific()
 {
     auto * device  = Renderer::Device();
-    srv_descriptor = Renderer::SrvDescriptorHeap()->AllocateSrvDescriptor();
+    srv_descriptor = Renderer::SrvDescriptorHeap()->AllocateShaderVisibleDescriptor();
 
     // Texture resource:
     D3D12_HEAP_PROPERTIES heap_props = {};

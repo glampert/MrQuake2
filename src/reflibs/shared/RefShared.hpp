@@ -79,8 +79,8 @@ struct Vec2u16
     std::uint16_t y;
 };
 
-template<typename T, std::size_t Size>
-constexpr std::size_t ArrayLength(const T (&)[Size])
+template<typename T, unsigned Size>
+constexpr unsigned ArrayLength(const T (&)[Size])
 {
     return Size;
 }
@@ -378,6 +378,8 @@ void Shutdown();
 
 void Printf(const char * fmt, ...);
 REFLIB_NORETURN void Errorf(const char * fmt, ...);
+
+int GetTimeMilliseconds();
 
 namespace Cmd
 {

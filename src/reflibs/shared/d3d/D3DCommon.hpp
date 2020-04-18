@@ -122,6 +122,50 @@ struct D3DCommon
         *out_h = tex->height;
     }
 
+    static void DrawFpsCounter()
+    {
+        // Average multiple frames together to smooth changes out a bit.
+        static constexpr uint32_t kMaxFrames = 4;
+        struct FpsCounter
+        {
+            uint32_t previousTimes[kMaxFrames];
+            uint32_t previousTime;
+            uint32_t count;
+            uint32_t index;
+        };
+        static FpsCounter fps;
+
+        const uint32_t timeMillisec = GameInterface::GetTimeMilliseconds(); // Real time clock
+        const uint32_t frameTime = timeMillisec - fps.previousTime;
+
+        fps.previousTimes[fps.index++] = frameTime;
+        fps.previousTime = timeMillisec;
+
+        if (fps.index == kMaxFrames)
+        {
+            uint32_t total = 0;
+            for (uint32_t i = 0; i < kMaxFrames; ++i)
+            {
+                total += fps.previousTimes[i];
+            }
+
+            if (total == 0)
+            {
+                total = 1;
+            }
+
+            fps.count = (10000 * kMaxFrames / total);
+            fps.count = (fps.count + 5) / 10;
+            fps.index = 0;
+        }
+
+        char text[128];
+        sprintf_s(text, "FPS:%u", fps.count);
+
+        // Draw it at the top-left corner of the screen
+        DrawAltString(10, 10, text);
+    }
+
     static void BeginFrame(float /*camera_separation*/)
     {
         FASTASSERT(!RB::FrameStarted());
@@ -131,6 +175,7 @@ struct D3DCommon
     static void EndFrame()
     {
         FASTASSERT(RB::FrameStarted());
+        DrawFpsCounter();
         RB::EndFrame();
     }
 
@@ -249,6 +294,69 @@ struct D3DCommon
 
         RB::SBatch(SpriteBatchIdx::kDrawChar)->PushQuad(float(x), float(y), kGlyphSize, kGlyphSize,
             fcol, frow, fcol + kGlyphUVScale, frow + kGlyphUVScale, kColorWhite);
+    }
+
+    static void DrawString(int x, int y, const char * s)
+    {
+        while (*s)
+        {
+            DrawChar(x, y, *s);
+            x += 8; // kGlyphSize
+            ++s;
+        }
+    }
+
+    static void DrawAltString(int x, int y, const char * s)
+    {
+        while (*s)
+        {
+            DrawChar(x, y, *s ^ 0x80);
+            x += 8; // kGlyphSize
+            ++s;
+        }
+    }
+
+    static void DrawNumberBig(int x, int y, int color, int width, int value)
+    {
+        // Draw a big number using one of the 0-9 textures
+        // color=0: normal color
+        // color=1: alternate color (red numbers)
+        // width: 3 is a good default
+
+        constexpr int kStatMinus = 10; // num frame for '-' stats digit
+        constexpr int kCharWidth = 16;
+
+        static const char * const sb_nums[2][11] = {
+            { "num_0",  "num_1",  "num_2",  "num_3",  "num_4",  "num_5",  "num_6",  "num_7",  "num_8",  "num_9",  "num_minus"  },
+            { "anum_0", "anum_1", "anum_2", "anum_3", "anum_4", "anum_5", "anum_6", "anum_7", "anum_8", "anum_9", "anum_minus" }
+        };
+
+        FASTASSERT(color == 0 || color == 1);
+
+        if (width < 1) width = 1;
+        if (width > 5) width = 5;
+
+        char num[16];
+        sprintf_s(num, "%i", value);
+        int l = (int)strlen(num);
+        if (l > width)
+            l = width;
+        x += 2 + kCharWidth * (width - l);
+
+        char * ptr = num;
+        while (*ptr && l)
+        {
+            int frame;
+            if (*ptr == '-')
+                frame = kStatMinus;
+            else
+                frame = *ptr - '0';
+
+            DrawPic(x, y, sb_nums[color][frame]);
+            x += kCharWidth;
+            ptr++;
+            l--;
+        }
     }
 
     static void DrawTileClear(int /*x*/, int /*y*/, int /*w*/, int /*h*/, const char * /*name*/)
