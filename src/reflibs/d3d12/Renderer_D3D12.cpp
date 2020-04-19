@@ -23,7 +23,7 @@ namespace D3D12
 // Renderer
 ///////////////////////////////////////////////////////////////////////////////
 
-const DirectX::XMFLOAT4A Renderer::kClearColor{ 0.0f, 0.0f, 0.5f, 1.0f };
+const DirectX::XMFLOAT4A Renderer::kClearColor{ 0.0f, 0.0f, 0.0f, 1.0f };
 const DirectX::XMFLOAT4A Renderer::kFloat4Zero{ 0.0f, 0.0f, 0.0f, 0.0f };
 const DirectX::XMFLOAT4A Renderer::kFloat4One { 1.0f, 1.0f, 1.0f, 1.0f };
 
