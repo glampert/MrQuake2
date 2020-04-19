@@ -110,6 +110,7 @@ private:
         ShaderProgram     m_shader_geometry;
         ConstantBuffer    m_cbuffer_geometry;
         PipelineState     m_pipeline_state_draw2d;
+        PipelineState     m_pipeline_state_draw3d;
         UploadContext     m_upload_ctx;
         DescriptorHeap    m_srv_descriptor_heap;
 

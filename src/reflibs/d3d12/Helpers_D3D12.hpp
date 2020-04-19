@@ -46,6 +46,42 @@ struct PipelineState final
     }
 };
 
+/* IDEA
+
+// NOTE: Possibly could have a single RootSignature if all shaders have the same set of constants and texture inputs
+
+// class with constants and pipeline state derives from ShaderProgram to define a custom shader
+class UiShader : public ShaderProgram
+{
+	struct VertexShaderConstants
+	{
+		...
+	} vs_constants;
+
+	struct PixelShaderConstants
+	{
+		...
+	} ps_constants;
+
+	struct Resources
+	{
+		const Texture* texture1;
+		Sampler sampler1;
+
+		const Texture* texture2;
+		Sampler sampler2;
+		...
+	} resources;
+
+	// override from ShaderProgram
+	void UploadConstants() override; // update the cbuffers from CPU data
+	void UploadResources() override; // upload textures to the GPU
+	void SetPipelineState() override;
+	// etc...
+};
+
+*/
+
 /*
 ===============================================================================
 

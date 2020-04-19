@@ -162,6 +162,7 @@ void Renderer::LoadShaders()
         pso_desc.SampleMask = UINT_MAX;
         pso_desc.NumRenderTargets = 1;
         pso_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        pso_desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
         pso_desc.SampleDesc.Count = 1;
         pso_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 
@@ -188,13 +189,13 @@ void Renderer::LoadShaders()
             D3D12_RASTERIZER_DESC & desc = pso_desc.RasterizerState;
             desc.FillMode = D3D12_FILL_MODE_SOLID;
             desc.CullMode = D3D12_CULL_MODE_NONE;
-            desc.FrontCounterClockwise = FALSE;
+            desc.FrontCounterClockwise = false;
             desc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
             desc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
             desc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
             desc.DepthClipEnable = true;
-            desc.MultisampleEnable = FALSE;
-            desc.AntialiasedLineEnable = FALSE;
+            desc.MultisampleEnable = false;
+            desc.AntialiasedLineEnable = false;
             desc.ForcedSampleCount = 0;
             desc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
         }
@@ -216,7 +217,55 @@ void Renderer::LoadShaders()
 
     // Common 3D geometry:
     {
-        sm_state->m_shader_geometry.LoadFromFxFile(REFD3D12_SHADER_PATH_WIDE L"GeometryCommon.fx", "VS_main", "PS_main", DebugValidation());
+        ShaderProgram & sp = sm_state->m_shader_geometry;
+        sp.LoadFromFxFile(REFD3D12_SHADER_PATH_WIDE L"GeometryCommon.fx", "VS_main", "PS_main", DebugValidation());
+
+        D3D12_DESCRIPTOR_RANGE desc_range = {};
+        desc_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        desc_range.NumDescriptors = 1;
+        desc_range.BaseShaderRegister = 0;
+        desc_range.RegisterSpace = 0;
+        desc_range.OffsetInDescriptorsFromTableStart = 0;
+
+        D3D12_ROOT_PARAMETER param[2] = {};
+
+        param[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        param[0].Constants.ShaderRegister = 0;
+        param[0].Constants.RegisterSpace = 0;
+        param[0].Constants.Num32BitValues = 16; // mvp_matrix (matrix)
+        param[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+        param[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        param[1].DescriptorTable.NumDescriptorRanges = 1;
+        param[1].DescriptorTable.pDescriptorRanges = &desc_range;
+        param[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        D3D12_STATIC_SAMPLER_DESC static_sampler = {};
+        static_sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        static_sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        static_sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        static_sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        static_sampler.MipLODBias = 0.0f;
+        static_sampler.MaxAnisotropy = 0;
+        static_sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+        static_sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        static_sampler.MinLOD = 0.0f;
+        static_sampler.MaxLOD = 0.0f;
+        static_sampler.ShaderRegister = 0;
+        static_sampler.RegisterSpace = 0;
+        static_sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        D3D12_ROOT_SIGNATURE_DESC rootsig_desc = {};
+        rootsig_desc.NumParameters = ArrayLength(param);
+        rootsig_desc.pParameters = param;
+        rootsig_desc.NumStaticSamplers = 1;
+        rootsig_desc.pStaticSamplers = &static_sampler;
+        rootsig_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+                             D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+                             D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                             D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+
+        sp.CreateRootSignature(Device(), rootsig_desc);
 
         const D3D12_INPUT_ELEMENT_DESC input_layout[] = { // DrawVertex3D
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, offsetof(DrawVertex3D, position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -224,27 +273,68 @@ void Renderer::LoadShaders()
             { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(DrawVertex3D, rgba),     D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         };
 
-        //TODO PSO
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc = {};
+        pso_desc.NodeMask = 1;
+        pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        pso_desc.pRootSignature = sp.root_signature.Get(); // ROOT_SIG
+        pso_desc.SampleMask = UINT_MAX;
+        pso_desc.NumRenderTargets = 1;
+        pso_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        pso_desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        pso_desc.SampleDesc.Count = 1;
+        pso_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 
-        /*
-        // Create the constant buffers:
-        D3D11_BUFFER_DESC buf_desc = {};
-        buf_desc.Usage             = D3D11_USAGE_DEFAULT;
-        buf_desc.ByteWidth         = sizeof(ConstantBufferDataSGeomVS);
-        buf_desc.BindFlags         = D3D11_BIND_CONSTANT_BUFFER;
-        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, sm_state->m_cbuffer_geometry_vs.GetAddressOf())))
+        pso_desc.InputLayout = { input_layout, ArrayLength(input_layout) };
+        pso_desc.VS = { sp.shader_bytecode.vs_blob->GetBufferPointer(), sp.shader_bytecode.vs_blob->GetBufferSize() };
+        pso_desc.PS = { sp.shader_bytecode.ps_blob->GetBufferPointer(), sp.shader_bytecode.ps_blob->GetBufferSize() };
+
+        // Create the blending setup
         {
-            GameInterface::Errorf("Failed to create VS shader constant buffer!");
+            D3D12_BLEND_DESC & desc = pso_desc.BlendState;
+            desc.AlphaToCoverageEnable = false;
+            desc.RenderTarget[0].BlendEnable = false;
+            desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+            desc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
+            desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+            desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+            desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+            desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+            desc.RenderTarget[0].LogicOp = D3D12_LOGIC_OP_NOOP;
+            desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
         }
 
-        buf_desc.ByteWidth = sizeof(ConstantBufferDataSGeomPS);
-        if (FAILED(Device()->CreateBuffer(&buf_desc, nullptr, sm_state->m_cbuffer_geometry_ps.GetAddressOf())))
+        // Create the rasterizer state
         {
-            GameInterface::Errorf("Failed to create PS shader constant buffer!");
+            D3D12_RASTERIZER_DESC & desc = pso_desc.RasterizerState;
+            desc.FillMode = D3D12_FILL_MODE_SOLID;
+            desc.CullMode = D3D12_CULL_MODE_BACK;
+            desc.FrontCounterClockwise = false;
+            desc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+            desc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+            desc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+            desc.DepthClipEnable = true;
+            desc.MultisampleEnable = false;
+            desc.AntialiasedLineEnable = false;
+            desc.ForcedSampleCount = 0;
+            desc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
         }
-        */
 
-        sm_state->m_cbuffer_geometry.Init(Device(), sizeof(GeometryCommonShaderConstants));
+        // Create depth-stencil State
+        {
+            D3D12_DEPTH_STENCIL_DESC & desc = pso_desc.DepthStencilState;
+            desc.DepthEnable = true;
+            desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            desc.StencilEnable = false;
+            desc.FrontFace.StencilFailOp = desc.FrontFace.StencilDepthFailOp = desc.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+            desc.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+            desc.BackFace = desc.FrontFace;
+        }
+
+        sm_state->m_pipeline_state_draw3d.CreatePso(Device(), pso_desc);
+
+        //TODO: switch to cbuffer
+        //sm_state->m_cbuffer_geometry.Init(Device(), sizeof(GeometryCommonShaderConstants));
     }
 
     GameInterface::Printf("Shaders loaded successfully.");
@@ -254,19 +344,18 @@ void Renderer::LoadShaders()
 
 void Renderer::RenderView(const refdef_s & view_def)
 {
-	/*
     PushEvent(L"Renderer::RenderView");
 
     ViewDrawStateImpl::FrameData frame_data{ sm_state->m_tex_store, *sm_state->m_mdl_store.WorldModel(), view_def };
 
     // Enter 3D mode (depth test ON)
-    EnableDepthTest();
+    //EnableDepthTest();
 
     // Set up camera/view (fills frame_data)
     sm_state->m_view_draw_state.RenderViewSetup(frame_data);
 
     // Update the constant buffers for this frame
-    RenderViewUpdateCBuffers(frame_data);
+    //RenderViewUpdateCBuffers(frame_data);
 
     // Set the camera/world-view:
     FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
@@ -291,12 +380,13 @@ void Renderer::RenderView(const refdef_s & view_def)
     sm_state->m_view_draw_state.RenderSolidEntities(frame_data);
     PopEvent(); // "RenderSolidEntities"
 
-    sm_state->m_view_draw_state.EndRenderPass();
+    sm_state->m_view_draw_state.EndRenderPass(sm_state->m_window.gfx_command_list.Get(), sm_state->m_pipeline_state_draw3d.pso.Get(), sm_state->m_shader_geometry);
 
     //
     // Transparencies/alpha pass
     //
 
+	/*
     // Color Blend ON
     EnableAlphaBlending();
 
@@ -319,9 +409,9 @@ void Renderer::RenderView(const refdef_s & view_def)
 
     // Back to 2D rendering mode (depth test OFF)
     DisableDepthTest();
+	*/
 
     PopEvent(); // "Renderer::RenderView"
-	*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -336,17 +426,17 @@ void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData & fra
     if (sm_state->m_disable_texturing.IsSet()) // Use only debug vertex color
     {
         cbuffer_data.ps.texture_color_scaling = kFloat4Zero;
-        cbuffer_data.ps.vertex_color_scaling = kFloat4One;
+        cbuffer_data.ps.vertex_color_scaling  = kFloat4One;
     }
     else if (sm_state->m_blend_debug_color.IsSet()) // Blend debug vertex color with texture
     {
         cbuffer_data.ps.texture_color_scaling = kFloat4One;
-        cbuffer_data.ps.vertex_color_scaling = kFloat4One;
+        cbuffer_data.ps.vertex_color_scaling  = kFloat4One;
     }
     else // Normal rendering
     {
         cbuffer_data.ps.texture_color_scaling = kFloat4One;
-        cbuffer_data.ps.vertex_color_scaling = kFloat4Zero;
+        cbuffer_data.ps.vertex_color_scaling  = kFloat4Zero;
     }
 
     sm_state->m_cbuffer_geometry.WriteStruct(cbuffer_data);
@@ -366,7 +456,7 @@ void Renderer::BeginFrame()
     ID3D12GraphicsCommandList * gfx_cmd_list = sm_state->m_window.gfx_command_list.Get();
 
     auto back_buffer_rtv = sm_state->m_window.render_target_descriptors[back_buffer_index];
-    ID3D12Resource * back_buffer_resource = sm_state->m_window.render_rarget_resources[back_buffer_index].Get();
+    ID3D12Resource * back_buffer_resource = sm_state->m_window.render_target_resources[back_buffer_index].Get();
 
     // Set back buffer to render target
     D3D12_RESOURCE_BARRIER barrier = {};
@@ -380,7 +470,14 @@ void Renderer::BeginFrame()
     gfx_cmd_list->Reset(cmd_allocator, nullptr);
     gfx_cmd_list->ResourceBarrier(1, &barrier);
     gfx_cmd_list->ClearRenderTargetView(back_buffer_rtv, reinterpret_cast<const float *>(&kClearColor), 0, nullptr);
-    gfx_cmd_list->OMSetRenderTargets(1, &back_buffer_rtv, false, nullptr);
+
+    const float depth_clear = 1.0f;
+    const std::uint8_t stencil_clear = 0;
+    gfx_cmd_list->ClearDepthStencilView(sm_state->m_window.depth_render_target_descriptor,
+                                        D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,
+                                        depth_clear, stencil_clear, 0, nullptr);
+
+    gfx_cmd_list->OMSetRenderTargets(1, &back_buffer_rtv, false, &sm_state->m_window.depth_render_target_descriptor);
     gfx_cmd_list->SetDescriptorHeaps(1, sm_state->m_srv_descriptor_heap.GetHeapAddr());
 
     // Setup viewport
@@ -431,11 +528,14 @@ void Renderer::EndFrame()
 
         // 2D text
         sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].EndFrame(gfx_cmd_list, sm_state->m_pipeline_state_draw2d.pso.Get(), static_cast<const TextureImageImpl *>(sm_state->m_tex_store.tex_conchars));
+
+        const float blend_factor_off[4] = { 1.f, 1.f, 1.f, 1.f };
+        gfx_cmd_list->OMSetBlendFactor(blend_factor_off);
     }
     // 2D end
 
     const auto back_buffer_index = sm_state->m_window.swap_chain->GetCurrentBackBufferIndex();
-    ID3D12Resource * back_buffer_resource = sm_state->m_window.render_rarget_resources[back_buffer_index].Get();
+    ID3D12Resource * back_buffer_resource = sm_state->m_window.render_target_resources[back_buffer_index].Get();
 
     // Set back buffer to present
     D3D12_RESOURCE_BARRIER barrier = {};

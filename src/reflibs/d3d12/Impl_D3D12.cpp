@@ -179,9 +179,8 @@ void ModelStoreImpl::DestroyModel(ModelInstance * mdl)
 
 void ViewDrawStateImpl::Init(const int max_verts)
 {
+    m_buffers.Init(Renderer::Device(), "ViewDrawStateImpl", max_verts);
     m_draw_cmds = new(MemTag::kRenderer) DrawCmdList{};
-
-    // TODO
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -191,16 +190,82 @@ void ViewDrawStateImpl::BeginRenderPass()
     FASTASSERT(m_batch_open == false);
     FASTASSERT(m_draw_cmds->empty());
 
-    // TODO
+    m_buffers.Begin();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawStateImpl::EndRenderPass()
+static inline D3D_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D(const PrimitiveTopology topology)
+{
+    switch (topology)
+    {
+    case PrimitiveTopology::kTriangleList  : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    case PrimitiveTopology::kTriangleStrip : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+    case PrimitiveTopology::kTriangleFan   : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST; // Converted by the front-end
+    default : GameInterface::Errorf("Bad PrimitiveTopology enum!");
+    } // switch
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawStateImpl::EndRenderPass(ID3D12GraphicsCommandList * gfx_cmd_list, ID3D12PipelineState * pipeline_state, ShaderProgram& shader_prog)
 {
     FASTASSERT(m_batch_open == false);
 
-    // TODO
+    // Flush draw:
+    const auto draw_buf = m_buffers.End();
+
+    gfx_cmd_list->IASetVertexBuffers(0, 1, &draw_buf.buffer_ptr->view);
+    gfx_cmd_list->SetPipelineState(pipeline_state);
+    gfx_cmd_list->SetGraphicsRootSignature(shader_prog.root_signature.Get());
+
+    constexpr float depth_min = 0.0f;
+    constexpr float depth_max = 1.0f;
+    const auto window_width   = static_cast<float>(Renderer::Width());
+    const auto window_height  = static_cast<float>(Renderer::Height());
+
+    auto SetDepthRange = [gfx_cmd_list, window_width, window_height](const float near_val, const float far_val)
+    {
+        D3D12_VIEWPORT vp;
+        vp.TopLeftX = 0.0f;
+        vp.TopLeftY = 0.0f;
+        vp.Width    = window_width;
+        vp.Height   = window_height;
+        vp.MinDepth = near_val;
+        vp.MaxDepth = far_val;
+        gfx_cmd_list->RSSetViewports(1, &vp);
+    };
+
+    for (const DrawCmd & cmd : *m_draw_cmds)
+    {
+        bool depth_range_changed = false;
+
+        // Depth hack to prevent weapons from poking into geometry.
+        if (cmd.depth_hack)
+        {
+            SetDepthRange(depth_min, depth_min + 0.3f * (depth_max - depth_min));
+            depth_range_changed = true;
+        }
+
+        // Slot[0] constants
+        const DirectX::XMMATRIX mvp_matrix = cmd.model_mtx * m_viewproj_mtx;
+        gfx_cmd_list->SetGraphicsRoot32BitConstants(0, 16, &mvp_matrix, 0);
+
+        // Bind texture & sampler (t0, s0):
+        const auto * tex = static_cast<const TextureImageImpl *>(cmd.texture);
+        gfx_cmd_list->SetGraphicsRootDescriptorTable(1, tex->srv_descriptor.gpu_handle);
+
+        gfx_cmd_list->IASetPrimitiveTopology(PrimitiveTopologyToD3D(cmd.topology));
+        gfx_cmd_list->DrawInstanced(cmd.num_verts, /*num_instances=*/1, cmd.first_vert, /*first_instance=*/0);
+
+        // Restore to default if we did a depth hacked draw.
+        if (depth_range_changed)
+        {
+            SetDepthRange(depth_min, depth_max);
+        }
+    }
+
+    m_draw_cmds->clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -219,9 +284,7 @@ MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
 
     m_batch_open = true;
 
-    // TODO
-    //return MiniImBatch{ m_buffers.CurrentVertexPtr(), m_buffers.NumVertsRemaining(), args.topology };
-    return MiniImBatch{ nullptr, 0, args.topology };
+    return MiniImBatch{ m_buffers.CurrentVertexPtr(), m_buffers.NumVertsRemaining(), args.topology };
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -232,10 +295,10 @@ void ViewDrawStateImpl::EndBatch(MiniImBatch & batch)
     FASTASSERT(m_batch_open == true);
     FASTASSERT(m_current_draw_cmd.topology == batch.Topology());
 
-    m_current_draw_cmd.first_vert = 0;//TODO m_buffers.CurrentPosition();
+    m_current_draw_cmd.first_vert = m_buffers.CurrentPosition();
     m_current_draw_cmd.num_verts  = batch.UsedVerts();
 
-//    m_buffers.Increment(batch.UsedVerts());
+    m_buffers.Increment(batch.UsedVerts());
 
     m_draw_cmds->push_back(m_current_draw_cmd);
     m_current_draw_cmd = {};

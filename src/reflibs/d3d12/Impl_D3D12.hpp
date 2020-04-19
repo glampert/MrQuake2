@@ -139,7 +139,7 @@ public:
     void Init(int max_verts);
     void SetViewProjMatrix(const DirectX::XMMATRIX & mtx) { m_viewproj_mtx = mtx; }
     void BeginRenderPass();
-    void EndRenderPass();
+    void EndRenderPass(ID3D12GraphicsCommandList * gfx_cmd_list, ID3D12PipelineState * pipeline_state, ShaderProgram& shader_prog);
 
     // Disallow copy.
     ViewDrawStateImpl(const ViewDrawStateImpl &) = delete;
@@ -165,7 +165,8 @@ private:
     using DrawCmdList = FixedSizeArray<DrawCmd, 2048>;
 
     DrawCmd m_current_draw_cmd = {};
-    DrawCmdList * m_draw_cmds  = nullptr;
+    DrawCmdList * m_draw_cmds  = nullptr; // TODO: OwnedPtr<DrawCmdList, MemTag::kRenderer> m_draw_cmds;
+    VertexBuffers<DrawVertex3D, kNumFrameBuffers> m_buffers;
 
     DirectX::XMMATRIX m_viewproj_mtx = {};
     bool              m_batch_open   = false;

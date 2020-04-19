@@ -272,39 +272,82 @@ SwapChainData::~SwapChainData()
 
 void RenderTargetData::InitRTVs(ID3D12Device5 * device, IDXGISwapChain4 * swap_chain)
 {
-    D3D12_DESCRIPTOR_HEAP_DESC heap_desc = {};
-    heap_desc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    heap_desc.NumDescriptors = kNumFrameBuffers;
-    heap_desc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    heap_desc.NodeMask       = 1;
-
-    if (FAILED(device->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&rtv_descriptor_heap))))
+    // Color framebuffers:
     {
-        GameInterface::Errorf("RenderTargetData - CreateDescriptorHeap failed!");
+        D3D12_DESCRIPTOR_HEAP_DESC heap_desc = {};
+        heap_desc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+        heap_desc.NumDescriptors = kNumFrameBuffers;
+        heap_desc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        heap_desc.NodeMask       = 1;
+        Dx12Check(device->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&rtv_descriptor_heap)));
+
+        const UINT rtv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle = rtv_descriptor_heap->GetCPUDescriptorHandleForHeapStart();
+
+        for (uint32_t i = 0; i < kNumFrameBuffers; ++i)
+        {
+            render_target_descriptors[i] = rtv_handle;
+            rtv_handle.ptr += rtv_descriptor_size;
+
+            ComPtr<ID3D12Resource> back_buffer;
+            if (FAILED(swap_chain->GetBuffer(i, IID_PPV_ARGS(&back_buffer))))
+            {
+                GameInterface::Errorf("SwapChain GetBuffer %u failed!", i);
+            }
+
+            // Debug name displayed in the SDK validation messages.
+            static wchar_t s_rt_buffer_names[kNumFrameBuffers][32];
+            swprintf_s(s_rt_buffer_names[i], L"SwapChainRenderTarget[%u]", i);
+            Dx12SetDebugName(back_buffer, s_rt_buffer_names[i]);
+
+            device->CreateRenderTargetView(back_buffer.Get(), nullptr, render_target_descriptors[i]);
+            render_target_resources[i] = back_buffer;
+        }
     }
 
-    const UINT rtv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-    D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle = rtv_descriptor_heap->GetCPUDescriptorHandleForHeapStart();
-
-    static wchar_t s_buffer_names[kNumFrameBuffers][32];
-
-    for (uint32_t i = 0; i < kNumFrameBuffers; ++i)
+    // Depth buffer:
     {
-        render_target_descriptors[i] = rtv_handle;
-        rtv_handle.ptr += rtv_descriptor_size;
+        DXGI_SWAP_CHAIN_DESC1 sd = {};
+        Dx12Check(swap_chain->GetDesc1(&sd));
+        const auto width  = sd.Width;
+        const auto height = sd.Height;
 
-        ComPtr<ID3D12Resource> back_buffer;
-        if (FAILED(swap_chain->GetBuffer(i, IID_PPV_ARGS(&back_buffer))))
-        {
-            GameInterface::Errorf("SwapChain GetBuffer %u failed!", i);
-        }
+        D3D12_DESCRIPTOR_HEAP_DESC heap_desc = {};
+        heap_desc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+        heap_desc.NumDescriptors = 1;
+        heap_desc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        heap_desc.NodeMask       = 1;
+        Dx12Check(device->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&dsv_descriptor_heap)));
 
-        // Debug name displayed in the SDK validation messages.
-        swprintf_s(s_buffer_names[i], L"BackBuffer[%u]", i);
-        Dx12SetDebugName(back_buffer, s_buffer_names[i]);
+        depth_render_target_descriptor = dsv_descriptor_heap->GetCPUDescriptorHandleForHeapStart();
 
-        device->CreateRenderTargetView(back_buffer.Get(), nullptr, render_target_descriptors[i]);
-        render_rarget_resources[i] = back_buffer;
+        // Texture resource:
+        D3D12_HEAP_PROPERTIES heap_props = {};
+        heap_props.Type                  = D3D12_HEAP_TYPE_DEFAULT;
+        heap_props.CPUPageProperty       = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heap_props.MemoryPoolPreference  = D3D12_MEMORY_POOL_UNKNOWN;
+
+        D3D12_RESOURCE_DESC res_desc     = {};
+        res_desc.Dimension               = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        res_desc.Alignment               = 0;
+        res_desc.Width                   = width;
+        res_desc.Height                  = height;
+        res_desc.DepthOrArraySize        = 1;
+        res_desc.MipLevels               = 1;
+        res_desc.Format                  = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        res_desc.SampleDesc.Count        = 1;
+        res_desc.SampleDesc.Quality      = 0;
+        res_desc.Layout                  = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        res_desc.Flags                   = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+        D3D12_CLEAR_VALUE clear_value    = {};
+        clear_value.Format               = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        clear_value.DepthStencil         = { 1.0f, 0 };
+
+        Dx12Check(device->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clear_value, IID_PPV_ARGS(&depth_render_target)));
+        Dx12SetDebugName(depth_render_target, L"SwapChainDepthTarget");
+
+        device->CreateDepthStencilView(depth_render_target.Get(), nullptr, depth_render_target_descriptor);
     }
 }
 

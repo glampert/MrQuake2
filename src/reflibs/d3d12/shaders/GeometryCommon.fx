@@ -35,27 +35,33 @@ VertexOutput VS_main(VertexInput input)
 ///////////////////////////////////////////////////////////////////////////////
 // Pixel Shader:
 
+/*
 cbuffer PixelShaderConstants : register(b1)
 {
     float4 texture_color_scaling;
     float4 vertex_color_scaling;
 };
+*/
 
 Texture2D    diffuse_texture : register(t0);
 SamplerState diffuse_sampler : register(s0);
 
 float4 PS_main(VertexOutput input) : SV_TARGET
 {
-    float4 tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
-    tex_color *= texture_color_scaling;
+	float4 tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
+	float3 c = tex_color.xyz;
+	return float4(c, 1.0f);
 
-    float4 vert_color = input.rgba;
-    vert_color *= vertex_color_scaling;
+//    float4 tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
+//    tex_color *= texture_color_scaling;
 
-    float4 frag_color = saturate(tex_color + vert_color);
-    frag_color.a = input.rgba.a * tex_color.a; // Preserve the incoming alpha values for transparencies
+//    float4 vert_color = input.rgba;
+//    vert_color *= vertex_color_scaling;
 
-    return frag_color;
+//    float4 frag_color = saturate(tex_color + vert_color);
+//    frag_color.a = input.rgba.a * tex_color.a; // Preserve the incoming alpha values for transparencies
+
+//    return frag_color;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
