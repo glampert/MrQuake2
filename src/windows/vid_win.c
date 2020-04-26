@@ -241,6 +241,28 @@ static void VID_LoadRefreshDLL(const char * dll_name)
 
 /*
 ==================
+VID_CmdRestart
+==================
+*/
+static void VID_CmdRestart(void)
+{
+    // "vid_ref D3D11; vid_restart"
+
+    winquake.vid_is_restarting = true;
+    VID_Shutdown();
+    VID_Init();
+    winquake.vid_is_restarting = false;
+
+    // Reload the level we had before.
+    cvar_t * mapname = Cvar_Get("mapname", "", 0);
+    if (mapname && mapname->string[0] != '\0')
+    {
+        Cbuf_AddText(va("killserver; map %s\n", mapname->string));
+    }
+}
+
+/*
+==================
 VID_Init
 ==================
 */
@@ -257,6 +279,8 @@ void VID_Init(void)
     char dll_name[256];
     Com_sprintf(dll_name, sizeof(dll_name), "Ref%s.dll", vid_ref->string);
     VID_LoadRefreshDLL(dll_name);
+
+    Cmd_AddCommand("vid_restart", &VID_CmdRestart);
 }
 
 /*
@@ -266,10 +290,13 @@ VID_Shutdown
 */
 void VID_Shutdown(void)
 {
+    Cmd_RemoveCommand("vid_restart");
+
     if (re.Shutdown)
     {
         re.Shutdown();
     }
+
     VID_UnloadRefreshDLL();
 }
 

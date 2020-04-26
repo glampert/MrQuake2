@@ -5,7 +5,7 @@
 #pragma once
 
 #include "reflibs/shared/RefShared.hpp"
-#include "reflibs/shared/OSWindow.hpp"
+#include "reflibs/shared/Win32Window.hpp"
 
 #include <dxgi1_6.h>
 #include <d3d12.h>
@@ -127,7 +127,7 @@ protected:
 ===============================================================================
 */
 class RenderWindow final
-    : public OSWindow
+    : public Win32Window
     , public DeviceData
     , public SwapChainData
     , public RenderTargetData

@@ -43,6 +43,7 @@ typedef struct
     qboolean  active_app;
     qboolean  minimized;
     qboolean  alttab_disabled;
+    qboolean  vid_is_restarting; // vid_restart command in progress?
 
     // Program command line, unix style
     int argc;

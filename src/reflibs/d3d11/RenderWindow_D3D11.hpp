@@ -5,7 +5,7 @@
 #pragma once
 
 #include "reflibs/shared/RefShared.hpp"
-#include "reflibs/shared/OSWindow.hpp"
+#include "reflibs/shared/Win32Window.hpp"
 
 #include <dxgi.h>
 #include <d3d11.h>
@@ -27,7 +27,7 @@ constexpr uint32_t kNumFrameBuffers = 2;
 ===============================================================================
 */
 class RenderWindow final
-    : public OSWindow
+    : public Win32Window
 {
 public:
 

@@ -48,7 +48,7 @@ void Renderer::Init(HINSTANCE hinst, WNDPROC wndproc, const int width, const int
     sm_state->m_window.Init("MrQuake2 (D3D11)", hinst, wndproc, width, height, fullscreen, debug_validation);
 
     // 2D sprite/UI batch setup
-    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].Init(6 * 5000); // 6 verts per quad (expand to 2 triangles each)
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].Init(6 * 6000); // 6 verts per quad (expand to 2 triangles each)
     sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].Init(6 * 128);
 
     // Initialize the stores/caches
@@ -95,7 +95,7 @@ void Renderer::CreateRSObjects()
 
 void Renderer::LoadShaders()
 {
-    GameInterface::Printf("CWD......: %s", OSWindow::CurrentWorkingDir().c_str());
+    GameInterface::Printf("CWD......: %s", Win32Window::CurrentWorkingDir().c_str());
     GameInterface::Printf("GameDir..: %s", GameInterface::FS::GameDir());
 
     // UI/2D sprites:
@@ -362,8 +362,8 @@ void Renderer::Flush2D()
     {
         ConstantBufferDataUIVS cbuffer_data_ui;
         cbuffer_data_ui.screen_dimensions = kFloat4Zero; // Set unused elements to zero
-        cbuffer_data_ui.screen_dimensions.x = static_cast<float>(sm_state->m_window.width);
-        cbuffer_data_ui.screen_dimensions.y = static_cast<float>(sm_state->m_window.height);
+        cbuffer_data_ui.screen_dimensions.x = static_cast<float>(Width());
+        cbuffer_data_ui.screen_dimensions.y = static_cast<float>(Height());
         DeviceContext()->UpdateSubresource(sm_state->m_cbuffer_ui_sprites.Get(), 0, nullptr, &cbuffer_data_ui, 0, 0);
     }
 

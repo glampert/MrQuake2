@@ -52,7 +52,7 @@ void Renderer::Init(HINSTANCE hinst, WNDPROC wndproc, const int width, const int
     sm_state->m_srv_descriptor_heap.Init(Device(), TextureStore::kTexturePoolSize);
 
     // 2D sprite/UI batch setup
-    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].Init(Device(), 6 * 5000); // 6 verts per quad (expand to 2 triangles each)
+    sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].Init(Device(), 6 * 6000); // 6 verts per quad (expand to 2 triangles each)
     sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawPics)].Init(Device(), 6 * 128);
 
     // Initialize the stores/caches
@@ -76,6 +76,7 @@ void Renderer::Shutdown()
     GameInterface::Printf("D3D12 Renderer shutting down.");
 
     const bool debug_check_live_objects = DebugValidation();
+    sm_state->m_window.FullGpuSynch();
 
     DeleteObject(sm_state, MemTag::kRenderer);
     sm_state = nullptr;
@@ -95,7 +96,7 @@ void Renderer::Shutdown()
 
 void Renderer::LoadShaders()
 {
-    GameInterface::Printf("CWD......: %s", OSWindow::CurrentWorkingDir().c_str());
+    GameInterface::Printf("CWD......: %s", Win32Window::CurrentWorkingDir().c_str());
     GameInterface::Printf("GameDir..: %s", GameInterface::FS::GameDir());
 
     // UI/2D sprites:
@@ -333,8 +334,35 @@ void Renderer::LoadShaders()
 
         sm_state->m_pipeline_state_draw3d.CreatePso(Device(), pso_desc);
 
-        //TODO: switch to cbuffer
-        //sm_state->m_cbuffer_geometry.Init(Device(), sizeof(GeometryCommonShaderConstants));
+        // Same as above but enable alpha blending for translucencies
+        {
+            D3D12_BLEND_DESC & desc = pso_desc.BlendState;
+            desc.AlphaToCoverageEnable = false;
+            desc.RenderTarget[0].BlendEnable = true;
+            desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+            desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+            desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+            desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+            desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+            desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+            desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+        }
+        sm_state->m_pipeline_state_translucent.CreatePso(Device(), pso_desc);
+
+        // Same as above but without z-writes
+        {
+            D3D12_DEPTH_STENCIL_DESC & desc = pso_desc.DepthStencilState;
+            desc.DepthEnable = true;
+            desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+            desc.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+            desc.StencilEnable = false;
+            desc.FrontFace.StencilFailOp = desc.FrontFace.StencilDepthFailOp = desc.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+            desc.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+            desc.BackFace = desc.FrontFace;
+        }
+        sm_state->m_pipeline_state_translucent_no_zwrite.CreatePso(Device(), pso_desc);
+
+        sm_state->m_const_buffers.Init(Device(), sizeof(GeometryCommonShaderConstants));
     }
 
     GameInterface::Printf("Shaders loaded successfully.");
@@ -348,19 +376,18 @@ void Renderer::RenderView(const refdef_s & view_def)
 
     ViewDrawStateImpl::FrameData frame_data{ sm_state->m_tex_store, *sm_state->m_mdl_store.WorldModel(), view_def };
 
-    // Enter 3D mode (depth test ON)
-    //EnableDepthTest();
-
     // Set up camera/view (fills frame_data)
     sm_state->m_view_draw_state.RenderViewSetup(frame_data);
 
     // Update the constant buffers for this frame
-    //RenderViewUpdateCBuffers(frame_data);
+    RenderViewUpdateCBuffers(frame_data);
 
     // Set the camera/world-view:
     FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
     const auto vp_mtx = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
     sm_state->m_view_draw_state.SetViewProjMatrix(vp_mtx);
+
+    ID3D12GraphicsCommandList * gfx_cmd_list = sm_state->m_window.gfx_command_list.Get();
 
     //
     // Render solid geometries (world and entities)
@@ -380,45 +407,37 @@ void Renderer::RenderView(const refdef_s & view_def)
     sm_state->m_view_draw_state.RenderSolidEntities(frame_data);
     PopEvent(); // "RenderSolidEntities"
 
-    sm_state->m_view_draw_state.EndRenderPass(sm_state->m_window.gfx_command_list.Get(), sm_state->m_pipeline_state_draw3d.pso.Get(), sm_state->m_shader_geometry);
+    sm_state->m_view_draw_state.EndRenderPass(gfx_cmd_list, sm_state->m_pipeline_state_draw3d.pso.Get(), sm_state->m_shader_geometry);
 
     //
     // Transparencies/alpha pass
     //
 
-	/*
     // Color Blend ON
-    EnableAlphaBlending();
-
+    const float blend_factor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    gfx_cmd_list->OMSetBlendFactor(blend_factor);
     PushEvent(L"RenderTranslucentSurfaces");
     sm_state->m_view_draw_state.BeginRenderPass();
     sm_state->m_view_draw_state.RenderTranslucentSurfaces(frame_data);
-    sm_state->m_view_draw_state.EndRenderPass();
+    sm_state->m_view_draw_state.EndRenderPass(gfx_cmd_list, sm_state->m_pipeline_state_translucent.pso.Get(), sm_state->m_shader_geometry);
     PopEvent(); // "RenderTranslucentSurfaces"
 
+    // Disable z writes in case they stack up
     PushEvent(L"RenderTranslucentEntities");
-    DisableDepthWrites(); // Disable z writes in case they stack up
     sm_state->m_view_draw_state.BeginRenderPass();
     sm_state->m_view_draw_state.RenderTranslucentEntities(frame_data);
-    sm_state->m_view_draw_state.EndRenderPass();
-    EnableDepthWrites();
+    sm_state->m_view_draw_state.EndRenderPass(gfx_cmd_list, sm_state->m_pipeline_state_translucent_no_zwrite.pso.Get(), sm_state->m_shader_geometry);
     PopEvent(); // "RenderTranslucentEntities"
-
-    // Color Blend OFF
-    DisableAlphaBlending();
-
-    // Back to 2D rendering mode (depth test OFF)
-    DisableDepthTest();
-	*/
 
     PopEvent(); // "Renderer::RenderView"
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
+//TODO: switch view shaders to use the CBuffer.
 void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData & frame_data)
 {
-	GeometryCommonShaderConstants cbuffer_data = {};
+    GeometryCommonShaderConstants cbuffer_data = {};
 
     FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
     cbuffer_data.vs.mvp_matrix = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
@@ -439,7 +458,7 @@ void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData & fra
         cbuffer_data.ps.vertex_color_scaling  = kFloat4Zero;
     }
 
-    sm_state->m_cbuffer_geometry.WriteStruct(cbuffer_data);
+    sm_state->m_const_buffers.GetCurrent().WriteStruct(cbuffer_data);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -528,9 +547,6 @@ void Renderer::EndFrame()
 
         // 2D text
         sm_state->m_sprite_batches[size_t(SpriteBatchIdx::kDrawChar)].EndFrame(gfx_cmd_list, sm_state->m_pipeline_state_draw2d.pso.Get(), static_cast<const TextureImageImpl *>(sm_state->m_tex_store.tex_conchars));
-
-        const float blend_factor_off[4] = { 1.f, 1.f, 1.f, 1.f };
-        gfx_cmd_list->OMSetBlendFactor(blend_factor_off);
     }
     // 2D end
 
@@ -562,15 +578,16 @@ void Renderer::EndFrame()
 
     PopEvent(); // "Renderer::BeginFrame"
 
+    sm_state->m_const_buffers.MoveToNextFrame();
     sm_state->m_window.MoveToNextFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Renderer::UploadTexture(const TextureImage * const tex)
+void Renderer::UploadTexture(const TextureImage * tex)
 {
     FASTASSERT(tex != nullptr);
-    // TODO
+    sm_state->m_upload_ctx.UploadTextureSync(*static_cast<const TextureImageImpl *>(tex), Device());
 }
 
 ///////////////////////////////////////////////////////////////////////////////

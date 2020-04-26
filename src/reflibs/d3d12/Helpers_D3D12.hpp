@@ -139,6 +139,34 @@ struct ConstantBuffer final : Buffer
     }
 };
 
+class ScratchConstantBuffers final
+{
+    uint32_t m_current_buffer = 0;
+    ConstantBuffer m_cbuffers[kNumFrameBuffers];
+
+public:
+
+    void Init(ID3D12Device5 * device, const uint32_t buffer_size_in_bytes)
+    {
+        for (ConstantBuffer & cbuf : m_cbuffers)
+        {
+            const bool buffer_ok = cbuf.Init(device, buffer_size_in_bytes);
+            FASTASSERT(buffer_ok);
+        }
+    }
+
+    ConstantBuffer & GetCurrent()
+    {
+        FASTASSERT(m_current_buffer < ArrayLength(m_cbuffers));
+        return m_cbuffers[m_current_buffer];
+    }
+
+    void MoveToNextFrame()
+    {
+        m_current_buffer = (m_current_buffer + 1) % kNumFrameBuffers;
+    }
+};
+
 /*
 class GraphicsCmdList final
 {
@@ -220,6 +248,7 @@ public:
         heap_desc.Flags                      = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
         Dx12Check(device->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&m_srv_descriptor_heap)));
+        Dx12SetDebugName(m_srv_descriptor_heap, L"SRVDescriptorHeap");
 
         m_srv_cpu_heap_start   = m_srv_descriptor_heap->GetCPUDescriptorHandleForHeapStart();
         m_srv_gpu_heap_start   = m_srv_descriptor_heap->GetGPUDescriptorHandleForHeapStart();

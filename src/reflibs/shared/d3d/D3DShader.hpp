@@ -49,7 +49,7 @@ namespace D3DShader
         if (FAILED(hr))
         {
             auto * details = (error_blob ? static_cast<const char *>(error_blob->GetBufferPointer()) : "<no info>");
-            GameInterface::Errorf("Failed to compile shader: %s.\n\nError info: %s", OSWindow::ErrorToString(hr).c_str(), details);
+            GameInterface::Errorf("Failed to compile shader: %s.\n\nError info: %s", Win32Window::ErrorToString(hr).c_str(), details);
         }
     }
 

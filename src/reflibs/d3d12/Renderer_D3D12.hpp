@@ -42,10 +42,10 @@ public:
     static ID3D12CommandQueue   * CmdQueue()                { return sm_state->m_window.command_queue.Get();  }
     static DescriptorHeap       * SrvDescriptorHeap()       { return &sm_state->m_srv_descriptor_heap;        }
     static UploadContext        * UploadCtx()               { return &sm_state->m_upload_ctx;                 }
-    static bool                   DebugValidation()         { return sm_state->m_window.debug_validation;     }
+    static bool                   DebugValidation()         { return sm_state->m_window.DebugValidation();    }
     static bool                   FrameStarted()            { return sm_state->m_frame_started;               }
-    static int                    Width()                   { return sm_state->m_window.width;                }
-    static int                    Height()                  { return sm_state->m_window.height;               }
+    static int                    Width()                   { return sm_state->m_window.Width();              }
+    static int                    Height()                  { return sm_state->m_window.Height();             }
 
     static void Init(HINSTANCE hinst, WNDPROC wndproc, int width, int height, bool fullscreen, bool debug_validation);
     static void Shutdown();
@@ -108,11 +108,13 @@ private:
         // Shader programs / render states:
         ShaderProgram     m_shader_ui_sprites;
         ShaderProgram     m_shader_geometry;
-        ConstantBuffer    m_cbuffer_geometry;
         PipelineState     m_pipeline_state_draw2d;
         PipelineState     m_pipeline_state_draw3d;
+        PipelineState     m_pipeline_state_translucent;
+        PipelineState     m_pipeline_state_translucent_no_zwrite;
         UploadContext     m_upload_ctx;
         DescriptorHeap    m_srv_descriptor_heap;
+        ScratchConstantBuffers m_const_buffers;
 
         // Cached Cvars:
         CvarWrapper       m_disable_texturing;

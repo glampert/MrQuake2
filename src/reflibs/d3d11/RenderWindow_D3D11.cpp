@@ -19,7 +19,7 @@ void RenderWindow::InitRenderWindow()
 {
     // If the project is in a debug build, enable debugging via SDK Layers with this flag.
     UINT create_device_flags = 0;
-    if (debug_validation)
+    if (m_debug_validation)
     {
         create_device_flags |= D3D11_CREATE_DEVICE_DEBUG;
         GameInterface::Printf("Creating D3D11 Device with debug validation...");
@@ -44,16 +44,16 @@ void RenderWindow::InitRenderWindow()
 
     DXGI_SWAP_CHAIN_DESC sd               = {};
     sd.BufferCount                        = kNumFrameBuffers;
-    sd.BufferDesc.Width                   = width;
-    sd.BufferDesc.Height                  = height;
+    sd.BufferDesc.Width                   = m_width;
+    sd.BufferDesc.Height                  = m_height;
     sd.BufferDesc.Format                  = DXGI_FORMAT_R8G8B8A8_UNORM;
     sd.BufferDesc.RefreshRate.Numerator   = 60;
     sd.BufferDesc.RefreshRate.Denominator = 1;
     sd.BufferUsage                        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.OutputWindow                       = hwnd;
+    sd.OutputWindow                       = m_hWnd;
     sd.SampleDesc.Count                   = 1;
     sd.SampleDesc.Quality                 = 0;
-    sd.Windowed                           = !fullscreen;
+    sd.Windowed                           = !m_fullscreen;
 
     HRESULT hr;
     D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL_11_0;
@@ -113,8 +113,8 @@ void RenderWindow::InitRenderWindow()
 
     // Create depth stencil texture:
     D3D11_TEXTURE2D_DESC desc_depth = {};
-    desc_depth.Width                = width;
-    desc_depth.Height               = height;
+    desc_depth.Width                = m_width;
+    desc_depth.Height               = m_height;
     desc_depth.MipLevels            = 1;
     desc_depth.ArraySize            = 1;
     desc_depth.Format               = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -145,8 +145,8 @@ void RenderWindow::InitRenderWindow()
 
     // Setup a default viewport:
     D3D11_VIEWPORT vp;
-    vp.Width    = static_cast<float>(width);
-    vp.Height   = static_cast<float>(height);
+    vp.Width    = static_cast<float>(m_width);
+    vp.Height   = static_cast<float>(m_height);
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
     vp.TopLeftX = 0;

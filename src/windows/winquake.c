@@ -242,13 +242,17 @@ static LRESULT CALLBACK WIN_MainWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
         // closing the window will quit the game!
         if (winquake.hwnd && winquake.hinstance)
         {
-            Sys_DebugOutput("WM_DESTROY received, shutting down...\n");
             winquake.active_app = false;
-            winquake.hinstance = NULL;
             winquake.hwnd = NULL;
-            if (!com_is_quitting)
+            if (!com_is_quitting && !winquake.vid_is_restarting)
             {
+                Sys_DebugOutput("WM_DESTROY received, shutting down...\n");
+                winquake.hinstance = NULL;
                 Com_Quit();
+            }
+            else if (winquake.vid_is_restarting)
+            {
+                Sys_DebugOutput("WM_DESTROY received from a vid_restart...\n");
             }
         }
         return 0;

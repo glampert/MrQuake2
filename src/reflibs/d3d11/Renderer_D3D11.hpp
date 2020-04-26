@@ -40,10 +40,10 @@ public:
     static ID3D11Device        * Device()                  { return sm_state->m_window.device.Get();         }
     static ID3D11DeviceContext * DeviceContext()           { return sm_state->m_window.device_context.Get(); }
     static IDXGISwapChain      * SwapChain()               { return sm_state->m_window.swap_chain.Get();     }
-    static bool                  DebugValidation()         { return sm_state->m_window.debug_validation;     }
+    static bool                  DebugValidation()         { return sm_state->m_window.DebugValidation();    }
     static bool                  FrameStarted()            { return sm_state->m_frame_started;               }
-    static int                   Width()                   { return sm_state->m_window.width;                }
-    static int                   Height()                  { return sm_state->m_window.height;               }
+    static int                   Width()                   { return sm_state->m_window.Width();              }
+    static int                   Height()                  { return sm_state->m_window.Height();             }
 
     static void Init(HINSTANCE hinst, WNDPROC wndproc, int width, int height, bool fullscreen, bool debug_validation);
     static void Shutdown();

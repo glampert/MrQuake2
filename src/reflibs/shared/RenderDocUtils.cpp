@@ -5,7 +5,7 @@
 
 #include "RenderDocUtils.hpp"
 #include "RefShared.hpp"
-#include "OSWindow.hpp"
+#include "Win32Window.hpp"
 
 // RenderDoc function pointers and structures:
 #include "external/renderdoc/renderdoc_app.h"
@@ -72,7 +72,7 @@ bool Initialize()
     g_renderdoc_api->SetCaptureKeys(capture_keys, int(ArrayLength(capture_keys)));
 
     // Path where captures will be saved (created if needed)
-    std::string capture_dir = OSWindow::CurrentWorkingDir();
+    std::string capture_dir = Win32Window::CurrentWorkingDir();
     capture_dir += g_captures_path;
     g_renderdoc_api->SetCaptureFilePathTemplate(capture_dir.c_str());
 

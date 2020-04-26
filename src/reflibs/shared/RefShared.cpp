@@ -4,7 +4,7 @@
 //
 
 #include "RefShared.hpp"
-#include "OSWindow.hpp"
+#include "Win32Window.hpp"
 #include "Memory.hpp"
 
 #include <cstdarg>

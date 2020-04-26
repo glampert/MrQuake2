@@ -24,7 +24,7 @@
     <ClCompile Include="..\..\src\reflibs\shared\MiniImBatch.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\ModelLoad.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\ModelStore.cpp" />
-    <ClCompile Include="..\..\src\reflibs\shared\OSWindow.cpp" />
+    <ClCompile Include="..\..\src\reflibs\shared\Win32Window.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\Palette.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\RefShared.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\RenderDocUtils.cpp" />
@@ -42,7 +42,7 @@
     <ClInclude Include="..\..\src\reflibs\shared\MiniImBatch.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\ModelStore.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\ModelStructs.hpp" />
-    <ClInclude Include="..\..\src\reflibs\shared\OSWindow.hpp" />
+    <ClInclude Include="..\..\src\reflibs\shared\Win32Window.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\Pool.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\RefShared.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\RenderDocUtils.hpp" />

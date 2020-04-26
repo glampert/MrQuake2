@@ -1,9 +1,9 @@
 //
-// OSWindow.cpp
+// Win32Window.cpp
 //  Application window creation and management.
 //
 
-#include "OSWindow.hpp"
+#include "Win32Window.hpp"
 #include "RefShared.hpp"
 
 #include <comdef.h>
@@ -13,33 +13,39 @@ namespace MrQ2
 {
 
 ///////////////////////////////////////////////////////////////////////////////
-// OSWindow
+// Win32Window
 ///////////////////////////////////////////////////////////////////////////////
 
-void OSWindow::Init(const char * name, HINSTANCE hInst, WNDPROC wndProc,
-                    const int w, const int h, const bool fs, const bool debug)
+void Win32Window::Init(const char * name, HINSTANCE hInst, WNDPROC wndProc,
+                       const int w, const int h, const bool fullscreen, const bool debug)
 {
-    this->hinst            = hInst;
-    this->wndproc          = wndProc;
-    this->window_name      = name;
-    this->width            = w;
-    this->height           = h;
-    this->fullscreen       = fs;
-    this->debug_validation = debug;
+    FASTASSERT(hInst   != nullptr);
+    FASTASSERT(wndProc != nullptr);
+
+    char title[256] = {};
+    sprintf_s(title, "%s %ix%i", name, w, h);
+
+    m_hInst            = hInst;
+    m_wndproc          = wndProc;
+    m_window_name      = title;
+    m_width            = w;
+    m_height           = h;
+    m_fullscreen       = fullscreen;
+    m_debug_validation = debug;
 
     Create();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void OSWindow::Create()
+void Win32Window::Create()
 {
     WNDCLASSEX wcex    = {0};
     wcex.cbSize        = sizeof(WNDCLASSEX);
     wcex.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-    wcex.lpfnWndProc   = wndproc;
-    wcex.hInstance     = hinst;
-    wcex.lpszClassName = window_name.c_str();
+    wcex.lpfnWndProc   = m_wndproc;
+    wcex.hInstance     = m_hInst;
+    wcex.lpszClassName = m_window_name.c_str();
     wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
     wcex.hIcon         = LoadIcon(nullptr, IDI_APPLICATION);
     wcex.hIconSm       = LoadIcon(nullptr, IDI_APPLICATION);
@@ -48,11 +54,11 @@ void OSWindow::Create()
     const auto result = RegisterClassEx(&wcex);
     if (!result)
     {
-        GameInterface::Errorf("RegisterClassEx failed with error code %#x", unsigned(result));
+        GameInterface::Errorf("RegisterClassEx failed with error code: %#x", unsigned(GetLastError()));
     }
 
     unsigned exstyle, stylebits;
-    if (fullscreen)
+    if (m_fullscreen)
     {
         exstyle   = WS_EX_TOPMOST;
         stylebits = WS_POPUP | WS_VISIBLE;
@@ -66,8 +72,8 @@ void OSWindow::Create()
     RECT r;
     r.left   = 0;
     r.top    = 0;
-    r.right  = width;
-    r.bottom = height;
+    r.right  = m_width;
+    r.bottom = m_height;
     AdjustWindowRect(&r, stylebits, FALSE);
 
     int x = 0, y = 0;
@@ -75,7 +81,7 @@ void OSWindow::Create()
     const int h = int(r.bottom - r.top);
     GameInterface::Printf("Creating window %ix%i ...", w, h);
 
-    if (!fullscreen)
+    if (!m_fullscreen)
     {
         auto vid_xpos = GameInterface::Cvar::Get("vid_xpos", "0", 0);
         auto vid_ypos = GameInterface::Cvar::Get("vid_ypos", "0", 0);
@@ -83,53 +89,59 @@ void OSWindow::Create()
         y = vid_ypos.AsInt();
     }
 
-    hwnd = CreateWindowEx(exstyle, window_name.c_str(), window_name.c_str(),
-                          stylebits, x, y, w, h, nullptr, nullptr, hinst, nullptr);
-    if (!hwnd)
+    m_hWnd = CreateWindowEx(exstyle, m_window_name.c_str(), m_window_name.c_str(),
+                          stylebits, x, y, w, h, nullptr, nullptr, m_hInst, nullptr);
+    if (!m_hWnd)
     {
         GameInterface::Errorf("Couldn't create application window!");
     }
 
-    ShowWindow(hwnd, SW_SHOW);
-    UpdateWindow(hwnd);
+    ShowWindow(m_hWnd, SW_SHOW);
+    UpdateWindow(m_hWnd);
 
     InitRenderWindow();
 
-    SetForegroundWindow(hwnd);
-    SetFocus(hwnd);
+    SetForegroundWindow(m_hWnd);
+    SetFocus(m_hWnd);
 
-    GameInterface::Video::NewWindow(width, height);
+    GameInterface::Video::NewWindow(m_width, m_height);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void OSWindow::Destroy()
+void Win32Window::Destroy()
 {
-    if (hwnd != nullptr)
+    if (m_hWnd != nullptr)
     {
-        DestroyWindow(hwnd);
-        hwnd = nullptr;
+        if (!DestroyWindow(m_hWnd))
+        {
+            GameInterface::Printf("WARNING: DestroyWindow failed with error code: %#x", unsigned(GetLastError()));
+        }
+        m_hWnd = nullptr;
     }
-    if (hinst != nullptr)
+    if (m_hInst != nullptr)
     {
-        UnregisterClass(window_name.c_str(), hinst);
-        hinst = nullptr;
+        if (!UnregisterClass(m_window_name.c_str(), m_hInst))
+        {
+            GameInterface::Printf("WARNING: UnregisterClass failed with error code: %#x", unsigned(GetLastError()));
+        }
+        m_hInst = nullptr;
     }
 
-    wndproc = nullptr;
-    window_name.clear();
+    m_wndproc = nullptr;
+    m_window_name.clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-OSWindow::~OSWindow()
+Win32Window::~Win32Window()
 {
     Destroy();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-std::string OSWindow::ErrorToString(HRESULT hr)
+std::string Win32Window::ErrorToString(HRESULT hr)
 {
     _com_error err(hr);
     const char * errmsg = err.ErrorMessage();
@@ -138,9 +150,9 @@ std::string OSWindow::ErrorToString(HRESULT hr)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-std::string OSWindow::CurrentWorkingDir()
+std::string Win32Window::CurrentWorkingDir()
 {
-    char cwd[512] = {0};
+    char cwd[512] = {};
     _getcwd(cwd, sizeof(cwd));
     return cwd;
 }

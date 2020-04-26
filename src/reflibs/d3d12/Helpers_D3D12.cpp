@@ -272,7 +272,6 @@ void SpriteBatch::BeginFrame()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-//void SpriteBatch::EndFrame(GraphicsContext & ctx, const ShaderProgram & shader, const Texture * opt_tex_atlas)
 void SpriteBatch::EndFrame(ID3D12GraphicsCommandList * gfx_cmd_list, ID3D12PipelineState * pipeline_state, const Texture * opt_tex_atlas)
 {
     const auto draw_buf = m_buffers.End();

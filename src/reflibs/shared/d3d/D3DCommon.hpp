@@ -364,6 +364,7 @@ struct D3DCommon
         FASTASSERT(RB::FrameStarted());
 
         // TODO - Only used when letterboxing the screen for SW rendering, so not required ???
+        // ACTUALLY you can control the letterboxing with the -,+ keys
         GameInterface::Errorf("DrawTileClear() not implemented!");
     }
 

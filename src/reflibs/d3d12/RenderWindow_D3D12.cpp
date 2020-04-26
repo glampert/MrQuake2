@@ -280,6 +280,7 @@ void RenderTargetData::InitRTVs(ID3D12Device5 * device, IDXGISwapChain4 * swap_c
         heap_desc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         heap_desc.NodeMask       = 1;
         Dx12Check(device->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&rtv_descriptor_heap)));
+        Dx12SetDebugName(rtv_descriptor_heap, L"RTVDescriptorHeap");
 
         const UINT rtv_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
         D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle = rtv_descriptor_heap->GetCPUDescriptorHandleForHeapStart();
@@ -318,6 +319,7 @@ void RenderTargetData::InitRTVs(ID3D12Device5 * device, IDXGISwapChain4 * swap_c
         heap_desc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         heap_desc.NodeMask       = 1;
         Dx12Check(device->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&dsv_descriptor_heap)));
+        Dx12SetDebugName(dsv_descriptor_heap, L"DSVDescriptorHeap");
 
         depth_render_target_descriptor = dsv_descriptor_heap->GetCPUDescriptorHandleForHeapStart();
 
@@ -359,8 +361,8 @@ void RenderWindow::InitRenderWindow()
 {
     GameInterface::Printf("D3D12 Setting up the RenderWindow...");
 
-    DeviceData::InitAdapterAndDevice(debug_validation);
-    SwapChainData::InitSwapChain(factory.Get(), device.Get(), hwnd, fullscreen, width, height);
+    DeviceData::InitAdapterAndDevice(m_debug_validation);
+    SwapChainData::InitSwapChain(factory.Get(), device.Get(), m_hWnd, m_fullscreen, m_width, m_height);
     RenderTargetData::InitRTVs(device.Get(), swap_chain.Get());
 
     GameInterface::Printf("D3D12 RenderWindow initialized.");

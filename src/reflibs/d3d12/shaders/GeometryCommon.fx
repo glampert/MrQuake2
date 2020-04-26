@@ -48,9 +48,12 @@ SamplerState diffuse_sampler : register(s0);
 
 float4 PS_main(VertexOutput input) : SV_TARGET
 {
-	float4 tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
-	float3 c = tex_color.xyz;
-	return float4(c, 1.0f);
+    float4 tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
+    float4 c = tex_color;
+    c.a = input.rgba.a * tex_color.a;
+    return c;
+
+// debug code disabled for now.
 
 //    float4 tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
 //    tex_color *= texture_color_scaling;
