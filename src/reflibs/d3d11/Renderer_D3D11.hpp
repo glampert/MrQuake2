@@ -28,6 +28,15 @@ class Renderer final
 {
 public:
 
+    enum class SpriteBatchIdx
+    {
+        kDrawChar, // Only used to draw console chars
+        kDrawPics, // Used by DrawPic, DrawStretchPic, etc
+
+        // Number of items in the enum - not a valid index.
+        kCount,
+    };
+
     static const DirectX::XMFLOAT4A kClearColor; // Color used to wipe the screen at the start of a frame
     static const DirectX::XMFLOAT4A kFloat4Zero; // All zeros
     static const DirectX::XMFLOAT4A kFloat4One;  // All ones

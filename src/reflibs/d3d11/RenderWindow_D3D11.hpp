@@ -4,7 +4,7 @@
 //
 #pragma once
 
-#include "reflibs/shared/RefShared.hpp"
+#include "reflibs/shared/Common.hpp"
 #include "reflibs/shared/Win32Window.hpp"
 
 #include <dxgi.h>
@@ -48,7 +48,7 @@ public:
 
 private:
 
-    void InitRenderWindow() override;
+	void InitRenderWindow(); //override;
 };
 
 } // D3D11

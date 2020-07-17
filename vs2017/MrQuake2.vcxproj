@@ -290,6 +290,10 @@
     <ClCompile Include="..\src\windows\vid_win.c" />
     <ClCompile Include="..\src\windows\winquake.c" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\data\baseq2\config.cfg" />
+    <None Include="..\data\baseq2\default.cfg" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

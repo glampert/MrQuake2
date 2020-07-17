@@ -12,6 +12,9 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{68a0b434-8e8f-4281-b868-4103af9a11f9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Dx12">
+      <UniqueIdentifier>{e36ac8a1-da97-45fd-a22f-eb830e3ddfcf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\reflibs\d3d12\RefAPI_D3D12.cpp">
@@ -29,6 +32,24 @@
     <ClCompile Include="..\..\src\reflibs\d3d12\Impl_D3D12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\d3d12\RenderInterfaceD3D12.cpp">
+      <Filter>Dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\d3d12\DLLInterfaceD3D12.cpp">
+      <Filter>Dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\d3d12\DeviceD3D12.cpp">
+      <Filter>Dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\d3d12\SwapChainD3D12.cpp">
+      <Filter>Dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\d3d12\DescriptorHeapD3D12.cpp">
+      <Filter>Dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\d3d12\BufferD3D12.cpp">
+      <Filter>Dx12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\reflibs\d3d12\Renderer_D3D12.hpp">
@@ -42,6 +63,39 @@
     </ClInclude>
     <ClInclude Include="..\..\src\reflibs\d3d12\Impl_D3D12.hpp">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d12\RenderInterfaceD3D12.hpp">
+      <Filter>Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d12\BufferD3D12.hpp">
+      <Filter>Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d12\GraphicsContextD3D12.hpp">
+      <Filter>Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d12\PipelineStateD3D12.hpp">
+      <Filter>Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d12\ShaderProgramD3D12.hpp">
+      <Filter>Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d12\TextureD3D12.hpp">
+      <Filter>Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d12\UploadContextD3D12.hpp">
+      <Filter>Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d12\SwapChainD3D12.hpp">
+      <Filter>Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d12\DeviceD3D12.hpp">
+      <Filter>Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d12\UtilsD3D12.hpp">
+      <Filter>Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\d3d12\DescriptorHeapD3D12.hpp">
+      <Filter>Dx12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

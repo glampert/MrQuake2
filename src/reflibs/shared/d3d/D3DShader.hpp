@@ -55,20 +55,20 @@ namespace D3DShader
 
     inline void LoadFromFxFile(const wchar_t * filename, const Info & info, Blobs * out_blobs)
     {
-        FASTASSERT(filename != nullptr && filename[0] != L'\0');
-        FASTASSERT(out_blobs != nullptr);
+        MRQ2_ASSERT(filename != nullptr && filename[0] != L'\0');
+        MRQ2_ASSERT(out_blobs != nullptr);
 
-        FASTASSERT(info.vs_entry != nullptr && info.vs_entry[0] != '\0');
-        FASTASSERT(info.vs_model != nullptr && info.vs_model[0] != '\0');
+        MRQ2_ASSERT(info.vs_entry != nullptr && info.vs_entry[0] != '\0');
+        MRQ2_ASSERT(info.vs_model != nullptr && info.vs_model[0] != '\0');
 
-        FASTASSERT(info.ps_entry != nullptr && info.ps_entry[0] != '\0');
-        FASTASSERT(info.ps_model != nullptr && info.ps_model[0] != '\0');
+        MRQ2_ASSERT(info.ps_entry != nullptr && info.ps_entry[0] != '\0');
+        MRQ2_ASSERT(info.ps_model != nullptr && info.ps_model[0] != '\0');
 
         CompileShaderFromFile(filename, info.vs_entry, info.vs_model, info.debug, out_blobs->vs_blob.GetAddressOf());
-        FASTASSERT(out_blobs->vs_blob != nullptr);
+        MRQ2_ASSERT(out_blobs->vs_blob != nullptr);
 
         CompileShaderFromFile(filename, info.ps_entry, info.ps_model, info.debug, out_blobs->ps_blob.GetAddressOf());
-        FASTASSERT(out_blobs->ps_blob != nullptr);
+        MRQ2_ASSERT(out_blobs->ps_blob != nullptr);
     }
 
 } // D3DShader

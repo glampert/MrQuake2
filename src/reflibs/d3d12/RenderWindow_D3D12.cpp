@@ -4,7 +4,7 @@
 //
 
 #include "RenderWindow_D3D12.hpp"
-#include "reflibs/shared/RefShared.hpp"
+#include "reflibs/shared/Common.hpp"
 
 namespace MrQ2
 {
@@ -48,7 +48,7 @@ void DeviceData::InitAdapterAndDevice(const bool debug_validation)
         ComPtr<ID3D12Device5> temp_device;
         DXGI_ADAPTER_DESC1 dapter_desc = {};
 
-        FASTASSERT(temp_adapter != nullptr);
+        MRQ2_ASSERT(temp_adapter != nullptr);
         temp_adapter->GetDesc1(&dapter_desc);
 
         // Remove software emulation
@@ -224,7 +224,7 @@ void SwapChainData::InitCmdList(ID3D12Device5 * device)
 void SwapChainData::MoveToNextFrame()
 {
     // Schedule a Signal command in the queue
-    FASTASSERT(frame_index < kNumFrameBuffers);
+    MRQ2_ASSERT(frame_index < kNumFrameBuffers);
     const uint64_t currentFenceValue = fence_values[frame_index];
     command_queue->Signal(fence.Get(), currentFenceValue);
 

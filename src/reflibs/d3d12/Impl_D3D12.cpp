@@ -59,8 +59,8 @@ void TextureImageImpl::InitD3DSpecific()
 
 void TextureImageImpl::InitFromScrap(const TextureImageImpl * const scrap_tex)
 {
-    FASTASSERT(scrap_tex != nullptr);
-    FASTASSERT(scrap_tex->from_scrap);
+    MRQ2_ASSERT(scrap_tex != nullptr);
+    MRQ2_ASSERT(scrap_tex->from_scrap);
 
     // Share the scrap texture resource(s)
     resource       = scrap_tex->resource;
@@ -187,8 +187,8 @@ void ViewDrawStateImpl::Init(const int max_verts)
 
 void ViewDrawStateImpl::BeginRenderPass()
 {
-    FASTASSERT(m_batch_open == false);
-    FASTASSERT(m_draw_cmds->empty());
+    MRQ2_ASSERT(m_batch_open == false);
+    MRQ2_ASSERT(m_draw_cmds->empty());
 
     m_buffers.Begin();
 }
@@ -210,7 +210,7 @@ static inline D3D_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D(const PrimitiveTopol
 
 void ViewDrawStateImpl::EndRenderPass(ID3D12GraphicsCommandList * gfx_cmd_list, ID3D12PipelineState * pipeline_state, ShaderProgram& shader_prog)
 {
-    FASTASSERT(m_batch_open == false);
+    MRQ2_ASSERT(m_batch_open == false);
 
     // Flush draw:
     const auto draw_buf = m_buffers.End();
@@ -272,8 +272,8 @@ void ViewDrawStateImpl::EndRenderPass(ID3D12GraphicsCommandList * gfx_cmd_list, 
 
 MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
 {
-    FASTASSERT(m_batch_open == false);
-    FASTASSERT_ALIGN16(args.model_matrix.floats);
+    MRQ2_ASSERT(m_batch_open == false);
+    MRQ2_ASSERT_ALIGN16(args.model_matrix.floats);
 
     m_current_draw_cmd.model_mtx  = DirectX::XMMATRIX{ args.model_matrix.floats };
     m_current_draw_cmd.texture    = args.optional_tex ? args.optional_tex : Renderer::TexStore()->tex_white2x2;
@@ -291,9 +291,9 @@ MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
 
 void ViewDrawStateImpl::EndBatch(MiniImBatch & batch)
 {
-    FASTASSERT(batch.IsValid());
-    FASTASSERT(m_batch_open == true);
-    FASTASSERT(m_current_draw_cmd.topology == batch.Topology());
+    MRQ2_ASSERT(batch.IsValid());
+    MRQ2_ASSERT(m_batch_open == true);
+    MRQ2_ASSERT(m_current_draw_cmd.topology == batch.Topology());
 
     m_current_draw_cmd.first_vert = m_buffers.CurrentPosition();
     m_current_draw_cmd.num_verts  = batch.UsedVerts();

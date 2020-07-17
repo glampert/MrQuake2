@@ -55,7 +55,7 @@ void ModelStore::DestroyAllLoadedModels()
 
 void ModelStore::BeginRegistration(const char * const map_name)
 {
-    FASTASSERT(map_name != nullptr && map_name[0] != '\0');
+    MRQ2_ASSERT(map_name != nullptr && map_name[0] != '\0');
 
     GameInterface::Printf("==== ModelStore::BeginRegistration '%s' ====", map_name);
     ++m_registration_num;
@@ -93,8 +93,8 @@ void ModelStore::EndRegistration()
 
 const ModelInstance * ModelStore::Find(const char * const name, const ModelType mt)
 {
-    FASTASSERT(name != nullptr && name[0] != '\0');
-    FASTASSERT(mt != ModelType::kCount);
+    MRQ2_ASSERT(name != nullptr && name[0] != '\0');
+    MRQ2_ASSERT(mt != ModelType::kCount);
 
     // Inline models are handled differently:
     if (name[0] == '*')
@@ -165,7 +165,7 @@ void ModelStore::LoadWorldModel(const char * const map_name)
         }
 
         auto erase_iter = std::find(m_models_cache.begin(), m_models_cache.end(), m_world_model);
-        FASTASSERT(erase_iter != m_models_cache.end());
+        MRQ2_ASSERT(erase_iter != m_models_cache.end());
         m_models_cache.erase(erase_iter);
 
         DestroyModel(m_world_model);
@@ -255,7 +255,7 @@ void ModelStore::ReferenceAllTextures(ModelInstance & mdl)
     case ModelType::kSprite :
         {
             auto * p_sprite = mdl.hunk.ViewBaseAs<dsprite_t>();
-            FASTASSERT(p_sprite != nullptr);
+            MRQ2_ASSERT(p_sprite != nullptr);
             for (int i = 0; i < p_sprite->numframes; ++i)
             {
                 mdl.data.skins[i] = m_tex_store.FindOrLoad(p_sprite->frames[i].name, TextureType::kSprite);
@@ -265,7 +265,7 @@ void ModelStore::ReferenceAllTextures(ModelInstance & mdl)
     case ModelType::kAliasMD2 :
         {
             auto * p_md2 = mdl.hunk.ViewBaseAs<dmdl_t>();
-            FASTASSERT(p_md2 != nullptr);
+            MRQ2_ASSERT(p_md2 != nullptr);
             for (int i = 0; i < p_md2->num_skins; ++i)
             {
                 auto * skin_name = reinterpret_cast<const char *>(p_md2) + p_md2->ofs_skins + (i * MAX_SKINNAME);

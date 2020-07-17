@@ -17,9 +17,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\reflibs\shared\RefShared.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\reflibs\shared\TextureStore.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -53,11 +50,11 @@
     <ClCompile Include="..\..\src\reflibs\shared\Win32Window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\reflibs\shared\Common.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\reflibs\shared\RefShared.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\reflibs\shared\TextureStore.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -101,6 +98,9 @@
       <Filter>Header Files\d3d</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\reflibs\shared\Win32Window.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reflibs\shared\Common.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,0 +1,163 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Common">
+      <UniqueIdentifier>{bfe7d8ae-ca40-4163-b39d-26c57df1cc62}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Backend">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\renderers\d3d12\BufferD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\d3d12\DescriptorHeapD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\d3d12\DeviceD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\d3d12\DLLInterfaceD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\d3d12\RenderInterfaceD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\d3d12\SwapChainD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\Common.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\DrawAliasMD2.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\Memory.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\ModelLoad.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\ModelStore.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\Palette.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\RenderDocUtils.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\SkyBox.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\TextureStore.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\ViewDraw.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\Win32Window.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\DLLInterface.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\d3d12\TextureD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\d3d12\GraphicsContextD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\d3d12\UploadContextD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\ImmediateModeBatching.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\d3d12\PipelineStateD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\d3d12\ShaderProgramD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\renderers\d3d12\BufferD3D12.hpp">
+      <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\d3d12\DescriptorHeapD3D12.hpp">
+      <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\d3d12\DeviceD3D12.hpp">
+      <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\d3d12\GraphicsContextD3D12.hpp">
+      <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\d3d12\PipelineStateD3D12.hpp">
+      <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\d3d12\RenderInterfaceD3D12.hpp">
+      <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\d3d12\ShaderProgramD3D12.hpp">
+      <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\d3d12\SwapChainD3D12.hpp">
+      <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\d3d12\TextureD3D12.hpp">
+      <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\d3d12\UploadContextD3D12.hpp">
+      <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\d3d12\UtilsD3D12.hpp">
+      <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\Common.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\Memory.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\ModelStore.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\ModelStructs.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\Pool.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\RenderDocUtils.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\SkyBox.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\TextureStore.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\ViewDraw.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\Win32Window.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\DLLInterface.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\RenderInterface.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\Array.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\ImmediateModeBatching.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

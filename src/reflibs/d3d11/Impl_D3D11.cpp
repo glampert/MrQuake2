@@ -131,7 +131,7 @@ void TextureImageImpl::InitD3DSpecific()
 
 void TextureImageImpl::InitFromScrap(const TextureImageImpl * const scrap_tex)
 {
-    FASTASSERT(scrap_tex != nullptr);
+    MRQ2_ASSERT(scrap_tex != nullptr);
 
     // Share the scrap texture resource(s)
     tex_resource = scrap_tex->tex_resource;
@@ -186,7 +186,7 @@ void TextureStoreImpl::UploadScrapIfNeeded()
 
 unsigned TextureStoreImpl::MultisampleQualityLevel(const DXGI_FORMAT fmt) const
 {
-    FASTASSERT(fmt == DXGI_FORMAT_R8G8B8A8_UNORM); // only format supported at the moment
+    MRQ2_ASSERT(fmt == DXGI_FORMAT_R8G8B8A8_UNORM); // only format supported at the moment
     (void)fmt;
 
     return m_multisample_quality_levels_rgba;
@@ -298,8 +298,8 @@ void ViewDrawStateImpl::Init(const int max_verts, const ShaderProgram & sp,
 
 void ViewDrawStateImpl::BeginRenderPass()
 {
-    FASTASSERT(m_batch_open == false);
-    FASTASSERT(m_draw_cmds->empty());
+    MRQ2_ASSERT(m_batch_open == false);
+    MRQ2_ASSERT(m_draw_cmds->empty());
 
     m_buffers.Begin();
 }
@@ -321,7 +321,7 @@ static inline D3D_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D(const PrimitiveTopol
 
 void ViewDrawStateImpl::EndRenderPass()
 {
-    FASTASSERT(m_batch_open == false);
+    MRQ2_ASSERT(m_batch_open == false);
 
     // Flush draw:
     ID3D11DeviceContext * const context = Renderer::DeviceContext();
@@ -385,8 +385,8 @@ void ViewDrawStateImpl::EndRenderPass()
 
 MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
 {
-    FASTASSERT(m_batch_open == false);
-    FASTASSERT_ALIGN16(args.model_matrix.floats);
+    MRQ2_ASSERT(m_batch_open == false);
+    MRQ2_ASSERT_ALIGN16(args.model_matrix.floats);
 
     m_current_draw_cmd.model_mtx  = DirectX::XMMATRIX{ args.model_matrix.floats };
     m_current_draw_cmd.texture    = args.optional_tex ? args.optional_tex : Renderer::TexStore()->tex_white2x2;
@@ -404,9 +404,9 @@ MiniImBatch ViewDrawStateImpl::BeginBatch(const BeginBatchArgs & args)
 
 void ViewDrawStateImpl::EndBatch(MiniImBatch & batch)
 {
-    FASTASSERT(batch.IsValid());
-    FASTASSERT(m_batch_open == true);
-    FASTASSERT(m_current_draw_cmd.topology == batch.Topology());
+    MRQ2_ASSERT(batch.IsValid());
+    MRQ2_ASSERT(m_batch_open == true);
+    MRQ2_ASSERT(m_current_draw_cmd.topology == batch.Topology());
 
     m_current_draw_cmd.first_vert = m_buffers.CurrentPosition();
     m_current_draw_cmd.num_verts  = batch.UsedVerts();

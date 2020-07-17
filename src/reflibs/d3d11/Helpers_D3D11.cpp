@@ -23,7 +23,7 @@ void ShaderProgram::LoadFromFxFile(ID3D11Device * device,
                                    const InputLayoutDesc & layout,
                                    const bool debug)
 {
-    FASTASSERT(layout.desc != nullptr && layout.num_elements > 0);
+    MRQ2_ASSERT(layout.desc != nullptr && layout.num_elements > 0);
 
     D3DShader::Info shader_info;
     shader_info.vs_entry = vs_entry;
@@ -253,7 +253,7 @@ void SpriteBatch::PushQuadTextured(const float x, const float y,
                                    const TextureImage * const tex,
                                    const DirectX::XMFLOAT4A & color)
 {
-    FASTASSERT(tex != nullptr);
+    MRQ2_ASSERT(tex != nullptr);
     const int quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color);
     m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });
@@ -268,7 +268,7 @@ void SpriteBatch::PushQuadTexturedUVs(const float x, const float y,
                                       const TextureImage * const tex,
                                       const DirectX::XMFLOAT4A & color)
 {
-    FASTASSERT(tex != nullptr);
+    MRQ2_ASSERT(tex != nullptr);
     const int quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, u0, v0, u1, v1, color);
     m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });

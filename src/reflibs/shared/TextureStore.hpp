@@ -4,7 +4,7 @@
 //
 #pragma once
 
-#include "RefShared.hpp"
+#include "Common.hpp"
 #include "Memory.hpp"
 
 #include <vector>
@@ -62,6 +62,7 @@ public:
     const int            height;        // Height in pixels.
     const Vec2u16        scrap_uv0;     // Offsets into the scrap if this is allocate from the scrap, zero otherwise.
     const Vec2u16        scrap_uv1;     // If not zero, this is a scrap image. In such case, use these instead of width & height.
+    //Texture              texture;       // Back-end renderer texture object.
 
     TextureImage(const ColorRGBA32 * const pix, const std::uint32_t regn, const TextureType tt, const bool use_scrap,
                  const int w, const int h, const Vec2u16 scrap0, const Vec2u16 scrap1, const char * const tex_name)

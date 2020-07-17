@@ -20,7 +20,7 @@ bool MiniImBatch::sm_emulated_triangle_fans = true;
 
 void MiniImBatch::PushVertex(const DrawVertex3D & vert)
 {
-    FASTASSERT(IsValid()); // Clear()ed?
+    MRQ2_ASSERT(IsValid()); // Clear()ed?
 
     if (sm_emulated_triangle_fans)
     {
@@ -61,14 +61,14 @@ void MiniImBatch::PushVertex(const DrawVertex3D & vert)
 
 void MiniImBatch::PushModelSurface(const ModelSurface & surf, const vec4_t * const opt_color_override)
 {
-    FASTASSERT(IsValid()); // Clear()ed?
+    MRQ2_ASSERT(IsValid()); // Clear()ed?
 
     const ModelPoly & poly  = *surf.polys;
     const int num_triangles = (poly.num_verts - 2);
     const int num_verts     = (num_triangles  * 3);
 
-    FASTASSERT(num_triangles > 0);
-    FASTASSERT(num_verts <= NumVerts());
+    MRQ2_ASSERT(num_triangles > 0);
+    MRQ2_ASSERT(num_verts <= NumVerts());
 
     DrawVertex3D * const first_vert = Increment(num_verts);
     DrawVertex3D * verts_iter = first_vert;
@@ -105,12 +105,12 @@ void MiniImBatch::PushModelSurface(const ModelSurface & surf, const vec4_t * con
         }
     }
 
-    FASTASSERT(verts_iter == (first_vert + num_verts));
+    MRQ2_ASSERT(verts_iter == (first_vert + num_verts));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-REFLIB_NOINLINE void MiniImBatch::OverflowError() const
+MRQ2_RENDERLIB_NOINLINE void MiniImBatch::OverflowError() const
 {
     GameInterface::Errorf("MiniImBatch overflowed! used_verts=%i, num_verts=%i. "
                           "Increase vertex batch size.", m_used_verts, m_num_verts);

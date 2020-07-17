@@ -383,7 +383,7 @@ void Renderer::RenderView(const refdef_s & view_def)
     RenderViewUpdateCBuffers(frame_data);
 
     // Set the camera/world-view:
-    FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
+    MRQ2_ASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
     const auto vp_mtx = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
     sm_state->m_view_draw_state.SetViewProjMatrix(vp_mtx);
 
@@ -439,7 +439,7 @@ void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData & fra
 {
     GeometryCommonShaderConstants cbuffer_data = {};
 
-    FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
+    MRQ2_ASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
     cbuffer_data.vs.mvp_matrix = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
 
     if (sm_state->m_disable_texturing.IsSet()) // Use only debug vertex color
@@ -586,7 +586,7 @@ void Renderer::EndFrame()
 
 void Renderer::UploadTexture(const TextureImage * tex)
 {
-    FASTASSERT(tex != nullptr);
+    MRQ2_ASSERT(tex != nullptr);
     sm_state->m_upload_ctx.UploadTextureSync(*static_cast<const TextureImageImpl *>(tex), Device());
 }
 

@@ -1,0 +1,14 @@
+
+- Finish renderer refactor, tidy up D3d11 and D3D12 back-ends.
+
+- Move static world geometry rendering to use vertex buffers instead of submitting every frame.
+  MD2s can stay as they are for now and get regenerated and sumitted per-frame with the MiniImBatch.
+
+- Implement lighting with point lights, ambient and maybe spot lights.
+
+- Implement shadow maps for shadows.
+
+- Look into some form of automated bump mapping/normal mapping (generate the bump maps from the existing colour textures).
+  Nothing fancy, but might give it a cooler look.
+  
+- Look into ways of improving the particle systems used by the game. They are pretty rough quads in the original quake!

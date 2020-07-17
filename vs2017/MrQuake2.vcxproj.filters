@@ -23,6 +23,9 @@
     <Filter Include="src\windows">
       <UniqueIdentifier>{55553b68-f13a-49d3-bac4-3afe1dab3854}</UniqueIdentifier>
     </Filter>
+    <Filter Include="cfg">
+      <UniqueIdentifier>{b7a0b2f1-3fad-4764-aafb-5153778b47c6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\client\adivtab.h">
@@ -438,5 +441,13 @@
     <ClCompile Include="..\src\windows\vid_win.c">
       <Filter>src\windows</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\data\baseq2\config.cfg">
+      <Filter>cfg</Filter>
+    </None>
+    <None Include="..\data\baseq2\default.cfg">
+      <Filter>cfg</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -31,7 +31,7 @@ cvar_t * vid_height     = NULL;
 cvar_t * vid_width      = NULL;
 cvar_t * vid_fullscreen = NULL;
 
-static HMODULE reflib_dll    = NULL;
+static HMODULE renderer_dll  = NULL;
 static HMODULE renderdoc_dll = NULL; // resident once loaded
 
 typedef struct
@@ -157,29 +157,29 @@ static void VID_TryLoadRenderDocDLL()
 
 /*
 ==================
-VID_UnloadRefreshDLL
+VID_UnloadRendererDLL
 ==================
 */
-static void VID_UnloadRefreshDLL()
+static void VID_UnloadRendererDLL()
 {
-    if (reflib_dll)
+    if (renderer_dll)
     {
-        Com_DPrintf("Unloading Reflib...\n");
-        if (!FreeLibrary(reflib_dll))
+        Com_DPrintf("Unloading Renderer DLL...\n");
+        if (!FreeLibrary(renderer_dll))
         {
-            Com_Error(ERR_FATAL, "Reflib FreeLibrary failed!\n");
+            Com_Error(ERR_FATAL, "Renderer FreeLibrary failed!\n");
         }
-        reflib_dll = NULL;
+        renderer_dll = NULL;
     }
     memset(&re, 0, sizeof(re));
 }
 
 /*
 ==================
-VID_LoadRefreshDLL
+VID_LoadRendererDLL
 ==================
 */
-static void VID_LoadRefreshDLL(const char * dll_name)
+static void VID_LoadRendererDLL(const char * dll_name)
 {
     refimport_t ri;
     GetRefAPI_t GetRefAPI;
@@ -187,15 +187,15 @@ static void VID_LoadRefreshDLL(const char * dll_name)
     VID_TryLoadRenderDocDLL();
 
     VID_Shutdown();
-    Com_Printf("---- Loading Refresh DLL %s ----\n", dll_name);
+    Com_Printf("---- Loading Renderer DLL %s ----\n", dll_name);
 
-    reflib_dll = LoadLibrary(dll_name);
-    if (!reflib_dll)
+    renderer_dll = LoadLibrary(dll_name);
+    if (!renderer_dll)
     {
         Com_Error(ERR_FATAL, "LoadLibrary('%s') failed!\n", dll_name);
     }
 
-    GetRefAPI = (GetRefAPI_t)GetProcAddress(reflib_dll, "GetRefAPI");
+    GetRefAPI = (GetRefAPI_t)GetProcAddress(renderer_dll, "GetRefAPI");
     if (!GetRefAPI)
     {
         Com_Error(ERR_FATAL, "GetProcAddress failed on %s\n", dll_name);
@@ -225,14 +225,14 @@ static void VID_LoadRefreshDLL(const char * dll_name)
 
     if (re.api_version != REF_API_VERSION)
     {
-        VID_UnloadRefreshDLL();
-        Com_Error(ERR_FATAL, "Refresh %s has incompatible API version!\n", dll_name);
+        VID_UnloadRendererDLL();
+        Com_Error(ERR_FATAL, "Renderer %s has incompatible API version!\n", dll_name);
     }
 
     if (!re.Init(winquake.hinstance, winquake.wndproc, (int)vid_fullscreen->value))
     {
-        VID_UnloadRefreshDLL();
-        Com_Error(ERR_FATAL, "Couldn't start refresh %s!\n", dll_name);
+        VID_UnloadRendererDLL();
+        Com_Error(ERR_FATAL, "Couldn't start Renderer DLL %s!\n", dll_name);
     }
 
     vidref_val = re.vidref;
@@ -277,8 +277,8 @@ void VID_Init(void)
     viddef.height = (int)vid_height->value;
 
     char dll_name[256];
-    Com_sprintf(dll_name, sizeof(dll_name), "Ref%s.dll", vid_ref->string);
-    VID_LoadRefreshDLL(dll_name);
+    Com_sprintf(dll_name, sizeof(dll_name), "Renderer%s.dll", vid_ref->string);
+    VID_LoadRendererDLL(dll_name);
 
     Cmd_AddCommand("vid_restart", &VID_CmdRestart);
 }
@@ -297,7 +297,7 @@ void VID_Shutdown(void)
         re.Shutdown();
     }
 
-    VID_UnloadRefreshDLL();
+    VID_UnloadRendererDLL();
 }
 
 /*

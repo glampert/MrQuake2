@@ -4,6 +4,7 @@
 //  required by refexport_t. Sets up the D3D12 refresh DLL.
 //
 
+/*
 #include "Renderer_D3D12.hpp"
 #include "reflibs/shared/d3d/D3DCommon.hpp"
 
@@ -22,7 +23,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-extern "C" REFLIB_DLL_EXPORT refexport_t GetRefAPI(refimport_t ri)
+extern "C" MRQ2_RENDERLIB_DLL_EXPORT refexport_t GetRefAPI(refimport_t ri)
 {
     MrQ2::GameInterface::Initialize(ri, "D3D12");
 
@@ -54,5 +55,5 @@ extern "C" REFLIB_DLL_EXPORT refexport_t GetRefAPI(refimport_t ri)
     re.AppActivate         = &RefAPI12::AppActivate;
     return re;
 }
-
+*/
 ///////////////////////////////////////////////////////////////////////////////

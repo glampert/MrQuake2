@@ -4,7 +4,7 @@
 //
 
 #include "RenderWindow_D3D11.hpp"
-#include "reflibs/shared/RefShared.hpp"
+#include "reflibs/shared/Common.hpp"
 
 namespace MrQ2
 {

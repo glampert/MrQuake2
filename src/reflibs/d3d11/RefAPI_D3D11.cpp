@@ -21,7 +21,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-extern "C" REFLIB_DLL_EXPORT refexport_t GetRefAPI(refimport_t ri)
+extern "C" MRQ2_RENDERLIB_DLL_EXPORT refexport_t GetRefAPI(refimport_t ri)
 {
     MrQ2::GameInterface::Initialize(ri, "D3D11");
 

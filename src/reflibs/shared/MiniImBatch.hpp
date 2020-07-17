@@ -4,7 +4,7 @@
 //
 #pragma once
 
-#include "RefShared.hpp"
+#include "Common.hpp"
 
 namespace MrQ2
 {
@@ -34,16 +34,7 @@ enum class PrimitiveTopology : std::uint8_t
 {
     kTriangleList,
     kTriangleStrip,
-    kTriangleFan,
-};
-
-enum class SpriteBatchIdx
-{
-    kDrawChar, // Only used to draw console chars
-    kDrawPics, // Used by DrawPic, DrawStretchPic, etc
-
-    // Number of items in the enum - not a valid index.
-    kCount,
+    kTriangleFan
 };
 
 struct ModelSurface;
@@ -115,7 +106,7 @@ public:
 
 private:
 
-    REFLIB_NORETURN void OverflowError() const;
+    MRQ2_RENDERLIB_NORETURN void OverflowError() const;
 
     DrawVertex3D *    m_verts_ptr;
     int               m_num_verts;

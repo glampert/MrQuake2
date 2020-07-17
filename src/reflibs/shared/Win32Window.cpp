@@ -4,7 +4,7 @@
 //
 
 #include "Win32Window.hpp"
-#include "RefShared.hpp"
+#include "Common.hpp"
 
 #include <comdef.h>
 #include <direct.h>
@@ -16,31 +16,23 @@ namespace MrQ2
 // Win32Window
 ///////////////////////////////////////////////////////////////////////////////
 
-void Win32Window::Init(const char * name, HINSTANCE hInst, WNDPROC wndProc,
-                       const int w, const int h, const bool fullscreen, const bool debug)
+void Win32Window::Init(const char * name, HINSTANCE hInst, WNDPROC wndProc, const int width, const int height, const bool fullscreen, const bool debug)
 {
-    FASTASSERT(hInst   != nullptr);
-    FASTASSERT(wndProc != nullptr);
+    MRQ2_ASSERT(hInst   != nullptr);
+    MRQ2_ASSERT(wndProc != nullptr);
 
     char title[256] = {};
-    sprintf_s(title, "%s %ix%i", name, w, h);
+    sprintf_s(title, "%s %ix%i", name, width, height);
 
     m_hInst            = hInst;
     m_wndproc          = wndProc;
-    m_window_name      = title;
-    m_width            = w;
-    m_height           = h;
+    m_width            = width;
+    m_height           = height;
     m_fullscreen       = fullscreen;
     m_debug_validation = debug;
+    m_window_name      = title;
 
-    Create();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void Win32Window::Create()
-{
-    WNDCLASSEX wcex    = {0};
+    WNDCLASSEX wcex    = {};
     wcex.cbSize        = sizeof(WNDCLASSEX);
     wcex.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wcex.lpfnWndProc   = m_wndproc;
@@ -90,7 +82,7 @@ void Win32Window::Create()
     }
 
     m_hWnd = CreateWindowEx(exstyle, m_window_name.c_str(), m_window_name.c_str(),
-                          stylebits, x, y, w, h, nullptr, nullptr, m_hInst, nullptr);
+                            stylebits, x, y, w, h, nullptr, nullptr, m_hInst, nullptr);
     if (!m_hWnd)
     {
         GameInterface::Errorf("Couldn't create application window!");
@@ -98,8 +90,6 @@ void Win32Window::Create()
 
     ShowWindow(m_hWnd, SW_SHOW);
     UpdateWindow(m_hWnd);
-
-    InitRenderWindow();
 
     SetForegroundWindow(m_hWnd);
     SetFocus(m_hWnd);
@@ -109,7 +99,7 @@ void Win32Window::Create()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Win32Window::Destroy()
+void Win32Window::Shutdown()
 {
     if (m_hWnd != nullptr)
     {
@@ -119,6 +109,7 @@ void Win32Window::Destroy()
         }
         m_hWnd = nullptr;
     }
+
     if (m_hInst != nullptr)
     {
         if (!UnregisterClass(m_window_name.c_str(), m_hInst))
@@ -130,13 +121,6 @@ void Win32Window::Destroy()
 
     m_wndproc = nullptr;
     m_window_name.clear();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-Win32Window::~Win32Window()
-{
-    Destroy();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

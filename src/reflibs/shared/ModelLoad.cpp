@@ -248,7 +248,7 @@ static void CalcSurfaceExtents(const ModelInstance & mdl, ModelSurface & surf)
     maxs[0] = maxs[1] = -99999;
 
     const ModelTexInfo * const tex = surf.texinfo;
-    FASTASSERT(tex != nullptr);
+    MRQ2_ASSERT(tex != nullptr);
 
     for (int i = 0; i < surf.num_edges; ++i)
     {
@@ -586,8 +586,8 @@ static void TriangulatePolygon(ModelPoly & poly)
 
 static void BuildPolygonFromSurface(ModelInstance & mdl, ModelSurface & surf)
 {
-    FASTASSERT(mdl.data.vertexes != nullptr);
-    FASTASSERT(mdl.data.edges != nullptr && mdl.data.surf_edges != nullptr);
+    MRQ2_ASSERT(mdl.data.vertexes != nullptr);
+    MRQ2_ASSERT(mdl.data.edges != nullptr && mdl.data.surf_edges != nullptr);
 
     const ModelVertex * const verts = mdl.data.vertexes;
     const ModelEdge * const edges = mdl.data.edges;
@@ -825,8 +825,8 @@ static void SubdivideSurface(ModelInstance & mdl, ModelSurface & surf)
 
 static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lump_t & l)
 {
-    FASTASSERT(mdl.data.planes   != nullptr); // load first!
-    FASTASSERT(mdl.data.texinfos != nullptr);
+    MRQ2_ASSERT(mdl.data.planes   != nullptr); // load first!
+    MRQ2_ASSERT(mdl.data.texinfos != nullptr);
 
     const auto * in = GetDataPtr<dface_t>(mdl_data, l);
     if (l.filelen % sizeof(*in))
@@ -887,7 +887,7 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
         }
         else
         {
-            FASTASSERT(mdl.data.light_data != nullptr);
+            MRQ2_ASSERT(mdl.data.light_data != nullptr);
             out->samples = mdl.data.light_data + i;
         }
 
@@ -932,7 +932,7 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
 
 static void LoadMarkSurfaces(ModelInstance & mdl, const void * const mdl_data, const lump_t & l)
 {
-    FASTASSERT(mdl.data.surfaces != nullptr); // load first!
+    MRQ2_ASSERT(mdl.data.surfaces != nullptr); // load first!
 
     const auto * in = GetDataPtr<std::int16_t>(mdl_data, l);
     if (l.filelen % sizeof(*in))
@@ -980,7 +980,7 @@ static void LoadVisibility(ModelInstance & mdl, const void * const mdl_data, con
 
 static void LoadLeafs(ModelInstance & mdl, const void * const mdl_data, const lump_t & l)
 {
-    FASTASSERT(mdl.data.mark_surfaces != nullptr); // load first!
+    MRQ2_ASSERT(mdl.data.mark_surfaces != nullptr); // load first!
 
     const auto * in = GetDataPtr<dleaf_t>(mdl_data, l);
     if (l.filelen % sizeof(*in))
@@ -1029,8 +1029,8 @@ static void SetParentRecursive(ModelNode * node, ModelNode * parent)
 
 static void LoadNodes(ModelInstance & mdl, const void * const mdl_data, const lump_t & l)
 {
-    FASTASSERT(mdl.data.planes != nullptr); // load first!
-    FASTASSERT(mdl.data.leafs  != nullptr);
+    MRQ2_ASSERT(mdl.data.planes != nullptr); // load first!
+    MRQ2_ASSERT(mdl.data.leafs  != nullptr);
 
     const auto * in = GetDataPtr<dnode_t>(mdl_data, l);
     if (l.filelen % sizeof(*in))
@@ -1162,13 +1162,13 @@ static void SetUpSubModels(ModelStore & mdl_store, ModelInstance & mdl)
 
 void LoadBrushModel(ModelStore & mdl_store, TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len)
 {
-    FASTASSERT(mdl_data != nullptr);
-    FASTASSERT(mdl_data_len > 0);
+    MRQ2_ASSERT(mdl_data != nullptr);
+    MRQ2_ASSERT(mdl_data_len > 0);
     (void)mdl_data_len;
 
     // Allocate the block we are going to expand the data into:
     const unsigned hunk_size = Megabytes(16); // 16MB is the original size used by Quake 2
-    FASTASSERT(hunk_size >= unsigned(mdl_data_len));
+    MRQ2_ASSERT(hunk_size >= unsigned(mdl_data_len));
     mdl.hunk.Init(hunk_size, MemTag::kWorldModel);
 
     // Check header version/id:
@@ -1223,12 +1223,12 @@ void LoadBrushModel(ModelStore & mdl_store, TextureStore & tex_store, ModelInsta
 
 void LoadSpriteModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len)
 {
-    FASTASSERT(mdl_data != nullptr);
-    FASTASSERT(mdl_data_len > 0);
+    MRQ2_ASSERT(mdl_data != nullptr);
+    MRQ2_ASSERT(mdl_data_len > 0);
 
     // Allocate the block we are going to expand the data into:
     const unsigned hunk_size = RoundNextPoT(mdl_data_len);
-    FASTASSERT(hunk_size >= unsigned(mdl_data_len));
+    MRQ2_ASSERT(hunk_size >= unsigned(mdl_data_len));
     mdl.hunk.Init(hunk_size, MemTag::kSpriteModel);
 
     const auto * p_sprite_in = static_cast<const dsprite_t *>(mdl_data);
@@ -1274,12 +1274,12 @@ void LoadSpriteModel(TextureStore & tex_store, ModelInstance & mdl, const void *
 
 void LoadAliasMD2Model(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len)
 {
-    FASTASSERT(mdl_data != nullptr);
-    FASTASSERT(mdl_data_len > 0);
+    MRQ2_ASSERT(mdl_data != nullptr);
+    MRQ2_ASSERT(mdl_data_len > 0);
 
     // Allocate the block we are going to expand the data into:
     const unsigned hunk_size = RoundNextPoT(mdl_data_len);
-    FASTASSERT(hunk_size >= unsigned(mdl_data_len));
+    MRQ2_ASSERT(hunk_size >= unsigned(mdl_data_len));
     mdl.hunk.Init(hunk_size, MemTag::kAliasModel);
 
     const auto * p_mdl_data_in = static_cast<const dmdl_t *>(mdl_data);

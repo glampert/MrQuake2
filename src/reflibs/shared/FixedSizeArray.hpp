@@ -4,7 +4,7 @@
 //
 #pragma once
 
-#include "RefShared.hpp"
+#include "Common.hpp"
 #include <algorithm>
 #include <utility>
 
@@ -36,7 +36,7 @@ public:
 
     FixedSizeArray(const_pointer first, const size_type count)
     {
-        FASTASSERT(count <= capacity());
+        MRQ2_ASSERT(count <= capacity());
         std::copy_n(first, count, data());
         m_count = count;
     }
@@ -44,7 +44,7 @@ public:
     FixedSizeArray(const_pointer first, const_pointer last)
     {
         const auto count = static_cast<size_type>(std::distance(first, last));
-        FASTASSERT(count <= capacity());
+        MRQ2_ASSERT(count <= capacity());
         std::copy(first, last, data());
         m_count = count;
     }
@@ -57,7 +57,7 @@ public:
 
     void fill(const_reference val, const size_type count = kCapacity)
     {
-        FASTASSERT(count <= capacity());
+        MRQ2_ASSERT(count <= capacity());
         std::fill_n(data(), count, val);
         m_count = count;
     }
@@ -79,19 +79,19 @@ public:
 
     void push_back(const_reference val)
     {
-        FASTASSERT(size() < capacity());
+        MRQ2_ASSERT(size() < capacity());
         m_elements[m_count++] = val;
     }
 
     void push_back(value_type && val)
     {
-        FASTASSERT(size() < capacity());
+        MRQ2_ASSERT(size() < capacity());
         m_elements[m_count++] = std::move(val);
     }
 
     void pop_back()
     {
-        FASTASSERT(!empty());
+        MRQ2_ASSERT(!empty());
         --m_count;
     }
 
@@ -107,21 +107,21 @@ public:
 
     const_reference operator[](const size_type index) const
     {
-        FASTASSERT(index >= 0 && index < size());
+        MRQ2_ASSERT(index >= 0 && index < size());
         return m_elements[index];
     }
 
     reference operator[](const size_type index)
     {
-        FASTASSERT(index >= 0 && index < size());
+        MRQ2_ASSERT(index >= 0 && index < size());
         return m_elements[index];
     }
 
-    const_reference front() const { FASTASSERT(!empty()); return m_elements[0]; }
-    reference       front()       { FASTASSERT(!empty()); return m_elements[0]; }
+    const_reference front() const { MRQ2_ASSERT(!empty()); return m_elements[0]; }
+    reference       front()       { MRQ2_ASSERT(!empty()); return m_elements[0]; }
 
-    const_reference back()  const { FASTASSERT(!empty()); return m_elements[size() - 1]; }
-    reference       back()        { FASTASSERT(!empty()); return m_elements[size() - 1]; }
+    const_reference back()  const { MRQ2_ASSERT(!empty()); return m_elements[size() - 1]; }
+    reference       back()        { MRQ2_ASSERT(!empty()); return m_elements[size() - 1]; }
 
     size_type       size()  const { return m_count; }
     bool            empty() const { return size() == 0; }

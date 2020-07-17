@@ -9,8 +9,43 @@
 #include "reflibs/shared/RenderDocUtils.hpp"
 #include <DirectXMath.h>
 
+/* TODO
+#if MRQ2_D3D11_DLL
+	#include "RenderInterfaceD3D11.hpp"
+#elif MRQ2_D3D12_DLL
+	#include "RenderInterfaceD3D12.hpp"
+#else
+	#error "Missing renderer compilation switch!"
+#endif
+*/
+
 namespace MrQ2
 {
+
+/*
+// this uses the lower-level API, lower-level API does not know about TextureImage/ModelInstance, etc
+class Quake2RendererDllInterface
+{
+private:
+
+	static constexpr auto kSpriteBatchCount = size_t(SpriteBatchIdx::kCount);
+
+	struct State
+	{
+		RenderInterface m_renderer;
+		SpriteBatch m_sprite_batches[kSpriteBatchCount];
+		TextureStore m_texture_store;
+		ModelStore m_model_store;
+		ViewDrawState m_view_state;
+	};
+
+	static State sm_state;
+
+public:
+
+	// static functions for the DLL
+};
+*/
 
 // Code shared by both the D3D11 and D3D12 back-ends goes here.
 // This header is only included in the RefAPI_D3D[X].cpp files.
@@ -19,7 +54,7 @@ struct D3DCommon
 {
     using RB = RendererBackEndType;
 
-    static int Init(void * hInstance, void * wndproc, int fullscreen)
+    static int Init(void * hInstance, void * wndproc, int is_fullscreen)
     {
         #if defined(DEBUG) || defined(_DEBUG)
         constexpr bool debug_validation = true;
@@ -45,7 +80,7 @@ struct D3DCommon
             RenderDocUtils::Initialize();
         }
 
-        RB::Init((HINSTANCE)hInstance, (WNDPROC)wndproc, w, h, !!fullscreen, debug_validation);
+        RB::Init((HINSTANCE)hInstance, (WNDPROC)wndproc, w, h, (bool)is_fullscreen, debug_validation);
         return true;
     }
 
@@ -168,21 +203,21 @@ struct D3DCommon
 
     static void BeginFrame(float /*camera_separation*/)
     {
-        FASTASSERT(!RB::FrameStarted());
+        MRQ2_ASSERT(!RB::FrameStarted());
         RB::BeginFrame();
     }
 
     static void EndFrame()
     {
-        FASTASSERT(RB::FrameStarted());
+        MRQ2_ASSERT(RB::FrameStarted());
         DrawFpsCounter();
         RB::EndFrame();
     }
 
     static void RenderFrame(refdef_t * const view_def)
     {
-        FASTASSERT(view_def != nullptr);
-        FASTASSERT(RB::FrameStarted());
+        MRQ2_ASSERT(view_def != nullptr);
+        MRQ2_ASSERT(RB::FrameStarted());
 
         // A world map should have been loaded already by BeginRegistration().
         if (RB::MdlStore()->WorldModel() == nullptr && !(view_def->rdflags & RDF_NOWORLDMODEL))
@@ -195,7 +230,7 @@ struct D3DCommon
 
     static void DrawPic(const int x, const int y, const char * const name)
     {
-        FASTASSERT(RB::FrameStarted());
+        MRQ2_ASSERT(RB::FrameStarted());
 
         const TextureImage * const tex = RB::TexStore()->FindOrLoad(name, TextureType::kPic);
         if (tex == nullptr)
@@ -218,19 +253,19 @@ struct D3DCommon
             const auto u1 = float(tex->scrap_uv1.x) / TextureStore::kScrapSize;
             const auto v1 = float(tex->scrap_uv1.y) / TextureStore::kScrapSize;
 
-            RB::SBatch(SpriteBatchIdx::kDrawPics)->PushQuadTexturedUVs(
+            RB::SBatch(RB::SpriteBatchIdx::kDrawPics)->PushQuadTexturedUVs(
                 fx, fy, fw, fh, u0, v0, u1, v1, tex, kColorWhite);
         }
         else
         {
-            RB::SBatch(SpriteBatchIdx::kDrawPics)->PushQuadTextured(
+            RB::SBatch(RB::SpriteBatchIdx::kDrawPics)->PushQuadTextured(
                 fx, fy, fw, fh, tex, kColorWhite);
         }
     }
 
     static void DrawStretchPic(const int x, const int y, const int w, const int h, const char * const name)
     {
-        FASTASSERT(RB::FrameStarted());
+        MRQ2_ASSERT(RB::FrameStarted());
 
         const TextureImage * const tex = RB::TexStore()->FindOrLoad(name, TextureType::kPic);
         if (tex == nullptr)
@@ -253,19 +288,19 @@ struct D3DCommon
             const auto u1 = float(tex->scrap_uv1.x) / TextureStore::kScrapSize;
             const auto v1 = float(tex->scrap_uv1.y) / TextureStore::kScrapSize;
 
-            RB::SBatch(SpriteBatchIdx::kDrawPics)->PushQuadTexturedUVs(
+            RB::SBatch(RB::SpriteBatchIdx::kDrawPics)->PushQuadTexturedUVs(
                 fx, fy, fw, fh, u0, v0, u1, v1, tex, kColorWhite);
         }
         else
         {
-            RB::SBatch(SpriteBatchIdx::kDrawPics)->PushQuadTextured(
+            RB::SBatch(RB::SpriteBatchIdx::kDrawPics)->PushQuadTextured(
                 fx, fy, fw, fh, tex, kColorWhite);
         }
     }
 
     static void DrawChar(const int x, const int y, int c)
     {
-        FASTASSERT(RB::FrameStarted());
+        MRQ2_ASSERT(RB::FrameStarted());
 
         // Draws one 8*8 console graphic character with 0 being transparent.
         // It can be clipped to the top of the screen to allow the console
@@ -292,7 +327,7 @@ struct D3DCommon
 
         static const DirectX::XMFLOAT4A kColorWhite = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-        RB::SBatch(SpriteBatchIdx::kDrawChar)->PushQuad(float(x), float(y), kGlyphSize, kGlyphSize,
+        RB::SBatch(RB::SpriteBatchIdx::kDrawChar)->PushQuad(float(x), float(y), kGlyphSize, kGlyphSize,
             fcol, frow, fcol + kGlyphUVScale, frow + kGlyphUVScale, kColorWhite);
     }
 
@@ -331,7 +366,7 @@ struct D3DCommon
             { "anum_0", "anum_1", "anum_2", "anum_3", "anum_4", "anum_5", "anum_6", "anum_7", "anum_8", "anum_9", "anum_minus" }
         };
 
-        FASTASSERT(color == 0 || color == 1);
+        MRQ2_ASSERT(color == 0 || color == 1);
 
         if (width < 1) width = 1;
         if (width > 5) width = 5;
@@ -361,7 +396,7 @@ struct D3DCommon
 
     static void DrawTileClear(int /*x*/, int /*y*/, int /*w*/, int /*h*/, const char * /*name*/)
     {
-        FASTASSERT(RB::FrameStarted());
+        MRQ2_ASSERT(RB::FrameStarted());
 
         // TODO - Only used when letterboxing the screen for SW rendering, so not required ???
         // ACTUALLY you can control the letterboxing with the -,+ keys
@@ -370,7 +405,7 @@ struct D3DCommon
 
     static void DrawFill(const int x, const int y, const int w, const int h, const int c)
     {
-        FASTASSERT(RB::FrameStarted());
+        MRQ2_ASSERT(RB::FrameStarted());
 
         const ColorRGBA32 color = TextureStore::ColorForIndex(c & 0xFF);
         const std::uint8_t r = (color & 0xFF);
@@ -381,13 +416,13 @@ struct D3DCommon
         const DirectX::XMFLOAT4A normalized_color{ r * scale, g * scale, b * scale, 1.0f };
         const TextureImage * const dummy_tex = RB::TexStore()->tex_white2x2;
 
-        RB::SBatch(SpriteBatchIdx::kDrawPics)->PushQuadTextured(
+        RB::SBatch(RB::SpriteBatchIdx::kDrawPics)->PushQuadTextured(
             float(x), float(y), float(w), float(h), dummy_tex, normalized_color);
     }
 
     static void DrawFadeScreen()
     {
-        FASTASSERT(RB::FrameStarted());
+        MRQ2_ASSERT(RB::FrameStarted());
 
         // was 0.8 on ref_gl Draw_FadeScreen
         constexpr float fade_alpha = 0.5f;
@@ -396,14 +431,14 @@ struct D3DCommon
         const TextureImage * dummy_tex = RB::TexStore()->tex_white2x2;
 
         // Full screen quad with alpha
-        RB::SBatch(SpriteBatchIdx::kDrawPics)->PushQuadTextured(
+        RB::SBatch(RB::SpriteBatchIdx::kDrawPics)->PushQuadTextured(
             0.0f, 0.0f, RB::Width(), RB::Height(), dummy_tex,
             DirectX::XMFLOAT4A{ 0.0f, 0.0f, 0.0f, fade_alpha });
     }
 
     static void DrawStretchRaw(const int x, const int y, int w, int h, const int cols, const int rows, const qbyte * const data)
     {
-        FASTASSERT(RB::FrameStarted());
+        MRQ2_ASSERT(RB::FrameStarted());
 
         //
         // This function is only used by Quake2 to draw the cinematic frames, nothing else,
@@ -412,10 +447,10 @@ struct D3DCommon
         //
 
         const TextureImage * const cin_tex = RB::TexStore()->tex_cinframe;
-        FASTASSERT(cin_tex != nullptr);
+        MRQ2_ASSERT(cin_tex != nullptr);
 
         ColorRGBA32 * const cinematic_buffer = const_cast<ColorRGBA32 *>(cin_tex->pixels);
-        FASTASSERT(cinematic_buffer != nullptr);
+        MRQ2_ASSERT(cinematic_buffer != nullptr);
 
         const ColorRGBA32 * const cinematic_palette = TextureStore::CinematicPalette();
         float hscale;
@@ -473,7 +508,7 @@ struct D3DCommon
 
         // Draw a fullscreen quadrilateral with the cinematic texture applied to it
         static const DirectX::XMFLOAT4A kColorWhite = { 1.0f, 1.0f, 1.0f, 1.0f };
-        RB::SBatch(SpriteBatchIdx::kDrawPics)->PushQuadTextured(
+        RB::SBatch(RB::SpriteBatchIdx::kDrawPics)->PushQuadTextured(
             float(x), float(y), float(w), float(h), cin_tex, kColorWhite);
     }
 

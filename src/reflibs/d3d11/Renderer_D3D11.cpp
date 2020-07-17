@@ -183,7 +183,7 @@ void Renderer::RenderView(const refdef_s & view_def)
     RenderViewUpdateCBuffers(frame_data);
 
     // Set the camera/world-view:
-    FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
+    MRQ2_ASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
     const auto vp_mtx = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
     sm_state->m_view_draw_state.SetViewProjMatrix(vp_mtx);
 
@@ -241,7 +241,7 @@ void Renderer::RenderView(const refdef_s & view_def)
 
 void Renderer::RenderViewUpdateCBuffers(const ViewDrawStateImpl::FrameData & frame_data)
 {
-    FASTASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
+    MRQ2_ASSERT_ALIGN16(frame_data.view_proj_matrix.floats);
 
     ConstantBufferDataSGeomVS cbuffer_data_geometry_vs;
     cbuffer_data_geometry_vs.mvp_matrix = DirectX::XMMATRIX{ frame_data.view_proj_matrix.floats };
@@ -356,7 +356,7 @@ void Renderer::Flush2D()
 {
     PushEvent(L"Renderer::Flush2D");
 
-    FASTASSERT(sm_state->m_cbuffer_ui_sprites != nullptr);
+    MRQ2_ASSERT(sm_state->m_cbuffer_ui_sprites != nullptr);
 
     if (sm_state->m_window_resized)
     {
@@ -399,7 +399,7 @@ void Renderer::DrawHelper(const unsigned num_verts, const unsigned first_vert, c
 
 void Renderer::UploadTexture(const TextureImage * const tex)
 {
-    FASTASSERT(tex != nullptr);
+    MRQ2_ASSERT(tex != nullptr);
 
     const TextureImageImpl* const impl = static_cast<const TextureImageImpl *>(tex);
     const UINT subRsrc  = 0; // no mips/slices

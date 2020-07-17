@@ -377,7 +377,7 @@ void SpriteBatch::PushQuadTextured(const float x, const float y,
                                    const TextureImage * const tex,
                                    const DirectX::XMFLOAT4A & color)
 {
-    FASTASSERT(tex != nullptr);
+    MRQ2_ASSERT(tex != nullptr);
     const int quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color);
     m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });
@@ -392,7 +392,7 @@ void SpriteBatch::PushQuadTexturedUVs(const float x, const float y,
                                       const TextureImage * const tex,
                                       const DirectX::XMFLOAT4A & color)
 {
-    FASTASSERT(tex != nullptr);
+    MRQ2_ASSERT(tex != nullptr);
     const int quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, u0, v0, u1, v1, color);
     m_deferred_textured_quads.push_back({ quad_start_vtx, static_cast<const TextureImageImpl *>(tex) });

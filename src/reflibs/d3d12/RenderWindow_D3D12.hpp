@@ -4,7 +4,7 @@
 //
 #pragma once
 
-#include "reflibs/shared/RefShared.hpp"
+#include "reflibs/shared/Common.hpp"
 #include "reflibs/shared/Win32Window.hpp"
 
 #include <dxgi1_6.h>
@@ -109,7 +109,7 @@ public:
     ComPtr<ID3D12Resource>       render_target_resources[kNumFrameBuffers]   = {};
     D3D12_CPU_DESCRIPTOR_HANDLE  render_target_descriptors[kNumFrameBuffers] = {};
 
-    // Debug buffer
+    // Depth buffer
     ComPtr<ID3D12DescriptorHeap> dsv_descriptor_heap; // Depth-Stencil View (DSV) heap
     ComPtr<ID3D12Resource>       depth_render_target;
     D3D12_CPU_DESCRIPTOR_HANDLE  depth_render_target_descriptor = {};
@@ -139,7 +139,7 @@ public:
 
 private:
 
-    void InitRenderWindow() override;
+	void InitRenderWindow();//override;
 };
 
 } // D3D12

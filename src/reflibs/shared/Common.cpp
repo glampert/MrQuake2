@@ -1,9 +1,9 @@
 //
-// RefShared.cpp
-//  Code shared by all refresh modules.
+// Common.cpp
+//  Code shared by all renderer back-ends.
 //
 
-#include "RefShared.hpp"
+#include "Common.hpp"
 #include "Win32Window.hpp"
 #include "Memory.hpp"
 
@@ -268,7 +268,7 @@ int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_s * p)
         break;
     default:
         dist1 = dist2 = 0.0f; // shut up compiler
-        FASTASSERT(false);
+        MRQ2_ASSERT(false);
         break;
     } // switch
 
@@ -282,7 +282,7 @@ int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_s * p)
         sides |= 2;
     }
 
-    FASTASSERT(sides != 0);
+    MRQ2_ASSERT(sides != 0);
     return sides;
 }
 
@@ -691,8 +691,8 @@ const char * Cmd::Argv(int i)
 
 void Cmd::RegisterCommand(const char * name, void (*cmd_func)())
 {
-    FASTASSERT(name != nullptr);
-    FASTASSERT(cmd_func != nullptr);
+    MRQ2_ASSERT(name != nullptr);
+    MRQ2_ASSERT(cmd_func != nullptr);
     g_Refimport.Cmd_AddCommand(name, cmd_func);
 }
 
@@ -700,7 +700,7 @@ void Cmd::RegisterCommand(const char * name, void (*cmd_func)())
 
 void Cmd::RemoveCommand(const char * name)
 {
-    FASTASSERT(name != nullptr);
+    MRQ2_ASSERT(name != nullptr);
     g_Refimport.Cmd_RemoveCommand(name);
 }
 
@@ -708,7 +708,7 @@ void Cmd::RemoveCommand(const char * name)
 
 void Cmd::ExecuteCommandText(const char * text)
 {
-    FASTASSERT(text != nullptr);
+    MRQ2_ASSERT(text != nullptr);
     g_Refimport.Cmd_ExecuteText(EXEC_NOW, text);
 }
 
@@ -716,7 +716,7 @@ void Cmd::ExecuteCommandText(const char * text)
 
 void Cmd::InsertCommandText(const char * text)
 {
-    FASTASSERT(text != nullptr);
+    MRQ2_ASSERT(text != nullptr);
     g_Refimport.Cmd_ExecuteText(EXEC_INSERT, text);
 }
 
@@ -724,7 +724,7 @@ void Cmd::InsertCommandText(const char * text)
 
 void Cmd::AppendCommandText(const char * text)
 {
-    FASTASSERT(text != nullptr);
+    MRQ2_ASSERT(text != nullptr);
     g_Refimport.Cmd_ExecuteText(EXEC_APPEND, text);
 }
 
@@ -732,8 +732,8 @@ void Cmd::AppendCommandText(const char * text)
 
 int FS::LoadFile(const char * name, void ** out_buf)
 {
-    FASTASSERT(name != nullptr);
-    FASTASSERT(out_buf != nullptr);
+    MRQ2_ASSERT(name != nullptr);
+    MRQ2_ASSERT(out_buf != nullptr);
     return g_Refimport.FS_LoadFile(name, out_buf);
 }
 
@@ -751,7 +751,7 @@ void FS::FreeFile(void * out_buf)
 
 void FS::CreatePath(const char * path)
 {
-    FASTASSERT(path != nullptr);
+    MRQ2_ASSERT(path != nullptr);
 
     char temp_path[1024];
     strcpy_s(temp_path, path);
@@ -785,8 +785,8 @@ const char * FS::GameDir()
 
 CvarWrapper Cvar::Get(const char * name, const char * default_value, unsigned flags)
 {
-    FASTASSERT(name != nullptr);
-    FASTASSERT(default_value != nullptr);
+    MRQ2_ASSERT(name != nullptr);
+    MRQ2_ASSERT(default_value != nullptr);
     return CvarWrapper{ g_Refimport.Cvar_Get(name, default_value, flags) };
 }
 
@@ -794,8 +794,8 @@ CvarWrapper Cvar::Get(const char * name, const char * default_value, unsigned fl
 
 CvarWrapper Cvar::Set(const char * name, const char * value)
 {
-    FASTASSERT(name != nullptr);
-    FASTASSERT(value != nullptr);
+    MRQ2_ASSERT(name != nullptr);
+    MRQ2_ASSERT(value != nullptr);
     return CvarWrapper{ g_Refimport.Cvar_Set(name, value) };
 }
 
@@ -803,7 +803,7 @@ CvarWrapper Cvar::Set(const char * name, const char * value)
 
 void Cvar::SetValue(const char * name, float value)
 {
-    FASTASSERT(name != nullptr);
+    MRQ2_ASSERT(name != nullptr);
     g_Refimport.Cvar_SetValue(name, value);
 }
 
@@ -811,7 +811,7 @@ void Cvar::SetValue(const char * name, float value)
 
 void Cvar::SetValue(const char * name, int value)
 {
-    FASTASSERT(name != nullptr);
+    MRQ2_ASSERT(name != nullptr);
     g_Refimport.Cvar_SetValue(name, static_cast<float>(value));
 }
 
@@ -844,7 +844,7 @@ bool Video::GetModeInfo(int & out_width, int & out_height, int mode_index)
 
 int CvarWrapper::AsInt() const
 {
-    FASTASSERT(IsNotNull());
+    MRQ2_ASSERT(IsNotNull());
     return static_cast<int>(m_wrapped_var->value);
 }
 
@@ -852,7 +852,7 @@ int CvarWrapper::AsInt() const
 
 float CvarWrapper::AsFloat() const
 {
-    FASTASSERT(IsNotNull());
+    MRQ2_ASSERT(IsNotNull());
     return m_wrapped_var->value;
 }
 
@@ -860,7 +860,7 @@ float CvarWrapper::AsFloat() const
 
 const char * CvarWrapper::AsStr() const
 {
-    FASTASSERT(IsNotNull());
+    MRQ2_ASSERT(IsNotNull());
     return m_wrapped_var->string;
 }
 
@@ -868,7 +868,7 @@ const char * CvarWrapper::AsStr() const
 
 void CvarWrapper::SetInt(int value)
 {
-    FASTASSERT(IsNotNull());
+    MRQ2_ASSERT(IsNotNull());
 
     char val_str[64];
     std::snprintf(val_str, sizeof(val_str), "%i", value);
@@ -879,7 +879,7 @@ void CvarWrapper::SetInt(int value)
 
 void CvarWrapper::SetFloat(float value)
 {
-    FASTASSERT(IsNotNull());
+    MRQ2_ASSERT(IsNotNull());
 
     char val_str[64];
     std::snprintf(val_str, sizeof(val_str), "%f", value);
@@ -890,7 +890,7 @@ void CvarWrapper::SetFloat(float value)
 
 void CvarWrapper::SetStr(const char * value)
 {
-    FASTASSERT(IsNotNull());
+    MRQ2_ASSERT(IsNotNull());
     GameInterface::g_Refimport.Cvar_Set(m_wrapped_var->name, value);
 }
 
@@ -898,7 +898,7 @@ void CvarWrapper::SetStr(const char * value)
 
 unsigned CvarWrapper::Flags() const
 {
-    FASTASSERT(IsNotNull());
+    MRQ2_ASSERT(IsNotNull());
     return m_wrapped_var->flags;
 }
 
@@ -906,7 +906,7 @@ unsigned CvarWrapper::Flags() const
 
 bool CvarWrapper::IsModified() const
 {
-    FASTASSERT(IsNotNull());
+    MRQ2_ASSERT(IsNotNull());
     return !!m_wrapped_var->modified;
 }
 
@@ -914,7 +914,7 @@ bool CvarWrapper::IsModified() const
 
 const char * CvarWrapper::Name() const
 {
-    FASTASSERT(IsNotNull());
+    MRQ2_ASSERT(IsNotNull());
     return m_wrapped_var->name;
 }
 

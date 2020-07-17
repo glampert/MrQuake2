@@ -12,7 +12,7 @@
 #include "common/q_files.h"
 
 // STB Image Write (stbiw)
-#define STBIW_ASSERT(expr) FASTASSERT(expr)
+#define STBIW_ASSERT(expr) MRQ2_ASSERT(expr)
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "external/stb/stb_image_write.h"
 
@@ -62,8 +62,8 @@ TextureStore::~TextureStore()
 
 void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const char * const file_type) const
 {
-    FASTASSERT(path != nullptr && path[0] != '\0');
-    FASTASSERT(file_type != nullptr && file_type[0] != '\0');
+    MRQ2_ASSERT(path != nullptr && path[0] != '\0');
+    MRQ2_ASSERT(file_type != nullptr && file_type[0] != '\0');
 
     constexpr int kNComponents = 4; // always RGBA
     char fullname[1024];
@@ -264,7 +264,7 @@ void TextureStore::EndRegistration()
 
 const char * TextureStore::NameFixup(const char * const in, const TextureType tt)
 {
-    FASTASSERT(in != nullptr && in[0] != '\0');
+    MRQ2_ASSERT(in != nullptr && in[0] != '\0');
 
     const char * tex_name = in;
     static char s_temp_name[1024];
@@ -292,7 +292,7 @@ const char * TextureStore::NameFixup(const char * const in, const TextureType tt
 
 const TextureImage * TextureStore::Find(const char * const name, const TextureType tt)
 {
-    FASTASSERT(tt != TextureType::kCount);
+    MRQ2_ASSERT(tt != TextureType::kCount);
     const char * tex_name = NameFixup(name, tt);
 
     if (kLogFindTextures)
@@ -302,7 +302,7 @@ const TextureImage * TextureStore::Find(const char * const name, const TextureTy
     }
 
     // At least "X.ext"
-    FASTASSERT(std::strlen(tex_name) >= 5);
+    MRQ2_ASSERT(std::strlen(tex_name) >= 5);
 
     // Compare by hash, much cheaper.
     const std::uint32_t name_hash = PathName::CalcHash(tex_name);
@@ -446,8 +446,8 @@ TextureImage * TextureStore::LoadWALImpl(const char * const name)
 TextureImage * TextureStore::ScrapTryAlloc8Bit(const Color8 * const pic8, const int width, const int height,
                                                const char * const name, const TextureType tt)
 {
-    FASTASSERT(width > 0 && height > 0);
-    FASTASSERT(m_scrap_inited);
+    MRQ2_ASSERT(width > 0 && height > 0);
+    MRQ2_ASSERT(m_scrap_inited);
 
     // Adding a 2 pixels padding border around each side to avoid sampling artifacts.
     const int padded_width  = width  + 2;
@@ -521,7 +521,7 @@ TextureImage * TextureStore::ScrapTryAlloc8Bit(const Color8 * const pic8, const 
 TextureImage * TextureStore::Common8BitTexSetup(const Color8 * const pic8, const int width, const int height,
                                                 const char * const name, const TextureType tt)
 {
-    FASTASSERT(width > 0 && height > 0);
+    MRQ2_ASSERT(width > 0 && height > 0);
 
     auto * pic32 = new(MemTag::kTextures) ColorRGBA32[width * height];
     UnPalettize8To32(width, height, pic8, sm_global_palette, pic32);
@@ -832,7 +832,7 @@ bool TGALoadFromFile(const char * const filename, ColorRGBA32 ** pic, int * widt
                     break;
 
                 default:
-                    FASTASSERT(false);
+                    MRQ2_ASSERT(false);
                     return false;
                 } // switch
             }
@@ -870,7 +870,7 @@ bool TGALoadFromFile(const char * const filename, ColorRGBA32 ** pic, int * widt
                         break;
 
                     default:
-                        FASTASSERT(false);
+                        MRQ2_ASSERT(false);
                         return false;
                     } // switch
 
@@ -925,7 +925,7 @@ bool TGALoadFromFile(const char * const filename, ColorRGBA32 ** pic, int * widt
                             break;
 
                         default:
-                            FASTASSERT(false);
+                            MRQ2_ASSERT(false);
                             return false;
                         } // switch
 
@@ -1001,7 +1001,7 @@ ColorRGBA32 RandomDebugColor()
     static std::uniform_int_distribution<int> s_distribution(0, kNumDebugColors - 1);
 
     const unsigned color_index = s_distribution(s_generator);
-    FASTASSERT(color_index < kNumDebugColors);
+    MRQ2_ASSERT(color_index < kNumDebugColors);
 
     return DebugColorsTable[color_index];
 }

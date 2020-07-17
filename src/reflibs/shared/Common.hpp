@@ -1,6 +1,6 @@
 //
-// RefShared.hpp
-//  Code shared by all refresh modules.
+// Common.hpp
+//  Code shared by all renderer back-ends.
 //
 #pragma once
 
@@ -38,22 +38,22 @@ using vec4_t = float[4];
 */
 
 // For marking GetRefAPI in each DLL.
-#define REFLIB_DLL_EXPORT __declspec(dllexport)
+#define MRQ2_RENDERLIB_DLL_EXPORT __declspec(dllexport)
 
 // For Errorf() which always aborts.
-#define REFLIB_NORETURN __declspec(noreturn)
+#define MRQ2_RENDERLIB_NORETURN __declspec(noreturn)
 
 // Prevents an otherwise inlineable function from being inlined.
-#define REFLIB_NOINLINE __declspec(noinline)
+#define MRQ2_RENDERLIB_NOINLINE __declspec(noinline)
 
 // Debug-only assert that triggers an immediate debug break.
 // Also generates less code (no function calls emitted).
 #ifndef NDEBUG
-    #define FASTASSERT(expr)         (void)((expr) || (__debugbreak(), 0))
-    #define FASTASSERT_ALIGN16(ptr)  FASTASSERT((std::uintptr_t(ptr) % 16) == 0)
+    #define MRQ2_ASSERT(expr)         (void)((expr) || (__debugbreak(), 0))
+    #define MRQ2_ASSERT_ALIGN16(ptr)  MRQ2_ASSERT((std::uintptr_t(ptr) % 16) == 0)
 #else // NDEBUG
-    #define FASTASSERT(expr)         /* nothing */
-    #define FASTASSERT_ALIGN16(ptr)  /* nothing */
+    #define MRQ2_ASSERT(expr)         // nothing
+    #define MRQ2_ASSERT_ALIGN16(ptr)  // nothing
 #endif // NDEBUG
 
 namespace MrQ2
@@ -257,10 +257,10 @@ public:
 
     PathName(const char * const path)
     {
-        FASTASSERT(path != nullptr);
+        MRQ2_ASSERT(path != nullptr);
         m_length = static_cast<std::uint32_t>(std::strlen(path));
 
-        FASTASSERT(m_length < kNameMaxLen);
+        MRQ2_ASSERT(m_length < kNameMaxLen);
         strcpy_s(m_string, path);
 
         m_hash = FnvHash32(reinterpret_cast<const std::uint8_t *>(m_string), m_length);
@@ -270,15 +270,15 @@ public:
         : m_hash{ hash }
         , m_length{ len }
     {
-        FASTASSERT(hash != 0);
-        FASTASSERT(path != nullptr);
-        FASTASSERT(len < kNameMaxLen);
+        MRQ2_ASSERT(hash != 0);
+        MRQ2_ASSERT(path != nullptr);
+        MRQ2_ASSERT(len < kNameMaxLen);
         strcpy_s(m_string, path);
     }
 
     static std::uint32_t CalcHash(const char * const path)
     {
-        FASTASSERT(path != nullptr);
+        MRQ2_ASSERT(path != nullptr);
         return FnvHash32(reinterpret_cast<const std::uint8_t *>(path), std::strlen(path));
     }
 
@@ -377,7 +377,7 @@ void Initialize(const refimport_s & ri, const char * ref_name);
 void Shutdown();
 
 void Printf(const char * fmt, ...);
-REFLIB_NORETURN void Errorf(const char * fmt, ...);
+MRQ2_RENDERLIB_NORETURN void Errorf(const char * fmt, ...);
 
 int GetTimeMilliseconds();
 

@@ -73,6 +73,11 @@ class UiShader : public ShaderProgram
 		...
 	} resources;
 
+	UiShader()
+	{
+		LoadFXFile("ShaderName.fx");
+	}
+
 	// override from ShaderProgram
 	void UploadConstants() override; // update the cbuffers from CPU data
 	void UploadResources() override; // upload textures to the GPU
@@ -151,13 +156,13 @@ public:
         for (ConstantBuffer & cbuf : m_cbuffers)
         {
             const bool buffer_ok = cbuf.Init(device, buffer_size_in_bytes);
-            FASTASSERT(buffer_ok);
+            MRQ2_ASSERT(buffer_ok);
         }
     }
 
     ConstantBuffer & GetCurrent()
     {
-        FASTASSERT(m_current_buffer < ArrayLength(m_cbuffers));
+        MRQ2_ASSERT(m_current_buffer < ArrayLength(m_cbuffers));
         return m_cbuffers[m_current_buffer];
     }
 
@@ -240,7 +245,7 @@ public:
 
     void Init(ID3D12Device5 * device, const uint32_t num_srv_descriptors)
     {
-        FASTASSERT(num_srv_descriptors != 0);
+        MRQ2_ASSERT(num_srv_descriptors != 0);
 
         D3D12_DESCRIPTOR_HEAP_DESC heap_desc = {};
         heap_desc.Type                       = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -258,7 +263,7 @@ public:
 
     Descriptor AllocateShaderVisibleDescriptor()
     {
-        FASTASSERT(m_srv_descriptor_heap != nullptr);
+        MRQ2_ASSERT(m_srv_descriptor_heap != nullptr);
 
         if (m_srv_descriptors_used == m_srv_descriptor_count)
         {
@@ -312,7 +317,7 @@ public:
 
     void Init(ID3D12Device5 * device, const char * const debug_name, const int max_verts)
     {
-        FASTASSERT(device != nullptr);
+        MRQ2_ASSERT(device != nullptr);
 
         m_num_verts  = max_verts;
         m_debug_name = debug_name;
@@ -335,11 +340,11 @@ public:
 
     VertexType * Increment(const int count)
     {
-        FASTASSERT(count > 0 && count <= m_num_verts);
+        MRQ2_ASSERT(count > 0 && count <= m_num_verts);
 
         VertexType * verts = m_mapped_ptrs[m_buffer_index];
-        FASTASSERT(verts != nullptr);
-        FASTASSERT_ALIGN16(verts);
+        MRQ2_ASSERT(verts != nullptr);
+        MRQ2_ASSERT_ALIGN16(verts);
 
         verts += m_used_verts;
         m_used_verts += count;
@@ -360,7 +365,7 @@ public:
 
     int NumVertsRemaining() const
     {
-        FASTASSERT((m_num_verts - m_used_verts) > 0);
+        MRQ2_ASSERT((m_num_verts - m_used_verts) > 0);
         return m_num_verts - m_used_verts;
     }
 
@@ -376,7 +381,7 @@ public:
 
     void Begin()
     {
-        FASTASSERT(m_used_verts == 0); // Missing End()?
+        MRQ2_ASSERT(m_used_verts == 0); // Missing End()?
 
         // Map the current buffer:
         void * const memory = m_vertex_buffers[m_buffer_index].Map();
@@ -385,13 +390,13 @@ public:
             GameInterface::Errorf("Failed to map %s vertex buffer %i", m_debug_name, m_buffer_index);
         }
 
-        FASTASSERT_ALIGN16(memory);
+        MRQ2_ASSERT_ALIGN16(memory);
         m_mapped_ptrs[m_buffer_index] = static_cast<VertexType *>(memory);
     }
 
     DrawBuffer End()
     {
-        FASTASSERT(m_mapped_ptrs[m_buffer_index] != nullptr); // Missing Begin()?
+        MRQ2_ASSERT(m_mapped_ptrs[m_buffer_index] != nullptr); // Missing Begin()?
 
         VertexBuffer & current_buffer = m_vertex_buffers[m_buffer_index];
         const int current_position = m_used_verts;

@@ -26,7 +26,7 @@
     <ClCompile Include="..\..\src\reflibs\shared\ModelStore.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\Win32Window.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\Palette.cpp" />
-    <ClCompile Include="..\..\src\reflibs\shared\RefShared.cpp" />
+    <ClCompile Include="..\..\src\reflibs\shared\Common.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\RenderDocUtils.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\SkyBox.cpp" />
     <ClCompile Include="..\..\src\reflibs\shared\TextureStore.cpp" />
@@ -44,7 +44,7 @@
     <ClInclude Include="..\..\src\reflibs\shared\ModelStructs.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\Win32Window.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\Pool.hpp" />
-    <ClInclude Include="..\..\src\reflibs\shared\RefShared.hpp" />
+    <ClInclude Include="..\..\src\reflibs\shared\Common.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\RenderDocUtils.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\SkyBox.hpp" />
     <ClInclude Include="..\..\src\reflibs\shared\TextureStore.hpp" />

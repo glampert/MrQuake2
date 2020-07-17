@@ -98,7 +98,7 @@ public:
 
     void Init(const char * const debug_name, const int max_verts, ID3D11Device * device, ID3D11DeviceContext * context)
     {
-        FASTASSERT(device != nullptr && context != nullptr);
+        MRQ2_ASSERT(device != nullptr && context != nullptr);
 
         m_num_verts  = max_verts;
         m_debug_name = debug_name;
@@ -125,11 +125,11 @@ public:
 
     VertexType * Increment(const int count)
     {
-        FASTASSERT(count > 0 && count <= m_num_verts);
+        MRQ2_ASSERT(count > 0 && count <= m_num_verts);
 
         VertexType * verts = m_mapped_ptrs[m_buffer_index];
-        FASTASSERT(verts != nullptr);
-        FASTASSERT_ALIGN16(verts);
+        MRQ2_ASSERT(verts != nullptr);
+        MRQ2_ASSERT_ALIGN16(verts);
 
         verts += m_used_verts;
         m_used_verts += count;
@@ -150,7 +150,7 @@ public:
 
     int NumVertsRemaining() const
     {
-        FASTASSERT((m_num_verts - m_used_verts) > 0);
+        MRQ2_ASSERT((m_num_verts - m_used_verts) > 0);
         return m_num_verts - m_used_verts;
     }
 
@@ -166,7 +166,7 @@ public:
 
     void Begin()
     {
-        FASTASSERT(m_used_verts == 0); // Missing End()?
+        MRQ2_ASSERT(m_used_verts == 0); // Missing End()?
 
         // Map the current buffer:
         D3D11_MAPPED_SUBRESOURCE mapping_info = {};
@@ -175,15 +175,15 @@ public:
             GameInterface::Errorf("Failed to map %s vertex buffer %i", m_debug_name, m_buffer_index);
         }
 
-        FASTASSERT(mapping_info.pData != nullptr);
-        FASTASSERT_ALIGN16(mapping_info.pData);
+        MRQ2_ASSERT(mapping_info.pData != nullptr);
+        MRQ2_ASSERT_ALIGN16(mapping_info.pData);
 
         m_mapped_ptrs[m_buffer_index] = static_cast<VertexType *>(mapping_info.pData);
     }
 
     DrawBuffer End()
     {
-        FASTASSERT(m_mapped_ptrs[m_buffer_index] != nullptr); // Missing Begin()?
+        MRQ2_ASSERT(m_mapped_ptrs[m_buffer_index] != nullptr); // Missing Begin()?
 
         ID3D11Buffer * const current_buffer = m_vertex_buffers[m_buffer_index].Get();
         const int current_position = m_used_verts;
