@@ -76,20 +76,21 @@ inline const DeviceD3D12 & RenderInterfaceD3D12::Device() const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-using Buffer            = BufferD3D12;
-using VertexBuffer      = VertexBufferD3D12;
-using IndexBuffer       = IndexBufferD3D12;
-using ConstantBuffer    = ConstantBufferD3D12;
-using Texture           = TextureD3D12;
-using TextureUpload     = TextureUploadD3D12;
-using UploadContext     = UploadContextD3D12;
-using VertexInputLayout = VertexInputLayoutD3D12;
-using ShaderProgram     = ShaderProgramD3D12;
-using PrimitiveTopology = PrimitiveTopologyD3D12;
-using PipelineState     = PipelineStateD3D12;
-using GraphicsContext   = GraphicsContextD3D12;
-using RenderDevice      = DeviceD3D12;
-using RenderInterface   = RenderInterfaceD3D12;
+using Buffer                 = BufferD3D12;
+using VertexBuffer           = VertexBufferD3D12;
+using IndexBuffer            = IndexBufferD3D12;
+using ConstantBuffer         = ConstantBufferD3D12;
+using ScratchConstantBuffers = ScratchConstantBuffersD3D12;
+using Texture                = TextureD3D12;
+using TextureUpload          = TextureUploadD3D12;
+using UploadContext          = UploadContextD3D12;
+using VertexInputLayout      = VertexInputLayoutD3D12;
+using ShaderProgram          = ShaderProgramD3D12;
+using PrimitiveTopology      = PrimitiveTopologyD3D12;
+using PipelineState          = PipelineStateD3D12;
+using GraphicsContext        = GraphicsContextD3D12;
+using RenderDevice           = DeviceD3D12;
+using RenderInterface        = RenderInterfaceD3D12;
 
 ///////////////////////////////////////////////////////////////////////////////
 

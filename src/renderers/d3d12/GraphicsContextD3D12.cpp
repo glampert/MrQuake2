@@ -53,6 +53,7 @@ void GraphicsContextD3D12::EndFrame()
     m_current_texture_srv    = {};
     m_current_viewport       = {};
     m_current_scissor_rect   = {};
+    m_current_topology       = PrimitiveTopologyD3D12::kCount;
     m_depth_range_changed    = false;
 
     m_current_viewport.MinDepth = 0.0f;
@@ -119,7 +120,7 @@ void GraphicsContextD3D12::SetConstantBuffer(const ConstantBufferD3D12 & cb)
     if (m_current_cb != cb.m_view.BufferLocation)
     {
         m_current_cb = cb.m_view.BufferLocation;
-        m_command_list->SetGraphicsRootConstantBufferView(RootSignatureD3D12::kRootParamIndexCBuffer, m_current_cb);
+        m_command_list->SetGraphicsRootConstantBufferView(RootSignatureD3D12::kRootParamIndexCBuffer0, m_current_cb);
     }
 }
 
@@ -128,16 +129,47 @@ void GraphicsContextD3D12::SetTexture(const TextureD3D12 & texture)
     if (m_current_texture_srv.ptr != texture.m_srv_descriptor.gpu_handle.ptr)
     {
         m_current_texture_srv = texture.m_srv_descriptor.gpu_handle;
-        m_command_list->SetGraphicsRootDescriptorTable(RootSignatureD3D12::kRootParamIndexTexture, m_current_texture_srv);
+        m_command_list->SetGraphicsRootDescriptorTable(RootSignatureD3D12::kRootParamIndexColorTexture, m_current_texture_srv);
     }
 }
 
 void GraphicsContextD3D12::SetPipelineState(const PipelineStateD3D12 & pipeline_state)
 {
-    if (m_current_pipeline_state != pipeline_state.m_state.Get())
+    if (m_current_pipeline_state != &pipeline_state)
     {
-        m_current_pipeline_state = pipeline_state.m_state.Get();
-        m_command_list->SetPipelineState(m_current_pipeline_state);
+        if (!pipeline_state.IsFinalized())
+        {
+            pipeline_state.Finalize();
+        }
+
+        m_current_pipeline_state = &pipeline_state;
+        m_command_list->SetPipelineState(pipeline_state.m_state.Get());
+
+        MRQ2_ASSERT(pipeline_state.m_pso_desc.pRootSignature != nullptr);
+        m_command_list->SetGraphicsRootSignature(pipeline_state.m_pso_desc.pRootSignature);
+
+        m_command_list->OMSetBlendFactor(pipeline_state.m_blend_factor);
+        SetPrimitiveTopology(pipeline_state.m_topology);
+    }
+}
+
+static inline D3D_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D(const PrimitiveTopologyD3D12 topology)
+{
+    switch (topology)
+    {
+    case PrimitiveTopologyD3D12::kTriangleList  : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    case PrimitiveTopologyD3D12::kTriangleStrip : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+    case PrimitiveTopologyD3D12::kTriangleFan   : return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST; // Converted by the front-end
+    default : GameInterface::Errorf("Bad PrimitiveTopology enum!");
+    } // switch
+}
+
+void GraphicsContextD3D12::SetPrimitiveTopology(const PrimitiveTopologyD3D12 topology)
+{
+    if (m_current_topology != topology)
+    {
+        m_current_topology = topology;
+        m_command_list->IASetPrimitiveTopology(PrimitiveTopologyToD3D(m_current_topology));
     }
 }
 

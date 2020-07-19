@@ -4,8 +4,8 @@
 //
 #pragma once
 
-// RefShared includes
 #include "Array.hpp"
+#include "RenderInterface.hpp"
 #include "TextureStore.hpp"
 #include "ModelStore.hpp"
 #include "SkyBox.hpp"
@@ -24,14 +24,14 @@ namespace MrQ2
 
 ===============================================================================
 */
-class ViewDrawState
+class ViewDrawState final
 {
 public:
 
-    // Max per RenderView/frame.
-    static constexpr int kMaxTranslucentEntities = 128;
+    // Max per RenderView
+    static constexpr uint32_t kMaxTranslucentEntities = 128;
 
-    struct FrameData final
+    struct FrameData
     {
         FrameData(TextureStore & texstore, ModelInstance & world, const refdef_t & view)
             : tex_store{ texstore }
@@ -63,14 +63,23 @@ public:
         FixedSizeArray<const entity_t *, kMaxTranslucentEntities> translucent_entities;
     };
 
-    ViewDrawState();
-    virtual ~ViewDrawState() = default;
+    ViewDrawState() = default;
+
+    // Not copyable.
+    ViewDrawState(const ViewDrawState &) = delete;
+    ViewDrawState & operator=(const ViewDrawState &) = delete;
+
+    void Init(const RenderDevice & device, const TextureStore & tex_store);
+    void Shutdown();
+
+    void BeginRenderPass();
+    void EndRenderPass(GraphicsContext & context, const ConstantBuffer & cbuff);
 
     // Level-load registration:
     void BeginRegistration();
     void EndRegistration();
 
-    // Frame/view rending:
+    // Frame/view rendering:
     void RenderViewSetup(FrameData & frame_data);
     void RenderWorldModel(FrameData & frame_data);
     void RenderSkyBox(FrameData & frame_data);
@@ -81,7 +90,7 @@ public:
     // Assignable ref
     SkyBox & Sky() { return m_skybox; }
 
-protected:
+private:
 
     struct BeginBatchArgs
     {
@@ -91,11 +100,8 @@ protected:
         bool                 depth_hack;
     };
 
-    // Implemented by the renderer back-end:
-    virtual MiniImBatch BeginBatch(const BeginBatchArgs & args) = 0;
-    virtual void EndBatch(MiniImBatch & batch) = 0;
-
-private:
+    MiniImBatch BeginBatch(const BeginBatchArgs & args);
+    void EndBatch(MiniImBatch & batch);
 
     // Frame setup:
     void SetUpViewClusters(const FrameData & frame_data);
@@ -126,17 +132,17 @@ private:
 private:
 
     // Current frame number/count
-    int m_frame_count = 0;
+    int m_frame_count{ 0 };
 
     // Bumped when going to a new PVS
-    int m_vis_frame_count = 0;
+    int m_vis_frame_count{ 0 };
 
     // View clusters:
     // BeginRegistration() has to reset them to -1 for a new map.
-    int m_view_cluster      = -1;
-    int m_view_cluster2     = -1;
-    int m_old_view_cluster  = -1;
-    int m_old_view_cluster2 = -1;
+    int m_view_cluster{ -1 };
+    int m_view_cluster2{ -1 };
+    int m_old_view_cluster{ -1 };
+    int m_old_view_cluster2{ -1 };
 
     // Cached Cvars:
     CvarWrapper m_force_null_entity_models;
@@ -149,10 +155,31 @@ private:
     CvarWrapper m_intensity;
 
     // Chain of world surfaces that draw with transparency (water/glass).
-    const ModelSurface * m_alpha_world_surfaces = nullptr;
+    const ModelSurface * m_alpha_world_surfaces{ nullptr };
 
     // SkyBox rendering helper
     SkyBox m_skybox;
+
+    struct DrawCmd
+    {
+        RenderMatrix         model_matrix;
+        const TextureImage * texture;
+        uint32_t             first_vert;
+        uint32_t             vertex_count;
+        PrimitiveTopology    topology;
+        bool                 depth_hack;
+    };
+
+    using DrawCmdList = FixedSizeArray<DrawCmd, 2048>;
+    using VBuffers    = VertexBuffers<DrawVertex3D, RenderInterface::kNumFrameBuffers>;
+
+    PipelineState        m_pipeline_state;
+    ShaderProgram        m_shader;
+    const TextureImage * m_tex_white2x2{ nullptr };
+    bool                 m_batch_open{ false };
+    VBuffers             m_buffers{};
+    DrawCmd              m_current_draw_cmd{};
+    DrawCmdList          m_draw_cmds{};
 };
 
 } // MrQ2

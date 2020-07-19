@@ -17,6 +17,15 @@ constexpr uint32_t kD12NumFrameBuffers = 3;
 template<typename T>
 using D12ComPtr = Microsoft::WRL::ComPtr<T>;
 
+enum class PrimitiveTopologyD3D12 : uint8_t
+{
+    kTriangleList,
+    kTriangleStrip,
+    kTriangleFan,
+
+    kCount
+};
+
 inline uint32_t D12Align(const uint32_t alignment, const uint32_t value)
 {
     const uint32_t a = alignment - 1u;

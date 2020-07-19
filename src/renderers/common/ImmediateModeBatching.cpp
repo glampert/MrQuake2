@@ -35,12 +35,13 @@ void SpriteBatch::BeginFrame()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SpriteBatch::EndFrame(GraphicsContext & context, const PipelineState & pipeline_state, const TextureImage * const opt_tex_atlas)
+void SpriteBatch::EndFrame(GraphicsContext & context, const ConstantBuffer & cbuff, const PipelineState & pipeline_state, const TextureImage * opt_tex_atlas)
 {
     const auto draw_buf = m_buffers.End();
 
-    context.SetVertexBuffer(*draw_buf.buffer_ptr);
     context.SetPipelineState(pipeline_state);
+    context.SetVertexBuffer(*draw_buf.buffer_ptr);
+    context.SetConstantBuffer(cbuff);
 
     // Fast path - one texture for the whole batch:
     if (opt_tex_atlas != nullptr)
@@ -146,6 +147,76 @@ void SpriteBatch::PushQuadTexturedUVs(float x, float y, float w, float h, float 
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// SpriteBatches
+///////////////////////////////////////////////////////////////////////////////
+
+void SpriteBatches::Init(const RenderDevice & device)
+{
+    m_batches[SpriteBatch::kDrawChar].Init(device, 6 * 6000); // 6 verts per quad (expanded to 2 triangles each)
+    m_batches[SpriteBatch::kDrawPics].Init(device, 6 * 128);
+
+    // Shaders
+    const VertexInputLayout vertex_input_layout = {
+        // DrawVertex2D
+        {
+            { VertexInputLayout::kVertexPosition, VertexInputLayout::kFormatFloat4, offsetof(DrawVertex2D, xy_uv) },
+            { VertexInputLayout::kVertexColor,    VertexInputLayout::kFormatFloat4, offsetof(DrawVertex2D, rgba)  },
+        }
+    };
+    if (!m_shader_draw_sprites.LoadFromFile(device, vertex_input_layout, "Draw2D"))
+    {
+        GameInterface::Errorf("WARNING: Failed to load Draw2D shader!");
+    }
+
+    // PipelineState:
+    // - Triangles
+    // - Alpha blend ON
+    // - Depth test OFF
+    // - Depth writes ON
+    // - Backface culling OFF
+    m_pipeline_draw_sprites.Init(device);
+    m_pipeline_draw_sprites.SetPrimitiveTopology(PrimitiveTopology::kTriangleList);
+    m_pipeline_draw_sprites.SetShaderProgram(m_shader_draw_sprites);
+    m_pipeline_draw_sprites.SetAlphaBlendingEnabled(true);
+    m_pipeline_draw_sprites.SetDepthTestEnabled(false);
+    m_pipeline_draw_sprites.SetDepthWritesEnabled(true);
+    m_pipeline_draw_sprites.SetCullEnabled(false);
+    m_pipeline_draw_sprites.Finalize();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void SpriteBatches::Shutdown()
+{
+    for (auto & sb : m_batches)
+    {
+        sb.Shutdown();
+    }
+
+    m_pipeline_draw_sprites.Shutdown();
+    m_shader_draw_sprites.Shutdown();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void SpriteBatches::BeginFrame()
+{
+    m_batches[SpriteBatch::kDrawChar].BeginFrame();
+    m_batches[SpriteBatch::kDrawPics].BeginFrame();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void SpriteBatches::EndFrame(GraphicsContext & context, const ConstantBuffer & cbuff, const TextureImage * glyphs_texture)
+{
+    // Miscellaneous UI sprites
+    m_batches[SpriteBatch::kDrawPics].EndFrame(context, cbuff, m_pipeline_draw_sprites);
+
+    // 2D text last so it overlays the console background
+    m_batches[SpriteBatch::kDrawChar].EndFrame(context, cbuff, m_pipeline_draw_sprites, glyphs_texture);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // MiniImBatch
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -198,9 +269,9 @@ void MiniImBatch::PushModelSurface(const ModelSurface & surf, const vec4_t * con
 {
     MRQ2_ASSERT(IsValid()); // Clear()ed?
 
-    const ModelPoly & poly  = *surf.polys;
-    const int num_triangles = (poly.num_verts - 2);
-    const int num_verts     = (num_triangles  * 3);
+    const ModelPoly & poly   = *surf.polys;
+    const int num_triangles  = (poly.num_verts - 2);
+    const uint32_t num_verts = (num_triangles * 3);
 
     MRQ2_ASSERT(num_triangles > 0);
     MRQ2_ASSERT(num_verts <= NumVerts());
@@ -247,7 +318,7 @@ void MiniImBatch::PushModelSurface(const ModelSurface & surf, const vec4_t * con
 
 MRQ2_RENDERLIB_NOINLINE void MiniImBatch::OverflowError() const
 {
-    GameInterface::Errorf("MiniImBatch overflowed! used_verts=%i, num_verts=%i. "
+    GameInterface::Errorf("MiniImBatch overflowed! used_verts=%u, num_verts=%u. "
                           "Increase vertex batch size.", m_used_verts, m_num_verts);
 }
 

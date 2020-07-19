@@ -6,7 +6,7 @@
 #include "RenderInterface.hpp"
 #include "TextureStore.hpp"
 #include "ModelStore.hpp"
-#include "ImmediateModeBatching.hpp"
+#include "ViewDraw.hpp"
 
 // Quake includes
 #include "client/ref.h"
@@ -24,14 +24,6 @@ namespace MrQ2
 */
 class DLLInterface final
 {
-private:
-
-    static RenderInterface sm_renderer;
-    static SpriteBatches   sm_sprite_batches;
-    static TextureStore    sm_texture_store;
-    static ModelStore      sm_model_store;
-    //TODO ViewDrawState next up!
-
 public:
 
     static int Init(void * hInst, void * wndProc, int fullscreen);
@@ -66,6 +58,21 @@ public:
     static void DrawAltString(int x, int y, const char * s);
     static void DrawNumberBig(int x, int y, int color, int width, int value);
     static void DrawFpsCounter();
+
+private:
+
+    static RenderInterface sm_renderer;
+    static SpriteBatches   sm_sprite_batches;
+    static TextureStore    sm_texture_store;
+    static ModelStore      sm_model_store;
+    static ViewDrawState   sm_view_state;
+
+    struct PerFrameShaderConstants
+    {
+        vec2_t screen_dimensions;
+    };
+    static PerFrameShaderConstants sm_per_frame_shader_consts;
+    static ScratchConstantBuffers  sm_per_frame_const_buffers;
 };
 
 } // MrQ2

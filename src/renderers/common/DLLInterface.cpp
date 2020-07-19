@@ -16,6 +16,11 @@ RenderInterface DLLInterface::sm_renderer;
 SpriteBatches   DLLInterface::sm_sprite_batches;
 TextureStore    DLLInterface::sm_texture_store;
 ModelStore      DLLInterface::sm_model_store;
+ViewDrawState   DLLInterface::sm_view_state;
+
+// Constant buffers:
+DLLInterface::PerFrameShaderConstants DLLInterface::sm_per_frame_shader_consts;
+ScratchConstantBuffers                DLLInterface::sm_per_frame_const_buffers;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -46,18 +51,22 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
 
     // 2D sprite/UI batch setup
     sm_sprite_batches.Init(sm_renderer.Device());
+    sm_per_frame_const_buffers.Init(sm_renderer.Device(), sizeof(sm_per_frame_shader_consts));
 
     // Stores/view:
     sm_texture_store.Init(sm_renderer.Device());
     sm_model_store.Init(sm_texture_store);
+    sm_view_state.Init(sm_renderer.Device(), sm_texture_store);
 
     return true;
 }
 
 void DLLInterface::Shutdown()
 {
+    sm_view_state.Shutdown();
     sm_model_store.Shutdown();
     sm_texture_store.Shutdown();
+    sm_per_frame_const_buffers.Shutdown();
     sm_sprite_batches.Shutdown();
     sm_renderer.Shutdown();
 
@@ -69,7 +78,7 @@ void DLLInterface::BeginRegistration(const char * const map_name)
 {
     GameInterface::Printf("**** DLLInterface::BeginRegistration ****");
 
-    //RB::ViewState()->BeginRegistration();
+    sm_view_state.BeginRegistration();
     sm_texture_store.BeginRegistration();
     sm_model_store.BeginRegistration(map_name);
 
@@ -83,7 +92,7 @@ void DLLInterface::EndRegistration()
     sm_model_store.EndRegistration();
     sm_texture_store.EndRegistration();
     sm_texture_store.UploadScrapIfNeeded();
-    //RB::ViewState()->EndRegistration();
+    sm_view_state.EndRegistration();
 
     MemTagsPrintAll();
 }
@@ -113,8 +122,7 @@ image_s * DLLInterface::RegisterPic(const char * const name)
 
 void DLLInterface::SetSky(const char * const name, const float rotate, vec3_t axis)
 {
-    //TODO
-    //RB::ViewState()->Sky() = SkyBox(*RB::TexStore(), name, rotate, axis);
+    sm_view_state.Sky() = SkyBox{ sm_texture_store, name, rotate, axis };
 }
 
 void DLLInterface::DrawGetPicSize(int * out_w, int * out_h, const char * const name)
@@ -145,8 +153,16 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
 void DLLInterface::EndFrame()
 {
     DrawFpsCounter();
-    sm_sprite_batches.EndFrame(sm_renderer.Device().GraphicsContext());
+
+    sm_per_frame_shader_consts.screen_dimensions[0] = static_cast<float>(sm_renderer.RenderWidth());
+    sm_per_frame_shader_consts.screen_dimensions[1] = static_cast<float>(sm_renderer.RenderHeight());
+    sm_per_frame_const_buffers.CurrentBuffer().WriteStruct(sm_per_frame_shader_consts);
+
+    auto & context = sm_renderer.Device().GraphicsContext();
+    sm_sprite_batches.EndFrame(context, sm_per_frame_const_buffers.CurrentBuffer(), sm_texture_store.tex_conchars);
     sm_renderer.EndFrame();
+
+    sm_per_frame_const_buffers.MoveToNextFrame();
 }
 
 void DLLInterface::RenderFrame(refdef_t * const view_def)

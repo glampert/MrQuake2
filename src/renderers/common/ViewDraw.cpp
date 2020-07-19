@@ -171,16 +171,120 @@ static RenderMatrix MakeEntityModelMatrix(const entity_t & entity, const bool fl
 // ViewDrawState
 ///////////////////////////////////////////////////////////////////////////////
 
-ViewDrawState::ViewDrawState()
-    : m_force_null_entity_models{ GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0) }
-    , m_lerp_entity_models{ GameInterface::Cvar::Get("r_lerp_entity_models", "1", 0) }
-    , m_skip_draw_alpha_surfs{ GameInterface::Cvar::Get("r_skip_draw_alpha_surfs", "0", 0) }
-    , m_skip_draw_texture_chains{ GameInterface::Cvar::Get("r_skip_draw_texture_chains", "0", 0) }
-    , m_skip_draw_world{ GameInterface::Cvar::Get("r_skip_draw_world", "0", 0) }
-    , m_skip_draw_sky{ GameInterface::Cvar::Get("r_skip_draw_sky", "0", 0) }
-    , m_skip_draw_entities{ GameInterface::Cvar::Get("r_skip_draw_entities", "0", 0) }
-    , m_intensity{ GameInterface::Cvar::Get("r_intensity", "2", 0) }
+void ViewDrawState::Init(const RenderDevice & device, const TextureStore & tex_store)
 {
+    m_tex_white2x2 = tex_store.tex_white2x2;
+
+    m_force_null_entity_models = GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0);
+    m_lerp_entity_models       = GameInterface::Cvar::Get("r_lerp_entity_models", "1", 0);
+    m_skip_draw_alpha_surfs    = GameInterface::Cvar::Get("r_skip_draw_alpha_surfs", "0", 0);
+    m_skip_draw_texture_chains = GameInterface::Cvar::Get("r_skip_draw_texture_chains", "0", 0);
+    m_skip_draw_world          = GameInterface::Cvar::Get("r_skip_draw_world", "0", 0);
+    m_skip_draw_sky            = GameInterface::Cvar::Get("r_skip_draw_sky", "0", 0);
+    m_skip_draw_entities       = GameInterface::Cvar::Get("r_skip_draw_entities", "0", 0);
+    m_intensity                = GameInterface::Cvar::Get("r_intensity", "2", 0);
+
+    constexpr uint32_t kViewDrawBatchSize = 25000; // max vertices * num buffers
+    m_buffers.Init(device, kViewDrawBatchSize);
+
+    // TODO
+    //m_shader.LoadFromFile();
+    //m_pipeline_state.Init(device);
+    //m_pipeline_state.Finalize();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::Shutdown()
+{
+    m_alpha_world_surfaces = nullptr;
+    m_tex_white2x2 = nullptr;
+
+    m_pipeline_state.Shutdown();
+    m_shader.Shutdown();
+    m_buffers.Shutdown();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::BeginRenderPass()
+{
+    MRQ2_ASSERT(m_batch_open == false);
+    MRQ2_ASSERT(m_draw_cmds.empty());
+
+    m_buffers.Begin();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::EndRenderPass(GraphicsContext & context, const ConstantBuffer & cbuff)
+{
+    MRQ2_ASSERT(m_batch_open == false);
+
+    const auto draw_buf = m_buffers.End();
+
+    context.SetPipelineState(m_pipeline_state);
+    context.SetVertexBuffer(*draw_buf.buffer_ptr);
+    context.SetConstantBuffer(cbuff);
+
+    for (const DrawCmd & cmd : m_draw_cmds)
+    {
+        // Depth hack to prevent weapons from poking into geometry.
+        if (cmd.depth_hack)
+        {
+            constexpr float depth_min = 0.0f;
+            constexpr float depth_max = 1.0f;
+            context.SetDepthRange(depth_min, depth_min + 0.3f * (depth_max - depth_min));
+        }
+
+        context.SetPrimitiveTopology(cmd.topology);
+        context.SetTexture(cmd.texture->texture);
+        context.Draw(cmd.first_vert, cmd.vertex_count);
+
+        // Restore to default if we did a depth-hacked draw.
+        context.RestoreDepthRange();
+    }
+
+    m_draw_cmds.clear();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+MiniImBatch ViewDrawState::BeginBatch(const BeginBatchArgs & args)
+{
+    MRQ2_ASSERT(m_batch_open == false);
+    MRQ2_ASSERT_ALIGN16(args.model_matrix.floats);
+
+    m_current_draw_cmd.model_matrix = args.model_matrix;
+    m_current_draw_cmd.texture      = (args.optional_tex != nullptr) ? args.optional_tex : m_tex_white2x2;
+    m_current_draw_cmd.topology     = args.topology;
+    m_current_draw_cmd.depth_hack   = args.depth_hack;
+    m_current_draw_cmd.first_vert   = 0;
+    m_current_draw_cmd.vertex_count = 0;
+
+    m_batch_open = true;
+
+    return MiniImBatch{ m_buffers.CurrentVertexPtr(), m_buffers.NumVertsRemaining(), args.topology };
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::EndBatch(MiniImBatch & batch)
+{
+    MRQ2_ASSERT(batch.IsValid());
+    MRQ2_ASSERT(m_batch_open == true);
+    MRQ2_ASSERT(m_current_draw_cmd.topology == batch.Topology());
+
+    m_current_draw_cmd.first_vert   = m_buffers.CurrentPosition();
+    m_current_draw_cmd.vertex_count = batch.UsedVerts();
+
+    m_buffers.Increment(batch.UsedVerts());
+
+    m_draw_cmds.push_back(m_current_draw_cmd);
+    m_current_draw_cmd = {};
+
+    batch.Clear();
+    m_batch_open = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

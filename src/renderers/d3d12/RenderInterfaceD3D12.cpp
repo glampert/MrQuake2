@@ -22,12 +22,14 @@ void RenderInterfaceD3D12::Init(HINSTANCE hInst, WNDPROC wndProc, const int widt
     m_render_targets.Init(m_device, m_swap_chain, m_descriptor_heap, width, height);
     m_upload_ctx.Init(m_device);
     m_graphics_ctx.Init(m_device, m_swap_chain, m_render_targets);
+    RootSignatureD3D12::CreateGlobalRootSignature(m_device);
 }
 
 void RenderInterfaceD3D12::Shutdown()
 {
     GameInterface::Printf("**** RenderInterfaceD3D12::Shutdown ****");
 
+    RootSignatureD3D12::sm_global.Shutdown();
     m_graphics_ctx.Shutdown();
     m_upload_ctx.Shutdown();
     m_render_targets.Shutdown();

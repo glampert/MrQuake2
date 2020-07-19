@@ -11,6 +11,89 @@ namespace MrQ2
 {
 
 ///////////////////////////////////////////////////////////////////////////////
+// RootSignatureD3D12
+///////////////////////////////////////////////////////////////////////////////
+
+RootSignatureD3D12 RootSignatureD3D12::sm_global;
+
+void RootSignatureD3D12::Init(const DeviceD3D12 & device)
+{
+    D12ComPtr<ID3DBlob> blob{};
+    if (FAILED(D3D12SerializeRootSignature(&root_sig_desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr)))
+    {
+        GameInterface::Errorf("Failed to serialize D3D12 RootSignature!");
+    }
+
+    MRQ2_ASSERT(blob != nullptr);
+    MRQ2_ASSERT(root_sig == nullptr);
+
+    if (FAILED(device.device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&root_sig))))
+    {
+        GameInterface::Errorf("Failed to create D3D12 RootSignature!");
+    }
+}
+
+void RootSignatureD3D12::Shutdown()
+{
+    root_sig = nullptr;
+    root_sig_desc = {};
+}
+
+void RootSignatureD3D12::CreateGlobalRootSignature(const DeviceD3D12 & device)
+{
+    D3D12_ROOT_PARAMETER params[RootSignatureD3D12::kRootParameterCount] = {};
+
+    // Constant buffer b0
+    {
+        params[RootSignatureD3D12::kRootParamIndexCBuffer0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+        params[RootSignatureD3D12::kRootParamIndexCBuffer0].Descriptor.ShaderRegister = 0;
+        params[RootSignatureD3D12::kRootParamIndexCBuffer0].Descriptor.RegisterSpace = RootSignatureD3D12::kRootParamIndexCBuffer0;
+        params[RootSignatureD3D12::kRootParamIndexCBuffer0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    }
+
+    // Sampler s0
+    {
+        D3D12_DESCRIPTOR_RANGE desc_range = {};
+        desc_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        desc_range.NumDescriptors = 1;
+        desc_range.BaseShaderRegister = 0;
+        desc_range.RegisterSpace = 0;
+        desc_range.OffsetInDescriptorsFromTableStart = 0;
+
+        params[RootSignatureD3D12::kRootParamIndexColorTexture].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[RootSignatureD3D12::kRootParamIndexColorTexture].DescriptorTable.NumDescriptorRanges = 1;
+        params[RootSignatureD3D12::kRootParamIndexColorTexture].DescriptorTable.pDescriptorRanges = &desc_range;
+        params[RootSignatureD3D12::kRootParamIndexColorTexture].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    }
+
+    D3D12_STATIC_SAMPLER_DESC static_sampler = {};
+    static_sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    static_sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    static_sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    static_sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    static_sampler.MipLODBias = 0.0f;
+    static_sampler.MaxAnisotropy = 0;
+    static_sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    static_sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+    static_sampler.MinLOD = 0.0f;
+    static_sampler.MaxLOD = 0.0f;
+    static_sampler.ShaderRegister = 0;
+    static_sampler.RegisterSpace = 0;
+    static_sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    sm_global.root_sig_desc.NumParameters = ArrayLength(params);
+    sm_global.root_sig_desc.pParameters = params;
+    sm_global.root_sig_desc.NumStaticSamplers = 1;
+    sm_global.root_sig_desc.pStaticSamplers = &static_sampler;
+    sm_global.root_sig_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+                                    D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+                                    D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                                    D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+
+    sm_global.Init(device);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // ShaderProgramD3D12
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -19,7 +102,7 @@ static const char D3D12ShadersPath[] = "src\\renderers\\d3d12\\shaders";
 
 bool ShaderProgramD3D12::LoadFromFile(const DeviceD3D12 & device, const VertexInputLayoutD3D12 & input_layout, const char * filename)
 {
-    return LoadFromFile(device, input_layout, filename, "PS_main", "VS_main", device.debug_validation);
+    return LoadFromFile(device, input_layout, filename, "VS_main", "PS_main", device.debug_validation);
 }
 
 bool ShaderProgramD3D12::LoadFromFile(const DeviceD3D12 & device, const VertexInputLayoutD3D12 & input_layout,
@@ -29,7 +112,7 @@ bool ShaderProgramD3D12::LoadFromFile(const DeviceD3D12 & device, const VertexIn
 
     constexpr size_t kMaxPathLen = 1024;
     char full_shader_path[kMaxPathLen] = {};
-    sprintf_s(full_shader_path, "%s\\%s", D3D12ShadersPath, filename);
+    sprintf_s(full_shader_path, "%s\\%s.fx", D3D12ShadersPath, filename);
 
     size_t num_converted = 0;
     wchar_t full_shader_path_wide[kMaxPathLen] = {};
@@ -49,7 +132,37 @@ bool ShaderProgramD3D12::LoadFromFile(const DeviceD3D12 & device, const VertexIn
     }
 
     m_device = &device;
-    m_inputLayout = input_layout;
+    m_input_layout = input_layout;
+
+    // Convert and cache the D3D12 input layout
+    const char * const d3d_input_layout_type_conv[] = { nullptr, "POSITION", "TEXCOORD", "COLOR" };
+    static_assert(ArrayLength(d3d_input_layout_type_conv) == VertexInputLayoutD3D12::kElementTypeCount);
+
+    const DXGI_FORMAT d3d_input_layout_format_conv[] = { DXGI_FORMAT_UNKNOWN, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT, DXGI_FORMAT_R32G32B32A32_FLOAT };
+    static_assert(ArrayLength(d3d_input_layout_format_conv) == VertexInputLayoutD3D12::kElementFormatCount);
+
+    uint32_t e = 0;
+    for (const auto & element : input_layout.elements)
+    {
+        if (element.type   == VertexInputLayoutD3D12::kInvalidElementType ||
+            element.format == VertexInputLayoutD3D12::kInvalidElementFormat)
+        {
+            continue;
+        }
+
+        m_input_layout_d3d[e].SemanticName         = d3d_input_layout_type_conv[element.type];
+        m_input_layout_d3d[e].SemanticIndex        = 0;
+        m_input_layout_d3d[e].Format               = d3d_input_layout_format_conv[element.format];
+        m_input_layout_d3d[e].InputSlot            = 0;
+        m_input_layout_d3d[e].AlignedByteOffset    = element.offset;
+        m_input_layout_d3d[e].InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+        m_input_layout_d3d[e].InstanceDataStepRate = 0;
+        ++e;
+    }
+
+    m_input_layout_count = e;
+    m_is_loaded = true;
+
     return true;
 }
 
@@ -57,7 +170,7 @@ void ShaderProgramD3D12::Shutdown()
 {
     m_device          = nullptr;
     m_shader_bytecode = {};
-    m_inputLayout     = {};
+    m_is_loaded       = false;
 }
 
 bool ShaderProgramD3D12::CompileShaderFromFile(const wchar_t * filename, const char * entry_point, const char * shader_model, const bool debug, ID3DBlob ** out_blob)
@@ -80,7 +193,10 @@ bool ShaderProgramD3D12::CompileShaderFromFile(const wchar_t * filename, const c
     if (FAILED(hr))
     {
         auto * details = (error_blob ? static_cast<const char *>(error_blob->GetBufferPointer()) : "<no info>");
-        GameInterface::Printf("WARNING: Failed to compile shader: %s.\n\nError info: %s", Win32Window::ErrorToString(hr).c_str(), details);
+        GameInterface::Printf(
+            "WARNING: Failed to compile shader: %s\n"
+            "Shader Compiler error info: %s",
+            Win32Window::ErrorToString(hr).c_str(), details);
         return false;
     }
 

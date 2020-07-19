@@ -15,7 +15,7 @@ namespace MrQ2
 /*
 ===============================================================================
 
-    DrawVertex3D / DrawVertex2D / PrimitiveTopology
+    DrawVertex3D / DrawVertex2D
 
 ===============================================================================
 */
@@ -197,7 +197,7 @@ public:
     void Shutdown();
 
     void BeginFrame();
-    void EndFrame(GraphicsContext & context, const PipelineState & pipeline_state, const TextureImage * const opt_tex_atlas = nullptr);
+    void EndFrame(GraphicsContext & context, const ConstantBuffer & cbuff, const PipelineState & pipeline_state, const TextureImage * const opt_tex_atlas = nullptr);
 
     DrawVertex2D * Increment(const uint32_t count)
     {
@@ -241,43 +241,19 @@ class SpriteBatches final
 {
 public:
 
-    void Init(const RenderDevice & device)
-    {
-        m_batches[SpriteBatch::kDrawChar].Init(device, 6 * 6000); // 6 verts per quad (expanded to 2 triangles each)
-        m_batches[SpriteBatch::kDrawPics].Init(device, 6 * 128);
-    }
+    void Init(const RenderDevice & device);
+    void Shutdown();
 
-    void Shutdown()
-    {
-        for (auto & sb : m_batches)
-        {
-            sb.Shutdown();
-        }
-    }
-
-    void BeginFrame()
-    {
-        m_batches[SpriteBatch::kDrawChar].BeginFrame();
-        m_batches[SpriteBatch::kDrawPics].BeginFrame();
-    }
-
-    void EndFrame(GraphicsContext & context)
-    {
-        // Miscellaneous UI sprites
-        m_batches[SpriteBatch::kDrawPics].EndFrame(context, m_pipeline_draw_sprites);
-
-        // 2D text last so it overlays the console background
-        m_batches[SpriteBatch::kDrawChar].EndFrame(context, m_pipeline_draw_sprites, m_chars_texture);
-    }
+    void BeginFrame();
+    void EndFrame(GraphicsContext & context, const ConstantBuffer & cbuff, const TextureImage * glyphs_texture);
 
     SpriteBatch & Get(const SpriteBatch::BatchIndex index) { return m_batches[index]; }
 
 private:
 
-    SpriteBatch          m_batches[SpriteBatch::kBatchCount];
-    const TextureImage * m_chars_texture{ nullptr };
-    PipelineState        m_pipeline_draw_sprites;
-    ShaderProgram        m_shader_draw_sprites;
+    SpriteBatch   m_batches[SpriteBatch::kBatchCount];
+    PipelineState m_pipeline_draw_sprites;
+    ShaderProgram m_shader_draw_sprites;
 };
 
 /*
@@ -292,7 +268,7 @@ class MiniImBatch final
 {
 public:
 
-    MiniImBatch(DrawVertex3D * const verts_ptr, const int num_verts, const PrimitiveTopology topology)
+    MiniImBatch(DrawVertex3D * const verts_ptr, const uint32_t num_verts, const PrimitiveTopology topology)
         : m_verts_ptr{ verts_ptr }
         , m_num_verts{ num_verts }
         , m_used_verts{ 0 }
@@ -309,7 +285,7 @@ public:
         m_used_verts = 0;
     }
 
-    DrawVertex3D * Increment(const int num_verts)
+    DrawVertex3D * Increment(const uint32_t num_verts)
     {
         auto * first_vert = (m_verts_ptr + m_used_verts);
         m_used_verts += num_verts;
@@ -341,9 +317,10 @@ public:
     void PushVertex(const DrawVertex3D & vert);
     void PushModelSurface(const ModelSurface & surf, const vec4_t * opt_color_override = nullptr);
 
-    int  NumVerts()  const { return m_num_verts; }
-    int  UsedVerts() const { return m_used_verts; }
-    bool IsValid()   const { return m_verts_ptr != nullptr; }
+    uint32_t NumVerts()  const { return m_num_verts; }
+    uint32_t UsedVerts() const { return m_used_verts; }
+
+    bool IsValid() const { return m_verts_ptr != nullptr; }
     PrimitiveTopology Topology() const { return m_topology; }
 
 private:
@@ -351,12 +328,12 @@ private:
     MRQ2_RENDERLIB_NORETURN void OverflowError() const;
 
     DrawVertex3D *    m_verts_ptr;
-    int               m_num_verts;
-    int               m_used_verts;
+    uint32_t          m_num_verts;
+    uint32_t          m_used_verts;
     PrimitiveTopology m_topology;
 
     // Triangle fan emulation support:
-    std::uint8_t      m_tri_fan_vert_count;
+    uint8_t           m_tri_fan_vert_count;
     DrawVertex3D      m_tri_fan_first_vert;
     DrawVertex3D      m_tri_fan_last_vert;
 

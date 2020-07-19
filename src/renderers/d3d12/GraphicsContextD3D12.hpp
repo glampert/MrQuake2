@@ -44,6 +44,7 @@ public:
     void SetConstantBuffer(const ConstantBufferD3D12 & cb);
     void SetTexture(const TextureD3D12 & texture);
     void SetPipelineState(const PipelineStateD3D12 & pipeline_state);
+    void SetPrimitiveTopology(const PrimitiveTopologyD3D12 topology);
 
     // Draw calls
     void Draw(const uint32_t first_vertex, const uint32_t vertex_count);
@@ -56,13 +57,14 @@ private:
     ID3D12GraphicsCommandList *         m_command_list{ nullptr };
 
     // Cached states:
-    ID3D12PipelineState *               m_current_pipeline_state{ nullptr };
+    const PipelineStateD3D12 *          m_current_pipeline_state{ nullptr };
     D3D12_GPU_VIRTUAL_ADDRESS           m_current_vb{};
     D3D12_GPU_VIRTUAL_ADDRESS           m_current_ib{};
     D3D12_GPU_VIRTUAL_ADDRESS           m_current_cb{};
     D3D12_GPU_DESCRIPTOR_HANDLE         m_current_texture_srv{};
     D3D12_VIEWPORT                      m_current_viewport{};
     RECT                                m_current_scissor_rect{};
+    PrimitiveTopologyD3D12              m_current_topology{ PrimitiveTopologyD3D12::kCount };
     bool                                m_depth_range_changed{ false };
 };
 

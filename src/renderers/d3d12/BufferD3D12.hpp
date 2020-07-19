@@ -122,7 +122,9 @@ public:
     {
         m_current_buffer = 0;
         for (auto & cbuf : m_cbuffers)
+        {
             cbuf.Shutdown();
+        }
     }
 
     ConstantBufferD3D12 & CurrentBuffer()

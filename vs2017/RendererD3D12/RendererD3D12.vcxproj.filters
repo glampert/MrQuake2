@@ -8,6 +8,9 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="Backend\Shaders">
+      <UniqueIdentifier>{1927f21f-f543-45e8-a6af-53e24bc68493}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\renderers\d3d12\BufferD3D12.cpp">
@@ -159,5 +162,10 @@
     <ClInclude Include="..\..\src\renderers\common\ImmediateModeBatching.hpp">
       <Filter>Common</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\src\renderers\d3d12\shaders\Draw2D.fx">
+      <Filter>Backend\Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>
