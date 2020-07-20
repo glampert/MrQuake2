@@ -40,9 +40,9 @@ public:
         { }
 
         // Frame matrices for the back-end
-        RenderMatrix view_matrix;
-        RenderMatrix proj_matrix;
-        RenderMatrix view_proj_matrix;
+        RenderMatrix view_matrix{};
+        RenderMatrix proj_matrix{};
+        RenderMatrix view_proj_matrix{};
 
         // Inputs
         TextureStore  & tex_store;
@@ -50,14 +50,14 @@ public:
         const refdef_t  view_def; // Local copy
 
         // Scene viewer/camera
-        vec3_t camera_origin;
-        vec3_t camera_lookat;
-        vec3_t forward_vec;
-        vec3_t right_vec;
-        vec3_t up_vec;
+        vec3_t camera_origin{};
+        vec3_t camera_lookat{};
+        vec3_t forward_vec{};
+        vec3_t right_vec{};
+        vec3_t up_vec{};
 
         // View frustum for the frame, so we can cull bounding boxes out of view
-        cplane_t frustum[4];
+        cplane_t frustum[4] = {};
 
         // Batched from RenderSolidEntities for the translucencies pass.
         FixedSizeArray<const entity_t *, kMaxTranslucentEntities> translucent_entities;
@@ -73,13 +73,14 @@ public:
     void Shutdown();
 
     void BeginRenderPass();
-    void EndRenderPass(GraphicsContext & context, const ConstantBuffer & cbuff);
+    void EndRenderPass(const FrameData & frame_data, GraphicsContext & context, const ArrayBase<const ConstantBuffer *> & cbuffers, const PipelineState & pipeline_state);
 
     // Level-load registration:
     void BeginRegistration();
     void EndRegistration();
 
     // Frame/view rendering:
+    void DoRenderView(FrameData & frame_data, GraphicsContext & context, const ArrayBase<const ConstantBuffer *> & cbuffers);
     void RenderViewSetup(FrameData & frame_data);
     void RenderWorldModel(FrameData & frame_data);
     void RenderSkyBox(FrameData & frame_data);
@@ -160,6 +161,15 @@ private:
     // SkyBox rendering helper
     SkyBox m_skybox;
 
+    //
+    // Low-level render back-end state:
+    //
+
+    struct PerDrawShaderConstants
+    {
+        RenderMatrix model_matrix;
+    };
+
     struct DrawCmd
     {
         RenderMatrix         model_matrix;
@@ -173,11 +183,14 @@ private:
     using DrawCmdList = FixedSizeArray<DrawCmd, 2048>;
     using VBuffers    = VertexBuffers<DrawVertex3D, RenderInterface::kNumFrameBuffers>;
 
-    PipelineState        m_pipeline_state;
-    ShaderProgram        m_shader;
+    PipelineState        m_pipeline_solid_geometry;
+    PipelineState        m_pipeline_translucent_world_geometry;
+    PipelineState        m_pipeline_translucent_entities;
+    ShaderProgram        m_render3d_shader;
+    ConstantBuffer       m_per_draw_const_buffer;
     const TextureImage * m_tex_white2x2{ nullptr };
     bool                 m_batch_open{ false };
-    VBuffers             m_buffers{};
+    VBuffers             m_vertex_buffers{};
     DrawCmd              m_current_draw_cmd{};
     DrawCmdList          m_draw_cmds{};
 };

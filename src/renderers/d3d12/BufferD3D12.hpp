@@ -85,7 +85,10 @@ class ConstantBufferD3D12 final : public BufferD3D12
 
 public:
 
-    bool Init(const DeviceD3D12 & device, const uint32_t buffer_size_in_bytes);
+    // Buffer is updated, used for a single draw call then discarded (PerDrawShaderConstants).
+    enum Flags : uint32_t { kNoFlags = 0, kOptimizeForSingleDraw = (1 << 1) };
+
+    bool Init(const DeviceD3D12 & device, const uint32_t buffer_size_in_bytes, const Flags flags = kNoFlags);
 
     template<typename T>
     void WriteStruct(const T & cbuffer_data)
@@ -101,6 +104,7 @@ public:
 private:
 
     D3D12_CONSTANT_BUFFER_VIEW_DESC m_view = {};
+    Flags m_flags{ kNoFlags };
 };
 
 ///////////////////////////////////////////////////////////////////////////////

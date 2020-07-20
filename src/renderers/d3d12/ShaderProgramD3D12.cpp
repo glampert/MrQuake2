@@ -3,6 +3,7 @@
 //
 
 #include "../common/Win32Window.hpp"
+#include "../common/Array.hpp"
 #include "ShaderProgramD3D12.hpp"
 #include "DeviceD3D12.hpp"
 #include <d3dcompiler.h>
@@ -16,7 +17,7 @@ namespace MrQ2
 
 RootSignatureD3D12 RootSignatureD3D12::sm_global;
 
-void RootSignatureD3D12::Init(const DeviceD3D12 & device)
+void RootSignatureD3D12::Init(const DeviceD3D12 & device, const D3D12_ROOT_SIGNATURE_DESC & root_sig_desc)
 {
     D12ComPtr<ID3DBlob> blob{};
     if (FAILED(D3D12SerializeRootSignature(&root_sig_desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr)))
@@ -36,61 +37,79 @@ void RootSignatureD3D12::Init(const DeviceD3D12 & device)
 void RootSignatureD3D12::Shutdown()
 {
     root_sig = nullptr;
-    root_sig_desc = {};
 }
 
 void RootSignatureD3D12::CreateGlobalRootSignature(const DeviceD3D12 & device)
 {
-    D3D12_ROOT_PARAMETER params[RootSignatureD3D12::kRootParameterCount] = {};
+    FixedSizeArray<D3D12_ROOT_PARAMETER, kRootParameterCount> params{};
 
-    // Constant buffer b0
+    // Constant buffers b0,bN-1
+    int cbuffer_slot = 0;
+    for (; cbuffer_slot < kCBufferCount - 1; ++cbuffer_slot)
     {
-        params[RootSignatureD3D12::kRootParamIndexCBuffer0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-        params[RootSignatureD3D12::kRootParamIndexCBuffer0].Descriptor.ShaderRegister = 0;
-        params[RootSignatureD3D12::kRootParamIndexCBuffer0].Descriptor.RegisterSpace = RootSignatureD3D12::kRootParamIndexCBuffer0;
-        params[RootSignatureD3D12::kRootParamIndexCBuffer0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        D3D12_ROOT_PARAMETER param = {};
+        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+        param.Descriptor.ShaderRegister = cbuffer_slot;
+        param.Descriptor.RegisterSpace  = 0;
+        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        params.push_back(param);
     }
 
-    // Sampler s0
+    // Last constant buffer is actually a set of Root constants so we can efficiently updated them per draw
     {
-        D3D12_DESCRIPTOR_RANGE desc_range = {};
-        desc_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        desc_range.NumDescriptors = 1;
-        desc_range.BaseShaderRegister = 0;
-        desc_range.RegisterSpace = 0;
-        desc_range.OffsetInDescriptorsFromTableStart = 0;
-
-        params[RootSignatureD3D12::kRootParamIndexColorTexture].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[RootSignatureD3D12::kRootParamIndexColorTexture].DescriptorTable.NumDescriptorRanges = 1;
-        params[RootSignatureD3D12::kRootParamIndexColorTexture].DescriptorTable.pDescriptorRanges = &desc_range;
-        params[RootSignatureD3D12::kRootParamIndexColorTexture].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        D3D12_ROOT_PARAMETER param = {};
+        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        param.Constants.ShaderRegister = cbuffer_slot;
+        param.Constants.RegisterSpace  = 0;
+		param.Constants.Num32BitValues = kMaxInlineRootConstants;
+        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        params.push_back(param);
     }
 
-    D3D12_STATIC_SAMPLER_DESC static_sampler = {};
-    static_sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-    static_sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    static_sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    static_sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    static_sampler.MipLODBias = 0.0f;
-    static_sampler.MaxAnisotropy = 0;
-    static_sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-    static_sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-    static_sampler.MinLOD = 0.0f;
-    static_sampler.MaxLOD = 0.0f;
-    static_sampler.ShaderRegister = 0;
-    static_sampler.RegisterSpace = 0;
-    static_sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    // Sampler/texture s0
+    {
+        D3D12_DESCRIPTOR_RANGE descriptor_range = {};
+        descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        descriptor_range.NumDescriptors = 1;
+        descriptor_range.BaseShaderRegister = 0;
+        descriptor_range.RegisterSpace = 0;
+        descriptor_range.OffsetInDescriptorsFromTableStart = 0;
 
-    sm_global.root_sig_desc.NumParameters = ArrayLength(params);
-    sm_global.root_sig_desc.pParameters = params;
-    sm_global.root_sig_desc.NumStaticSamplers = 1;
-    sm_global.root_sig_desc.pStaticSamplers = &static_sampler;
-    sm_global.root_sig_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-                                    D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-                                    D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                                    D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+        D3D12_ROOT_PARAMETER param = {};
+        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        param.DescriptorTable.NumDescriptorRanges = 1;
+        param.DescriptorTable.pDescriptorRanges = &descriptor_range;
+        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params.push_back(param);
+    }
 
-    sm_global.Init(device);
+    // Sampler descs
+    D3D12_STATIC_SAMPLER_DESC static_samplers[1] = {};
+    static_samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    static_samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    static_samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    static_samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    static_samplers[0].MipLODBias = 0.0f;
+    static_samplers[0].MaxAnisotropy = 0;
+    static_samplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    static_samplers[0].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+    static_samplers[0].MinLOD = 0.0f;
+    static_samplers[0].MaxLOD = 0.0f;
+    static_samplers[0].ShaderRegister = 0;
+    static_samplers[0].RegisterSpace = 0;
+    static_samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    D3D12_ROOT_SIGNATURE_DESC root_sig_desc = {};
+    root_sig_desc.NumParameters     = params.size();
+    root_sig_desc.pParameters       = params.data();
+    root_sig_desc.NumStaticSamplers = ArrayLength(static_samplers);
+    root_sig_desc.pStaticSamplers   = static_samplers;
+    root_sig_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+                          D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+                          D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                          D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+
+    sm_global.Init(device, root_sig_desc);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -131,9 +150,6 @@ bool ShaderProgramD3D12::LoadFromFile(const DeviceD3D12 & device, const VertexIn
         return false;
     }
 
-    m_device = &device;
-    m_input_layout = input_layout;
-
     // Convert and cache the D3D12 input layout
     const char * const d3d_input_layout_type_conv[] = { nullptr, "POSITION", "TEXCOORD", "COLOR" };
     static_assert(ArrayLength(d3d_input_layout_type_conv) == VertexInputLayoutD3D12::kElementTypeCount);
@@ -160,6 +176,7 @@ bool ShaderProgramD3D12::LoadFromFile(const DeviceD3D12 & device, const VertexIn
         ++e;
     }
 
+    m_device = &device;
     m_input_layout_count = e;
     m_is_loaded = true;
 

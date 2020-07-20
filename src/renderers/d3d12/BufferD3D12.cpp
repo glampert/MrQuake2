@@ -103,13 +103,14 @@ bool IndexBufferD3D12::Init(const DeviceD3D12 & device, const uint32_t buffer_si
 // ConstantBufferD3D12
 ///////////////////////////////////////////////////////////////////////////////
 
-bool ConstantBufferD3D12::Init(const DeviceD3D12 & device, const uint32_t buffer_size_in_bytes)
+bool ConstantBufferD3D12::Init(const DeviceD3D12 & device, const uint32_t buffer_size_in_bytes, const Flags flags)
 {
     const bool buffer_ok = InitUntypedBuffer(device, buffer_size_in_bytes);
     if (buffer_ok)
     {
         m_view.BufferLocation = m_resource->GetGPUVirtualAddress();
         m_view.SizeInBytes    = buffer_size_in_bytes;
+        m_flags               = flags;
     }
     return buffer_ok;
 }

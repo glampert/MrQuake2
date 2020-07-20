@@ -167,5 +167,8 @@
     <FxCompile Include="..\..\src\renderers\d3d12\shaders\Draw2D.fx">
       <Filter>Backend\Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\src\renderers\d3d12\shaders\Draw3D.fx">
+      <Filter>Backend\Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

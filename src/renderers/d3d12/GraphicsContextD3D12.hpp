@@ -4,6 +4,7 @@
 #pragma once
 
 #include "UtilsD3D12.hpp"
+#include "ShaderProgramD3D12.hpp"
 
 namespace MrQ2
 {
@@ -41,13 +42,26 @@ public:
     void RestoreDepthRange();
     void SetVertexBuffer(const VertexBufferD3D12 & vb);
     void SetIndexBuffer(const IndexBufferD3D12 & ib);
-    void SetConstantBuffer(const ConstantBufferD3D12 & cb);
-    void SetTexture(const TextureD3D12 & texture);
+    void SetConstantBuffer(const ConstantBufferD3D12 & cb, const uint32_t slot);
+    void SetTexture(const TextureD3D12 & texture, const uint32_t slot);
     void SetPipelineState(const PipelineStateD3D12 & pipeline_state);
     void SetPrimitiveTopology(const PrimitiveTopologyD3D12 topology);
 
+    template<typename T>
+    void SetAndUpdateConstantBufferForDraw(const ConstantBufferD3D12 & cb, const uint32_t slot, const T & data)
+    {
+        SetAndUpdateConstantBuffer_Internal(cb, slot, &data, sizeof(T));
+    }
+
     // Draw calls
     void Draw(const uint32_t first_vertex, const uint32_t vertex_count);
+
+    // Debug markers
+    // TODO
+    //void PushMarkerF(const wchar_t * format, ...);
+    //void PushMarker(const wchar_t * event_name);
+    //void PopMarker();
+    //#define MRQ2_SCOPED_GPU_MARKER(context, name) //context.PushMarker(L name)
 
 private:
 
@@ -60,12 +74,14 @@ private:
     const PipelineStateD3D12 *          m_current_pipeline_state{ nullptr };
     D3D12_GPU_VIRTUAL_ADDRESS           m_current_vb{};
     D3D12_GPU_VIRTUAL_ADDRESS           m_current_ib{};
-    D3D12_GPU_VIRTUAL_ADDRESS           m_current_cb{};
-    D3D12_GPU_DESCRIPTOR_HANDLE         m_current_texture_srv{};
+    D3D12_GPU_VIRTUAL_ADDRESS           m_current_cb[RootSignatureD3D12::kCBufferCount] = {};
+    D3D12_GPU_DESCRIPTOR_HANDLE         m_current_texture[RootSignatureD3D12::kTextureCount] = {};
     D3D12_VIEWPORT                      m_current_viewport{};
     RECT                                m_current_scissor_rect{};
     PrimitiveTopologyD3D12              m_current_topology{ PrimitiveTopologyD3D12::kCount };
     bool                                m_depth_range_changed{ false };
+
+    void SetAndUpdateConstantBuffer_Internal(const ConstantBufferD3D12 & cb, const uint32_t slot, const void * data, const uint32_t data_size);
 };
 
 } // MrQ2

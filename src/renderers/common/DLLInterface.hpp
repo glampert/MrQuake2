@@ -42,7 +42,7 @@ public:
 
     static void BeginFrame(float camera_separation);
     static void EndFrame();
-    static void RenderFrame(refdef_t * const view_def);
+    static void RenderView(refdef_t * const view_def);
 
     static void DrawPic(const int x, const int y, const char * const name);
     static void DrawStretchPic(const int x, const int y, const int w, const int h, const char * const name);
@@ -69,10 +69,24 @@ private:
 
     struct PerFrameShaderConstants
     {
-        vec2_t screen_dimensions;
+        vec4_t screen_dimensions;     // Only XY used.
+        vec4_t texture_color_scaling; // [debug] multiplied with texture color
+        vec4_t vertex_color_scaling;  // [debug] multiplied with vertex color
     };
     static PerFrameShaderConstants sm_per_frame_shader_consts;
     static ScratchConstantBuffers  sm_per_frame_const_buffers;
+
+    struct PerViewShaderConstants
+    {
+        RenderMatrix view_proj_matrix;
+    };
+    static PerViewShaderConstants sm_per_view_shader_consts;
+    static ScratchConstantBuffers sm_per_view_const_buffers;
+
+    // Cached Cvars:
+    static CvarWrapper sm_disable_texturing;
+    static CvarWrapper sm_blend_debug_color;
+    static CvarWrapper sm_draw_fps_counter;
 };
 
 } // MrQ2

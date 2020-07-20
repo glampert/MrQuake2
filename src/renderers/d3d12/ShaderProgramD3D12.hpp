@@ -13,18 +13,28 @@ class PipelineStateD3D12;
 
 struct RootSignatureD3D12 final
 {
-    enum RootParameterIndex : uint32_t
+    enum Constants : uint32_t
     {
-        kRootParamIndexCBuffer0,
-        kRootParamIndexColorTexture,
+        // Buffers
+        kRootParamIndexCBuffer0, // PerFrameShaderConstants
+        kRootParamIndexCBuffer1, // PerViewShaderConstants
+        kRootParamIndexCBuffer2, // PerDrawShaderConstants
 
-        kRootParameterCount
+        // Textures
+        kRootParamIndexTexture0,
+
+        // Internal counts
+        kCBufferCount = 3,
+        kTextureCount = 1,
+        kRootParameterCount = kCBufferCount + kTextureCount,
+
+        // In 32bit values
+        kMaxInlineRootConstants = 32
     };
 
     D12ComPtr<ID3D12RootSignature> root_sig{};
-    D3D12_ROOT_SIGNATURE_DESC      root_sig_desc{};
 
-    void Init(const DeviceD3D12 & device);
+    void Init(const DeviceD3D12 & device, const D3D12_ROOT_SIGNATURE_DESC & root_sig_desc);
     void Shutdown();
 
     static RootSignatureD3D12 sm_global;
@@ -112,7 +122,6 @@ private:
 
     const DeviceD3D12 *      m_device{ nullptr };
     Blobs                    m_shader_bytecode{};
-    VertexInputLayoutD3D12   m_input_layout{};
     D3D12_INPUT_ELEMENT_DESC m_input_layout_d3d[VertexInputLayoutD3D12::kMaxVertexElements] = {};
     uint32_t                 m_input_layout_count{ 0 };
     bool                     m_is_loaded{ false };

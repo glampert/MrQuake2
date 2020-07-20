@@ -12,3 +12,5 @@
   Nothing fancy, but might give it a cooler look.
   
 - Look into ways of improving the particle systems used by the game. They are pretty rough quads in the original quake!
+
+- Make bullet hits in the walls leave a damage decal.

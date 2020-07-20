@@ -41,12 +41,12 @@ void SpriteBatch::EndFrame(GraphicsContext & context, const ConstantBuffer & cbu
 
     context.SetPipelineState(pipeline_state);
     context.SetVertexBuffer(*draw_buf.buffer_ptr);
-    context.SetConstantBuffer(cbuff);
+    context.SetConstantBuffer(cbuff, 0);
 
     // Fast path - one texture for the whole batch:
     if (opt_tex_atlas != nullptr)
     {
-        context.SetTexture(opt_tex_atlas->texture);
+        context.SetTexture(opt_tex_atlas->texture, 0);
 
         const auto first_vertex = 0u;
         const auto vertex_count = draw_buf.used_verts;
@@ -56,7 +56,7 @@ void SpriteBatch::EndFrame(GraphicsContext & context, const ConstantBuffer & cbu
     {
         for (const DeferredTexQuad & d : m_deferred_textured_quads)
         {
-            context.SetTexture(d.tex->texture);
+            context.SetTexture(d.tex->texture, 0);
 
             const auto first_vertex = d.quad_start_vtx;
             const auto vertex_count = 6u; // one quad
@@ -165,7 +165,7 @@ void SpriteBatches::Init(const RenderDevice & device)
     };
     if (!m_shader_draw_sprites.LoadFromFile(device, vertex_input_layout, "Draw2D"))
     {
-        GameInterface::Errorf("WARNING: Failed to load Draw2D shader!");
+        GameInterface::Errorf("Failed to load Draw2D shader!");
     }
 
     // PipelineState:

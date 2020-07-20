@@ -5,6 +5,8 @@
 
 #include "ViewDraw.hpp"
 
+#include <DirectXMath.h>
+
 namespace MrQ2
 {
 
@@ -185,24 +187,70 @@ void ViewDrawState::Init(const RenderDevice & device, const TextureStore & tex_s
     m_intensity                = GameInterface::Cvar::Get("r_intensity", "2", 0);
 
     constexpr uint32_t kViewDrawBatchSize = 25000; // max vertices * num buffers
-    m_buffers.Init(device, kViewDrawBatchSize);
+    m_vertex_buffers.Init(device, kViewDrawBatchSize);
 
-    // TODO
-    //m_shader.LoadFromFile();
-    //m_pipeline_state.Init(device);
-    //m_pipeline_state.Finalize();
+    m_per_draw_const_buffer.Init(device, sizeof(PerDrawShaderConstants), ConstantBuffer::kOptimizeForSingleDraw);
+
+    // Shaders
+    const VertexInputLayout vertex_input_layout = {
+        // DrawVertex3D
+        {
+            { VertexInputLayout::kVertexPosition,  VertexInputLayout::kFormatFloat3, offsetof(DrawVertex3D, position) },
+            { VertexInputLayout::kVertexTexCoords, VertexInputLayout::kFormatFloat2, offsetof(DrawVertex3D, uv)       },
+            { VertexInputLayout::kVertexColor,     VertexInputLayout::kFormatFloat4, offsetof(DrawVertex3D, rgba)     },
+        }
+    };
+    if (!m_render3d_shader.LoadFromFile(device, vertex_input_layout, "Draw3D"))
+    {
+        GameInterface::Errorf("Failed to load Draw3D shader!");
+    }
+
+    // Opaque/solid geometry
+    m_pipeline_solid_geometry.Init(device);
+    m_pipeline_solid_geometry.SetPrimitiveTopology(PrimitiveTopology::kTriangleList);
+    m_pipeline_solid_geometry.SetShaderProgram(m_render3d_shader);
+    m_pipeline_solid_geometry.SetAlphaBlendingEnabled(false);
+    m_pipeline_solid_geometry.SetDepthTestEnabled(true);
+    m_pipeline_solid_geometry.SetDepthWritesEnabled(true);
+    m_pipeline_solid_geometry.SetCullEnabled(true);
+    m_pipeline_solid_geometry.Finalize();
+
+    // World translucencies (windows/glass)
+    m_pipeline_translucent_world_geometry.Init(device);
+    m_pipeline_translucent_world_geometry.SetPrimitiveTopology(PrimitiveTopology::kTriangleList);
+    m_pipeline_translucent_world_geometry.SetShaderProgram(m_render3d_shader);
+    m_pipeline_translucent_world_geometry.SetAlphaBlendingEnabled(true);
+    m_pipeline_translucent_world_geometry.SetDepthTestEnabled(true);
+    m_pipeline_translucent_world_geometry.SetDepthWritesEnabled(true);
+    m_pipeline_translucent_world_geometry.SetCullEnabled(true);
+    m_pipeline_translucent_world_geometry.Finalize();
+
+    // Translucent entities (disable z writes in case they stack up)
+    m_pipeline_translucent_entities.Init(device);
+    m_pipeline_translucent_entities.SetPrimitiveTopology(PrimitiveTopology::kTriangleList);
+    m_pipeline_translucent_entities.SetShaderProgram(m_render3d_shader);
+    m_pipeline_translucent_entities.SetAlphaBlendingEnabled(true);
+    m_pipeline_translucent_entities.SetDepthTestEnabled(true);
+    m_pipeline_translucent_entities.SetDepthWritesEnabled(false);
+    m_pipeline_translucent_entities.SetCullEnabled(true);
+    m_pipeline_translucent_entities.Finalize();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void ViewDrawState::Shutdown()
 {
+    m_skybox = {};
     m_alpha_world_surfaces = nullptr;
     m_tex_white2x2 = nullptr;
+    m_draw_cmds.clear();
 
-    m_pipeline_state.Shutdown();
-    m_shader.Shutdown();
-    m_buffers.Shutdown();
+    m_pipeline_solid_geometry.Shutdown();
+    m_pipeline_translucent_world_geometry.Shutdown();
+    m_pipeline_translucent_entities.Shutdown();
+    m_render3d_shader.Shutdown();
+    m_per_draw_const_buffer.Shutdown();
+    m_vertex_buffers.Shutdown();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -212,20 +260,25 @@ void ViewDrawState::BeginRenderPass()
     MRQ2_ASSERT(m_batch_open == false);
     MRQ2_ASSERT(m_draw_cmds.empty());
 
-    m_buffers.Begin();
+    m_vertex_buffers.Begin();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::EndRenderPass(GraphicsContext & context, const ConstantBuffer & cbuff)
+void ViewDrawState::EndRenderPass(const FrameData & frame_data, GraphicsContext & context, const ArrayBase<const ConstantBuffer *> & cbuffers, const PipelineState & pipeline_state)
 {
     MRQ2_ASSERT(m_batch_open == false);
 
-    const auto draw_buf = m_buffers.End();
+    const auto draw_buf = m_vertex_buffers.End();
 
-    context.SetPipelineState(m_pipeline_state);
+    context.SetPipelineState(pipeline_state);
     context.SetVertexBuffer(*draw_buf.buffer_ptr);
-    context.SetConstantBuffer(cbuff);
+
+    uint32_t cbuffer_slot = 0;
+    for (; cbuffer_slot < cbuffers.size(); ++cbuffer_slot)
+    {
+        context.SetConstantBuffer(*cbuffers[cbuffer_slot], cbuffer_slot);
+    }
 
     for (const DrawCmd & cmd : m_draw_cmds)
     {
@@ -237,8 +290,10 @@ void ViewDrawState::EndRenderPass(GraphicsContext & context, const ConstantBuffe
             context.SetDepthRange(depth_min, depth_min + 0.3f * (depth_max - depth_min));
         }
 
+        context.SetAndUpdateConstantBufferForDraw(m_per_draw_const_buffer, cbuffer_slot, cmd.model_matrix);
+
         context.SetPrimitiveTopology(cmd.topology);
-        context.SetTexture(cmd.texture->texture);
+        context.SetTexture(cmd.texture->texture, 0);
         context.Draw(cmd.first_vert, cmd.vertex_count);
 
         // Restore to default if we did a depth-hacked draw.
@@ -264,7 +319,7 @@ MiniImBatch ViewDrawState::BeginBatch(const BeginBatchArgs & args)
 
     m_batch_open = true;
 
-    return MiniImBatch{ m_buffers.CurrentVertexPtr(), m_buffers.NumVertsRemaining(), args.topology };
+    return MiniImBatch{ m_vertex_buffers.CurrentVertexPtr(), m_vertex_buffers.NumVertsRemaining(), args.topology };
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -275,10 +330,10 @@ void ViewDrawState::EndBatch(MiniImBatch & batch)
     MRQ2_ASSERT(m_batch_open == true);
     MRQ2_ASSERT(m_current_draw_cmd.topology == batch.Topology());
 
-    m_current_draw_cmd.first_vert   = m_buffers.CurrentPosition();
+    m_current_draw_cmd.first_vert   = m_vertex_buffers.CurrentPosition();
     m_current_draw_cmd.vertex_count = batch.UsedVerts();
 
-    m_buffers.Increment(batch.UsedVerts());
+    m_vertex_buffers.Increment(batch.UsedVerts());
 
     m_draw_cmds.push_back(m_current_draw_cmd);
     m_current_draw_cmd = {};
@@ -377,6 +432,35 @@ void ViewDrawState::SetUpFrustum(FrameData & frame_data) const
         frame_data.frustum[i].dist = Vec3Dot(frame_data.view_def.vieworg, frame_data.frustum[i].normal);
         frame_data.frustum[i].signbits = SignBitsForPlane(frame_data.frustum[i]);
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::DoRenderView(FrameData & frame_data, GraphicsContext & context, const ArrayBase<const ConstantBuffer *> & cbuffers)
+{
+    //
+    // Opaque/solid geometry pass
+    //
+
+    BeginRenderPass();
+    RenderWorldModel(frame_data);
+    RenderSkyBox(frame_data);
+    RenderSolidEntities(frame_data);
+    EndRenderPass(frame_data, context, cbuffers, m_pipeline_solid_geometry);
+
+    //
+    // Transparencies/alpha passes
+    //
+
+    // Color Blend ON for static world geometry
+    BeginRenderPass();
+    RenderTranslucentSurfaces(frame_data);
+    EndRenderPass(frame_data, context, cbuffers, m_pipeline_translucent_world_geometry);
+
+    // Disable z writes in case entities stack up
+    BeginRenderPass();
+    RenderTranslucentEntities(frame_data);
+    EndRenderPass(frame_data, context, cbuffers, m_pipeline_translucent_entities);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

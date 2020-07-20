@@ -6,7 +6,6 @@
 #include "SwapChainD3D12.hpp"
 #include "BufferD3D12.hpp"
 #include "TextureD3D12.hpp"
-#include "ShaderProgramD3D12.hpp"
 #include "PipelineStateD3D12.hpp"
 
 namespace MrQ2
@@ -49,12 +48,16 @@ void GraphicsContextD3D12::EndFrame()
     m_current_pipeline_state = nullptr;
     m_current_vb             = {};
     m_current_ib             = {};
-    m_current_cb             = {};
-    m_current_texture_srv    = {};
     m_current_viewport       = {};
     m_current_scissor_rect   = {};
     m_current_topology       = PrimitiveTopologyD3D12::kCount;
     m_depth_range_changed    = false;
+
+    for (auto & cb : m_current_cb)
+        cb = {};
+
+    for (auto & tex : m_current_texture)
+        tex = {};
 
     m_current_viewport.MinDepth = 0.0f;
     m_current_viewport.MaxDepth = 1.0f;
@@ -115,21 +118,25 @@ void GraphicsContextD3D12::SetIndexBuffer(const IndexBufferD3D12 & ib)
     }
 }
 
-void GraphicsContextD3D12::SetConstantBuffer(const ConstantBufferD3D12 & cb)
+void GraphicsContextD3D12::SetConstantBuffer(const ConstantBufferD3D12 & cb, const uint32_t slot)
 {
-    if (m_current_cb != cb.m_view.BufferLocation)
+    MRQ2_ASSERT(slot < RootSignatureD3D12::kCBufferCount);
+
+    if (m_current_cb[slot] != cb.m_view.BufferLocation)
     {
-        m_current_cb = cb.m_view.BufferLocation;
-        m_command_list->SetGraphicsRootConstantBufferView(RootSignatureD3D12::kRootParamIndexCBuffer0, m_current_cb);
+        m_current_cb[slot] = cb.m_view.BufferLocation;
+        m_command_list->SetGraphicsRootConstantBufferView(slot + RootSignatureD3D12::kRootParamIndexCBuffer0, m_current_cb[slot]);
     }
 }
 
-void GraphicsContextD3D12::SetTexture(const TextureD3D12 & texture)
+void GraphicsContextD3D12::SetTexture(const TextureD3D12 & texture, const uint32_t slot)
 {
-    if (m_current_texture_srv.ptr != texture.m_srv_descriptor.gpu_handle.ptr)
+    MRQ2_ASSERT(slot < RootSignatureD3D12::kTextureCount);
+
+    if (m_current_texture[slot].ptr != texture.m_srv_descriptor.gpu_handle.ptr)
     {
-        m_current_texture_srv = texture.m_srv_descriptor.gpu_handle;
-        m_command_list->SetGraphicsRootDescriptorTable(RootSignatureD3D12::kRootParamIndexColorTexture, m_current_texture_srv);
+        m_current_texture[slot] = texture.m_srv_descriptor.gpu_handle;
+        m_command_list->SetGraphicsRootDescriptorTable(slot + RootSignatureD3D12::kRootParamIndexTexture0, m_current_texture[slot]);
     }
 }
 
@@ -178,6 +185,19 @@ void GraphicsContextD3D12::Draw(const uint32_t first_vertex, const uint32_t vert
     const auto instance_count = 1u;
     const auto first_instance = 0u;
     m_command_list->DrawInstanced(vertex_count, instance_count, first_vertex, first_instance);
+}
+
+void GraphicsContextD3D12::SetAndUpdateConstantBuffer_Internal(const ConstantBufferD3D12 & cb, const uint32_t slot, const void * data, const uint32_t data_size)
+{
+    MRQ2_ASSERT(slot < RootSignatureD3D12::kCBufferCount);
+    MRQ2_ASSERT(data != nullptr && data_size != 0);
+    MRQ2_ASSERT((data_size % 4) == 0); // Must be a multiple of 4
+    MRQ2_ASSERT((data_size / 4) <= RootSignatureD3D12::kMaxInlineRootConstants);
+    MRQ2_ASSERT((cb.m_flags & ConstantBufferD3D12::kOptimizeForSingleDraw) != 0);
+
+    const auto num_32bit_values = data_size / 4;
+    m_command_list->SetGraphicsRoot32BitConstants(slot + RootSignatureD3D12::kRootParamIndexCBuffer0, num_32bit_values, data, 0);
+    (void)cb; // unused
 }
 
 } // MrQ2

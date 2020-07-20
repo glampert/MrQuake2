@@ -22,6 +22,14 @@ ViewDrawState   DLLInterface::sm_view_state;
 DLLInterface::PerFrameShaderConstants DLLInterface::sm_per_frame_shader_consts;
 ScratchConstantBuffers                DLLInterface::sm_per_frame_const_buffers;
 
+DLLInterface::PerViewShaderConstants  DLLInterface::sm_per_view_shader_consts;
+ScratchConstantBuffers                DLLInterface::sm_per_view_const_buffers;
+
+// Cached Cvars:
+CvarWrapper DLLInterface::sm_disable_texturing;
+CvarWrapper DLLInterface::sm_blend_debug_color;
+CvarWrapper DLLInterface::sm_draw_fps_counter;
+
 ///////////////////////////////////////////////////////////////////////////////
 
 int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
@@ -31,6 +39,10 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
     auto vid_height  = GameInterface::Cvar::Get("vid_height",  "768",  CvarWrapper::kFlagArchive);
     auto r_renderdoc = GameInterface::Cvar::Get("r_renderdoc", "0",    CvarWrapper::kFlagArchive);
     auto r_debug     = GameInterface::Cvar::Get("r_debug",     "0",    CvarWrapper::kFlagArchive);
+
+    sm_disable_texturing = GameInterface::Cvar::Get("r_disable_texturing", "0", 0);
+    sm_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
+    sm_draw_fps_counter  = GameInterface::Cvar::Get("r_draw_fps_counter",  "0", CvarWrapper::kFlagArchive);
 
     int w, h;
     if (!GameInterface::Video::GetModeInfo(w, h, vid_mode.AsInt()))
@@ -51,22 +63,26 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
 
     // 2D sprite/UI batch setup
     sm_sprite_batches.Init(sm_renderer.Device());
-    sm_per_frame_const_buffers.Init(sm_renderer.Device(), sizeof(sm_per_frame_shader_consts));
 
     // Stores/view:
     sm_texture_store.Init(sm_renderer.Device());
     sm_model_store.Init(sm_texture_store);
     sm_view_state.Init(sm_renderer.Device(), sm_texture_store);
 
+    // Constant buffers:
+    sm_per_frame_const_buffers.Init(sm_renderer.Device(), sizeof(sm_per_frame_shader_consts));
+    sm_per_view_const_buffers.Init(sm_renderer.Device(),  sizeof(sm_per_view_shader_consts));
+
     return true;
 }
 
 void DLLInterface::Shutdown()
 {
+    sm_per_view_const_buffers.Shutdown();
+    sm_per_frame_const_buffers.Shutdown();
     sm_view_state.Shutdown();
     sm_model_store.Shutdown();
     sm_texture_store.Shutdown();
-    sm_per_frame_const_buffers.Shutdown();
     sm_sprite_batches.Shutdown();
     sm_renderer.Shutdown();
 
@@ -146,26 +162,47 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
     const float   clear_depth    = 1.0f;
     const uint8_t clear_stencil  = 0;
 
+    sm_per_frame_shader_consts.screen_dimensions[0] = static_cast<float>(sm_renderer.RenderWidth());
+    sm_per_frame_shader_consts.screen_dimensions[1] = static_cast<float>(sm_renderer.RenderHeight());
+
+    if (sm_disable_texturing.IsSet()) // Use only debug vertex color
+    {
+        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 4, 0.0f);
+        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  4, 1.0f);
+    }
+    else if (sm_blend_debug_color.IsSet()) // Blend debug vertex color with texture
+    {
+        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 4, 1.0f);
+        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  4, 1.0f);
+    }
+    else // Normal rendering
+    {
+        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 4, 1.0f);
+        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  4, 0.0f);
+    }
+
+    sm_per_frame_const_buffers.CurrentBuffer().WriteStruct(sm_per_frame_shader_consts);
+
     sm_renderer.BeginFrame(clear_color, clear_depth, clear_stencil);
     sm_sprite_batches.BeginFrame();
 }
 
 void DLLInterface::EndFrame()
 {
-    DrawFpsCounter();
-
-    sm_per_frame_shader_consts.screen_dimensions[0] = static_cast<float>(sm_renderer.RenderWidth());
-    sm_per_frame_shader_consts.screen_dimensions[1] = static_cast<float>(sm_renderer.RenderHeight());
-    sm_per_frame_const_buffers.CurrentBuffer().WriteStruct(sm_per_frame_shader_consts);
+    if (sm_draw_fps_counter.IsSet())
+    {
+        DrawFpsCounter();
+    }
 
     auto & context = sm_renderer.Device().GraphicsContext();
     sm_sprite_batches.EndFrame(context, sm_per_frame_const_buffers.CurrentBuffer(), sm_texture_store.tex_conchars);
     sm_renderer.EndFrame();
 
     sm_per_frame_const_buffers.MoveToNextFrame();
+    sm_per_view_const_buffers.MoveToNextFrame();
 }
 
-void DLLInterface::RenderFrame(refdef_t * const view_def)
+void DLLInterface::RenderView(refdef_t * const view_def)
 {
     MRQ2_ASSERT(view_def != nullptr);
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
@@ -173,11 +210,24 @@ void DLLInterface::RenderFrame(refdef_t * const view_def)
     // A world map should have been loaded already by BeginRegistration().
     if (sm_model_store.WorldModel() == nullptr && !(view_def->rdflags & RDF_NOWORLDMODEL))
     {
-        GameInterface::Errorf("RenderFrame: Null world model!");
+        GameInterface::Errorf("RenderView: Null world model!");
     }
 
-    //TODO
-    //RB::RenderView(*view_def);
+    ViewDrawState::FrameData frame_data{ sm_texture_store, *sm_model_store.WorldModel(), *view_def };
+
+    // Set up camera/view (fills frame_data)
+    sm_view_state.RenderViewSetup(frame_data);
+
+    // Update the constant buffers for this view
+    sm_per_view_shader_consts.view_proj_matrix = frame_data.view_proj_matrix;
+    sm_per_view_const_buffers.CurrentBuffer().WriteStruct(sm_per_view_shader_consts);
+
+    FixedSizeArray<const ConstantBuffer *, 2> cbuffers;
+    cbuffers.push_back(&sm_per_frame_const_buffers.CurrentBuffer()); // slot(0)
+    cbuffers.push_back(&sm_per_view_const_buffers.CurrentBuffer());  // slot(1)
+
+    auto & context = sm_renderer.Device().GraphicsContext();
+    sm_view_state.DoRenderView(frame_data, context, cbuffers);
 }
 
 void DLLInterface::DrawPic(const int x, const int y, const char * const name)
