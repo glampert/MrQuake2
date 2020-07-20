@@ -34,10 +34,9 @@ public:
     void Shutdown();
 
     void UploadTextureImmediate(const TextureUploadD3D12& upload_info);
-    void UploadTextureAsync(const TextureUploadD3D12& upload_info);
 
-    // Blocks until all async texture uploads have completed.
-    void Synchronize();
+    // TODO:
+    // Async texture upload support?
 
 private:
 

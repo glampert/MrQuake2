@@ -172,12 +172,12 @@ private:
 
     struct DrawCmd
     {
-        RenderMatrix         model_matrix;
-        const TextureImage * texture;
-        uint32_t             first_vert;
-        uint32_t             vertex_count;
-        PrimitiveTopology    topology;
-        bool                 depth_hack;
+        PerDrawShaderConstants constants;
+        const TextureImage *   texture;
+        uint32_t               first_vert;
+        uint32_t               vertex_count;
+        PrimitiveTopology      topology;
+        bool                   depth_hack;
     };
 
     using DrawCmdList = FixedSizeArray<DrawCmd, 2048>;

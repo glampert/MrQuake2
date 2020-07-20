@@ -530,7 +530,7 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
     const bool do_draw = !m_skip_draw_texture_chains.IsSet();
 
     BeginBatchArgs args;
-    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+    args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
     args.topology     = PrimitiveTopology::kTriangleList;
     args.depth_hack   = false;
 
@@ -623,7 +623,7 @@ void ViewDrawState::RenderTranslucentSurfaces(FrameData & frame_data)
         else // Static translucent surface (glass, completely still fluid)
         {
             BeginBatchArgs args;
-            args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+            args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
             args.optional_tex = surf->texinfo->teximage;
             args.topology     = PrimitiveTopology::kTriangleList;
             args.depth_hack   = false;
@@ -715,7 +715,7 @@ void ViewDrawState::DrawAnimatedWaterPolys(const ModelSurface & surf, const floa
     }
 
     BeginBatchArgs args;
-    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+    args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
     args.optional_tex = surf.texinfo->teximage;
     args.topology     = PrimitiveTopology::kTriangleFan;
     args.depth_hack   = false;
@@ -1062,7 +1062,7 @@ void ViewDrawState::DrawSpriteModel(const FrameData & frame_data, const entity_t
     MrQ2::Vec3MAdd(quad[3].position, frame->width - frame->origin_x, right, quad[3].position);
 
     BeginBatchArgs args;
-    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+    args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
     args.optional_tex = model->data.skins[frame_num];
     args.topology     = PrimitiveTopology::kTriangleList;
     args.depth_hack   = false;
@@ -1172,7 +1172,7 @@ void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t &
     }
 
     BeginBatchArgs args;
-    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+    args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
     args.optional_tex = nullptr; // No texture
     args.topology     = PrimitiveTopology::kTriangleStrip;
     args.depth_hack   = false;

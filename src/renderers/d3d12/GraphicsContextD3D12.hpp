@@ -57,11 +57,8 @@ public:
     void Draw(const uint32_t first_vertex, const uint32_t vertex_count);
 
     // Debug markers
-    // TODO
-    //void PushMarkerF(const wchar_t * format, ...);
-    //void PushMarker(const wchar_t * event_name);
-    //void PopMarker();
-    //#define MRQ2_SCOPED_GPU_MARKER(context, name) //context.PushMarker(L name)
+    void PushMarker(const wchar_t * name);
+    void PopMarker();
 
 private:
 
@@ -80,8 +77,34 @@ private:
     RECT                                m_current_scissor_rect{};
     PrimitiveTopologyD3D12              m_current_topology{ PrimitiveTopologyD3D12::kCount };
     bool                                m_depth_range_changed{ false };
+    bool                                m_gpu_markers_enabled{ false };
 
     void SetAndUpdateConstantBuffer_Internal(const ConstantBufferD3D12 & cb, const uint32_t slot, const void * data, const uint32_t data_size);
 };
+
+//
+// Debug markers:
+//
+struct ScopedGpuMarkerD3D12 final
+{
+    GraphicsContextD3D12 & m_context;
+
+    ScopedGpuMarkerD3D12(GraphicsContextD3D12 & ctx, const wchar_t * name)
+        : m_context{ ctx }
+    {
+        m_context.PushMarker(name);
+    }
+
+    ~ScopedGpuMarkerD3D12()
+    {
+        m_context.PopMarker();
+    }
+};
+
+#define MRQ2_SCOPED_GPU_MARKER(context, name) MrQ2::ScopedGpuMarkerD3D12 MRQ2_CAT_TOKEN(gpu_scope_marker_, __LINE__){ context, MRQ2_MAKE_WIDE_STR(name) }
+#define MRQ2_FUNCTION_GPU_MARKER(context)     MrQ2::ScopedGpuMarkerD3D12 MRQ2_CAT_TOKEN(gpu_funct_marker_, __LINE__){ context, MRQ2_MAKE_WIDE_STR(__FUNCTION__) }
+
+#define MRQ2_PUSH_GPU_MARKER(context, name)   context.PushMarker(MRQ2_MAKE_WIDE_STR(name))
+#define MRQ2_POP_GPU_MARKER(context)          context.PopMarker()
 
 } // MrQ2

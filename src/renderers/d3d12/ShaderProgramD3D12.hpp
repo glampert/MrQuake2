@@ -29,7 +29,7 @@ struct RootSignatureD3D12 final
         kRootParameterCount = kCBufferCount + kTextureCount,
 
         // In 32bit values
-        kMaxInlineRootConstants = 32
+        kMaxInlineRootConstants = 16
     };
 
     D12ComPtr<ID3D12RootSignature> root_sig{};

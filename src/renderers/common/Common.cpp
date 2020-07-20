@@ -586,9 +586,9 @@ namespace GameInterface
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static refimport_t g_Refimport;
-static const char * g_Refname;
-constexpr int MAXPRINTMSG = 4096;
+static refimport_t   g_refimport  = {};
+static const char *  g_refname    = nullptr;
+static constexpr int kMaxPrintMsg = 4096;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -603,7 +603,7 @@ static void InstallGameMemoryHooks()
     {
         MemTagsTrackFree(size_bytes, MemTag(tag));
     };
-    g_Refimport.Sys_SetMemoryHooks(AllocHookFn, FreeHookFn);
+    g_refimport.Sys_SetMemoryHooks(AllocHookFn, FreeHookFn);
 
     MemTagsClearAll();
     Cmd::RegisterCommand("memtags", MemTagsPrintAll);
@@ -613,7 +613,7 @@ static void InstallGameMemoryHooks()
 
 static void RemoveGameMemoryHooks()
 {
-    g_Refimport.Sys_SetMemoryHooks(nullptr, nullptr);
+    g_refimport.Sys_SetMemoryHooks(nullptr, nullptr);
     Cmd::RemoveCommand("memtags");
 }
 
@@ -621,8 +621,8 @@ static void RemoveGameMemoryHooks()
 
 void Initialize(const refimport_s & ri, const char * ref_name)
 {
-    g_Refimport = ri;
-    g_Refname = ref_name;
+    g_refimport = ri;
+    g_refname = ref_name;
     InstallGameMemoryHooks();
 }
 
@@ -631,8 +631,8 @@ void Initialize(const refimport_s & ri, const char * ref_name)
 void Shutdown()
 {
     RemoveGameMemoryHooks();
-    g_Refimport = {};
-    g_Refname = nullptr;
+    g_refimport = {};
+    g_refname = nullptr;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -640,13 +640,13 @@ void Shutdown()
 void Printf(const char * fmt, ...)
 {
     va_list argptr;
-    char msg[MAXPRINTMSG];
+    char msg[kMaxPrintMsg];
 
     va_start(argptr, fmt);
     std::vsnprintf(msg, sizeof(msg), fmt, argptr);
     va_end(argptr);
 
-    g_Refimport.Con_Printf(PRINT_ALL, "[%s]: %s\n", g_Refname, msg);
+    g_refimport.Con_Printf(PRINT_ALL, "[%s]: %s\n", g_refname, msg);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -654,13 +654,13 @@ void Printf(const char * fmt, ...)
 void Errorf(const char * fmt, ...)
 {
     va_list argptr;
-    char msg[MAXPRINTMSG];
+    char msg[kMaxPrintMsg];
 
     va_start(argptr, fmt);
     std::vsnprintf(msg, sizeof(msg), fmt, argptr);
     va_end(argptr);
 
-    g_Refimport.Con_Printf(PRINT_ALL, "[%s] FATAL ERROR: %s\n", g_Refname, msg);
+    g_refimport.Con_Printf(PRINT_ALL, "[%s] FATAL ERROR: %s\n", g_refname, msg);
 
     MessageBox(nullptr, msg, "Fatal Error", MB_OK);
     std::abort();
@@ -670,21 +670,21 @@ void Errorf(const char * fmt, ...)
 
 int GetTimeMilliseconds()
 {
-    return g_Refimport.Sys_Milliseconds();
+    return g_refimport.Sys_Milliseconds();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 int Cmd::Argc()
 {
-    return g_Refimport.Cmd_Argc();
+    return g_refimport.Cmd_Argc();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 const char * Cmd::Argv(int i)
 {
-    return g_Refimport.Cmd_Argv(i);
+    return g_refimport.Cmd_Argv(i);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -693,7 +693,7 @@ void Cmd::RegisterCommand(const char * name, void (*cmd_func)())
 {
     MRQ2_ASSERT(name != nullptr);
     MRQ2_ASSERT(cmd_func != nullptr);
-    g_Refimport.Cmd_AddCommand(name, cmd_func);
+    g_refimport.Cmd_AddCommand(name, cmd_func);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -701,7 +701,7 @@ void Cmd::RegisterCommand(const char * name, void (*cmd_func)())
 void Cmd::RemoveCommand(const char * name)
 {
     MRQ2_ASSERT(name != nullptr);
-    g_Refimport.Cmd_RemoveCommand(name);
+    g_refimport.Cmd_RemoveCommand(name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -709,7 +709,7 @@ void Cmd::RemoveCommand(const char * name)
 void Cmd::ExecuteCommandText(const char * text)
 {
     MRQ2_ASSERT(text != nullptr);
-    g_Refimport.Cmd_ExecuteText(EXEC_NOW, text);
+    g_refimport.Cmd_ExecuteText(EXEC_NOW, text);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -717,7 +717,7 @@ void Cmd::ExecuteCommandText(const char * text)
 void Cmd::InsertCommandText(const char * text)
 {
     MRQ2_ASSERT(text != nullptr);
-    g_Refimport.Cmd_ExecuteText(EXEC_INSERT, text);
+    g_refimport.Cmd_ExecuteText(EXEC_INSERT, text);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -725,7 +725,7 @@ void Cmd::InsertCommandText(const char * text)
 void Cmd::AppendCommandText(const char * text)
 {
     MRQ2_ASSERT(text != nullptr);
-    g_Refimport.Cmd_ExecuteText(EXEC_APPEND, text);
+    g_refimport.Cmd_ExecuteText(EXEC_APPEND, text);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -734,7 +734,7 @@ int FS::LoadFile(const char * name, void ** out_buf)
 {
     MRQ2_ASSERT(name != nullptr);
     MRQ2_ASSERT(out_buf != nullptr);
-    return g_Refimport.FS_LoadFile(name, out_buf);
+    return g_refimport.FS_LoadFile(name, out_buf);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -743,7 +743,7 @@ void FS::FreeFile(void * out_buf)
 {
     if (out_buf != nullptr)
     {
-        g_Refimport.FS_FreeFile(out_buf);
+        g_refimport.FS_FreeFile(out_buf);
     }
 }
 
@@ -771,14 +771,14 @@ void FS::CreatePath(const char * path)
         temp_path[len + 1] = '\0';
     }
 
-    g_Refimport.FS_CreatePath(temp_path);
+    g_refimport.FS_CreatePath(temp_path);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 const char * FS::GameDir()
 {
-    return g_Refimport.FS_Gamedir();
+    return g_refimport.FS_Gamedir();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -787,7 +787,7 @@ CvarWrapper Cvar::Get(const char * name, const char * default_value, unsigned fl
 {
     MRQ2_ASSERT(name != nullptr);
     MRQ2_ASSERT(default_value != nullptr);
-    return CvarWrapper{ g_Refimport.Cvar_Get(name, default_value, flags) };
+    return CvarWrapper{ g_refimport.Cvar_Get(name, default_value, flags) };
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -796,7 +796,7 @@ CvarWrapper Cvar::Set(const char * name, const char * value)
 {
     MRQ2_ASSERT(name != nullptr);
     MRQ2_ASSERT(value != nullptr);
-    return CvarWrapper{ g_Refimport.Cvar_Set(name, value) };
+    return CvarWrapper{ g_refimport.Cvar_Set(name, value) };
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -804,7 +804,7 @@ CvarWrapper Cvar::Set(const char * name, const char * value)
 void Cvar::SetValue(const char * name, float value)
 {
     MRQ2_ASSERT(name != nullptr);
-    g_Refimport.Cvar_SetValue(name, value);
+    g_refimport.Cvar_SetValue(name, value);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -812,28 +812,28 @@ void Cvar::SetValue(const char * name, float value)
 void Cvar::SetValue(const char * name, int value)
 {
     MRQ2_ASSERT(name != nullptr);
-    g_Refimport.Cvar_SetValue(name, static_cast<float>(value));
+    g_refimport.Cvar_SetValue(name, static_cast<float>(value));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Video::MenuInit()
 {
-    g_Refimport.Vid_MenuInit();
+    g_refimport.Vid_MenuInit();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Video::NewWindow(int width, int height)
 {
-    g_Refimport.Vid_NewWindow(width, height);
+    g_refimport.Vid_NewWindow(width, height);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 bool Video::GetModeInfo(int & out_width, int & out_height, int mode_index)
 {
-    return !!g_Refimport.Vid_GetModeInfo(&out_width, &out_height, mode_index);
+    return !!g_refimport.Vid_GetModeInfo(&out_width, &out_height, mode_index);
 }
 
 } // GameInterface
@@ -872,7 +872,7 @@ void CvarWrapper::SetInt(int value)
 
     char val_str[64];
     std::snprintf(val_str, sizeof(val_str), "%i", value);
-    GameInterface::g_Refimport.Cvar_Set(m_wrapped_var->name, val_str);
+    GameInterface::g_refimport.Cvar_Set(m_wrapped_var->name, val_str);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -883,7 +883,7 @@ void CvarWrapper::SetFloat(float value)
 
     char val_str[64];
     std::snprintf(val_str, sizeof(val_str), "%f", value);
-    GameInterface::g_Refimport.Cvar_Set(m_wrapped_var->name, val_str);
+    GameInterface::g_refimport.Cvar_Set(m_wrapped_var->name, val_str);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -891,7 +891,7 @@ void CvarWrapper::SetFloat(float value)
 void CvarWrapper::SetStr(const char * value)
 {
     MRQ2_ASSERT(IsNotNull());
-    GameInterface::g_Refimport.Cvar_Set(m_wrapped_var->name, value);
+    GameInterface::g_refimport.Cvar_Set(m_wrapped_var->name, value);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

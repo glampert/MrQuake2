@@ -157,10 +157,10 @@ const char * FormatMemoryUnit(const std::size_t size_bytes, const bool abbreviat
     char num_str_buf[100];
 
     // Max chars reserved for the output string, max `num_str_buf + 28` chars for the unit str
-    constexpr unsigned MEM_UNIT_STR_MAXLEN = sizeof(num_str_buf) + 28;
+    constexpr unsigned kMemUnitStrMaxLen = sizeof(num_str_buf) + 28;
 
     static int bufnum = 0;
-    static char s_local_str_buf[8][MEM_UNIT_STR_MAXLEN];
+    static char s_local_str_buf[8][kMemUnitStrMaxLen];
 
     fmtbuf = s_local_str_buf[bufnum];
     bufnum = (bufnum + 1) & 7;
@@ -193,7 +193,7 @@ const char * FormatMemoryUnit(const std::size_t size_bytes, const bool abbreviat
     }
 
     // Combine the strings:
-    std::snprintf(fmtbuf, MEM_UNIT_STR_MAXLEN, "%s %s", num_str_buf, mem_unit_str);
+    std::snprintf(fmtbuf, kMemUnitStrMaxLen, "%s %s", num_str_buf, mem_unit_str);
     return fmtbuf;
 }
 
@@ -222,7 +222,7 @@ void MemFreeTracked(const void * ptr, const size_t size_bytes, const MemTag tag)
 // MemHunk
 ///////////////////////////////////////////////////////////////////////////////
 
-constexpr unsigned HUNK_SIZE_ROUND = 31;
+constexpr unsigned kHunkSizeRound = 31;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -241,7 +241,7 @@ void MemHunk::Init(const unsigned size, const MemTag tag)
 {
     MRQ2_ASSERT(base_ptr == nullptr); // Trap invalid reinitialization
 
-    const unsigned rounded_size = (size + HUNK_SIZE_ROUND) & ~HUNK_SIZE_ROUND;
+    const unsigned rounded_size = (size + kHunkSizeRound) & ~kHunkSizeRound;
     MRQ2_ASSERT(rounded_size >= size);
 
     curr_size = 0;
@@ -262,7 +262,7 @@ void * MemHunk::AllocBlock(const unsigned block_size)
 {
     MRQ2_ASSERT(base_ptr != nullptr); // Uninitialized?
 
-    const unsigned rounded_size = (block_size + HUNK_SIZE_ROUND) & ~HUNK_SIZE_ROUND;
+    const unsigned rounded_size = (block_size + kHunkSizeRound) & ~kHunkSizeRound;
     MRQ2_ASSERT(rounded_size >= block_size);
 
     // The hunk stack doesn't resize.

@@ -164,11 +164,14 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\..\src\renderers\d3d12\shaders\Draw2D.fx">
+    <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw2D.fx">
       <Filter>Backend\Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\src\renderers\d3d12\shaders\Draw3D.fx">
+    <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw3D.fx">
       <Filter>Backend\Shaders</Filter>
     </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

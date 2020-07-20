@@ -162,28 +162,31 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
     const float   clear_depth    = 1.0f;
     const uint8_t clear_stencil  = 0;
 
+    sm_renderer.BeginFrame(clear_color, clear_depth, clear_stencil);
+
     sm_per_frame_shader_consts.screen_dimensions[0] = static_cast<float>(sm_renderer.RenderWidth());
     sm_per_frame_shader_consts.screen_dimensions[1] = static_cast<float>(sm_renderer.RenderHeight());
 
     if (sm_disable_texturing.IsSet()) // Use only debug vertex color
     {
-        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 4, 0.0f);
-        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  4, 1.0f);
+        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 0.0f);
+        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  1.0f);
     }
     else if (sm_blend_debug_color.IsSet()) // Blend debug vertex color with texture
     {
-        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 4, 1.0f);
-        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  4, 1.0f);
+        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 1.0f);
+        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  1.0f);
     }
     else // Normal rendering
     {
-        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 4, 1.0f);
-        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  4, 0.0f);
+        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 1.0f);
+        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  0.0f);
     }
 
-    sm_per_frame_const_buffers.CurrentBuffer().WriteStruct(sm_per_frame_shader_consts);
+    auto & context = sm_renderer.Device().GraphicsContext();
+    MRQ2_PUSH_GPU_MARKER(context, "BeginFrame");
 
-    sm_renderer.BeginFrame(clear_color, clear_depth, clear_stencil);
+    sm_per_frame_const_buffers.CurrentBuffer().WriteStruct(sm_per_frame_shader_consts);
     sm_sprite_batches.BeginFrame();
 }
 
@@ -195,17 +198,26 @@ void DLLInterface::EndFrame()
     }
 
     auto & context = sm_renderer.Device().GraphicsContext();
-    sm_sprite_batches.EndFrame(context, sm_per_frame_const_buffers.CurrentBuffer(), sm_texture_store.tex_conchars);
-    sm_renderer.EndFrame();
+    {
+        MRQ2_SCOPED_GPU_MARKER(context, "Draw2DSprites");
+        sm_sprite_batches.EndFrame(context, sm_per_frame_const_buffers.CurrentBuffer(), sm_texture_store.tex_conchars);
+    }
+
+    MRQ2_POP_GPU_MARKER(context); // "EndFrame"
 
     sm_per_frame_const_buffers.MoveToNextFrame();
     sm_per_view_const_buffers.MoveToNextFrame();
+
+    sm_renderer.EndFrame();
 }
 
 void DLLInterface::RenderView(refdef_t * const view_def)
 {
     MRQ2_ASSERT(view_def != nullptr);
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
+
+    auto & context = sm_renderer.Device().GraphicsContext();
+    MRQ2_SCOPED_GPU_MARKER(context, "RenderView");
 
     // A world map should have been loaded already by BeginRegistration().
     if (sm_model_store.WorldModel() == nullptr && !(view_def->rdflags & RDF_NOWORLDMODEL))
@@ -226,7 +238,6 @@ void DLLInterface::RenderView(refdef_t * const view_def)
     cbuffers.push_back(&sm_per_frame_const_buffers.CurrentBuffer()); // slot(0)
     cbuffers.push_back(&sm_per_view_const_buffers.CurrentBuffer());  // slot(1)
 
-    auto & context = sm_renderer.Device().GraphicsContext();
     sm_view_state.DoRenderView(frame_data, context, cbuffers);
 }
 

@@ -117,7 +117,7 @@ void RootSignatureD3D12::CreateGlobalRootSignature(const DeviceD3D12 & device)
 ///////////////////////////////////////////////////////////////////////////////
 
 // Path from the project root where to find shaders for this renderer
-static const char D3D12ShadersPath[] = "src\\renderers\\d3d12\\shaders";
+static const char D3D12ShadersPath[] = "src\\renderers\\shaders\\hlsl";
 
 bool ShaderProgramD3D12::LoadFromFile(const DeviceD3D12 & device, const VertexInputLayoutD3D12 & input_layout, const char * filename)
 {

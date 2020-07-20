@@ -56,6 +56,12 @@ using vec4_t = float[4];
     #define MRQ2_ASSERT_ALIGN16(ptr)  // nothing
 #endif // NDEBUG
 
+#define MRQ2_MAKE_WIDE_STR_IMPL(s) L ## s
+#define MRQ2_MAKE_WIDE_STR(s)      MRQ2_MAKE_WIDE_STR_IMPL(s)
+
+#define MRQ2_CAT_TOKEN_IMPL(a, b)  a ## b
+#define MRQ2_CAT_TOKEN(a, b)       MRQ2_CAT_TOKEN_IMPL(a, b)
+
 namespace MrQ2
 {
 
@@ -90,9 +96,10 @@ constexpr float DegToRad(const float degrees)
     return degrees * (3.14159265358979323846f / 180.0f);
 }
 
-inline void VecSplatN(float* vec, const int dims, const float val)
+template<int N>
+inline void VecSplatN(float (&vec)[N], const float val)
 {
-    for (int i = 0; i < dims; ++i)
+    for (int i = 0; i < N; ++i)
     {
         vec[i] = val;
     }
@@ -197,7 +204,7 @@ int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_s * p);
 /*
 ===============================================================================
 
-    RenderMatrix (row-major 4x4, float32 vectors, 16 aligned)
+    RenderMatrix (row-major 4x4, float4 vectors, 16 aligned)
 
 ===============================================================================
 */
@@ -210,7 +217,7 @@ struct alignas(16) RenderMatrix final
         float  m[4][4];
     };
 
-    enum IdentityInitializer { Identity };
+    enum IdentityInitializer { kIdentity };
 
     RenderMatrix() = default;         // Uninitialized matrix
     RenderMatrix(IdentityInitializer) // Identity matrix

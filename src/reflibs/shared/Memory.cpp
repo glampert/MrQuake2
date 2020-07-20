@@ -222,7 +222,7 @@ void MemFreeTracked(const void * ptr, const size_t size_bytes, const MemTag tag)
 // MemHunk
 ///////////////////////////////////////////////////////////////////////////////
 
-constexpr unsigned HUNK_SIZE_ROUND = 31;
+constexpr unsigned kHunkSizeRound = 31;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -241,7 +241,7 @@ void MemHunk::Init(const unsigned size, const MemTag tag)
 {
     MRQ2_ASSERT(base_ptr == nullptr); // Trap invalid reinitialization
 
-    const unsigned rounded_size = (size + HUNK_SIZE_ROUND) & ~HUNK_SIZE_ROUND;
+    const unsigned rounded_size = (size + kHunkSizeRound) & ~kHunkSizeRound;
     MRQ2_ASSERT(rounded_size >= size);
 
     curr_size = 0;
@@ -262,7 +262,7 @@ void * MemHunk::AllocBlock(const unsigned block_size)
 {
     MRQ2_ASSERT(base_ptr != nullptr); // Uninitialized?
 
-    const unsigned rounded_size = (block_size + HUNK_SIZE_ROUND) & ~HUNK_SIZE_ROUND;
+    const unsigned rounded_size = (block_size + kHunkSizeRound) & ~kHunkSizeRound;
     MRQ2_ASSERT(rounded_size >= block_size);
 
     // The hunk stack doesn't resize.

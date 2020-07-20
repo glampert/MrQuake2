@@ -290,7 +290,7 @@ void ViewDrawState::EndRenderPass(const FrameData & frame_data, GraphicsContext 
             context.SetDepthRange(depth_min, depth_min + 0.3f * (depth_max - depth_min));
         }
 
-        context.SetAndUpdateConstantBufferForDraw(m_per_draw_const_buffer, cbuffer_slot, cmd.model_matrix);
+        context.SetAndUpdateConstantBufferForDraw(m_per_draw_const_buffer, cbuffer_slot, cmd.constants);
 
         context.SetPrimitiveTopology(cmd.topology);
         context.SetTexture(cmd.texture->texture, 0);
@@ -310,7 +310,7 @@ MiniImBatch ViewDrawState::BeginBatch(const BeginBatchArgs & args)
     MRQ2_ASSERT(m_batch_open == false);
     MRQ2_ASSERT_ALIGN16(args.model_matrix.floats);
 
-    m_current_draw_cmd.model_matrix = args.model_matrix;
+    m_current_draw_cmd.constants.model_matrix = args.model_matrix;
     m_current_draw_cmd.texture      = (args.optional_tex != nullptr) ? args.optional_tex : m_tex_white2x2;
     m_current_draw_cmd.topology     = args.topology;
     m_current_draw_cmd.depth_hack   = args.depth_hack;
@@ -441,26 +441,43 @@ void ViewDrawState::DoRenderView(FrameData & frame_data, GraphicsContext & conte
     //
     // Opaque/solid geometry pass
     //
-
-    BeginRenderPass();
-    RenderWorldModel(frame_data);
-    RenderSkyBox(frame_data);
-    RenderSolidEntities(frame_data);
-    EndRenderPass(frame_data, context, cbuffers, m_pipeline_solid_geometry);
+    {
+        MRQ2_SCOPED_GPU_MARKER(context, "RenderOpaqueGeometry");
+        BeginRenderPass();
+        {
+            MRQ2_SCOPED_GPU_MARKER(context, "RenderWorldModel");
+            RenderWorldModel(frame_data);
+        }
+        {
+            MRQ2_SCOPED_GPU_MARKER(context, "RenderSkyBox");
+            RenderSkyBox(frame_data);
+        }
+        {
+            MRQ2_SCOPED_GPU_MARKER(context, "RenderSolidEntities");
+            RenderSolidEntities(frame_data);
+        }
+        EndRenderPass(frame_data, context, cbuffers, m_pipeline_solid_geometry);
+    }
 
     //
     // Transparencies/alpha passes
     //
 
     // Color Blend ON for static world geometry
-    BeginRenderPass();
-    RenderTranslucentSurfaces(frame_data);
-    EndRenderPass(frame_data, context, cbuffers, m_pipeline_translucent_world_geometry);
+    {
+        MRQ2_SCOPED_GPU_MARKER(context, "RenderTranslucentSurfaces");
+        BeginRenderPass();
+        RenderTranslucentSurfaces(frame_data);
+        EndRenderPass(frame_data, context, cbuffers, m_pipeline_translucent_world_geometry);
+    }
 
     // Disable z writes in case entities stack up
-    BeginRenderPass();
-    RenderTranslucentEntities(frame_data);
-    EndRenderPass(frame_data, context, cbuffers, m_pipeline_translucent_entities);
+    {
+        MRQ2_SCOPED_GPU_MARKER(context, "RenderTranslucentEntities");
+        BeginRenderPass();
+        RenderTranslucentEntities(frame_data);
+        EndRenderPass(frame_data, context, cbuffers, m_pipeline_translucent_entities);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -718,7 +735,7 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
     const bool do_draw = !m_skip_draw_texture_chains.IsSet();
 
     BeginBatchArgs args;
-    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+    args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
     args.topology     = PrimitiveTopology::kTriangleList;
     args.depth_hack   = false;
 
@@ -811,7 +828,7 @@ void ViewDrawState::RenderTranslucentSurfaces(FrameData & frame_data)
         else // Static translucent surface (glass, completely still fluid)
         {
             BeginBatchArgs args;
-            args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+            args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
             args.optional_tex = surf->texinfo->teximage;
             args.topology     = PrimitiveTopology::kTriangleList;
             args.depth_hack   = false;
@@ -903,7 +920,7 @@ void ViewDrawState::DrawAnimatedWaterPolys(const ModelSurface & surf, const floa
     }
 
     BeginBatchArgs args;
-    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+    args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
     args.optional_tex = surf.texinfo->teximage;
     args.topology     = PrimitiveTopology::kTriangleFan;
     args.depth_hack   = false;
@@ -1223,34 +1240,34 @@ void ViewDrawState::DrawSpriteModel(const FrameData & frame_data, const entity_t
 
     quad[0].uv[0] = 0.0f;
     quad[0].uv[1] = 1.0f;
-    MrQ2::VecSplatN(quad[0].rgba, 4, 1.0f);
+    MrQ2::VecSplatN(quad[0].rgba, 1.0f);
     quad[0].rgba[3] = alpha;
     MrQ2::Vec3MAdd(entity.origin, -frame->origin_y, up, quad[0].position);
     MrQ2::Vec3MAdd(quad[0].position, -frame->origin_x, right, quad[0].position);
 
     quad[1].uv[0] = 0.0f;
     quad[1].uv[1] = 0.0f;
-    MrQ2::VecSplatN(quad[1].rgba, 4, 1.0f);
+    MrQ2::VecSplatN(quad[1].rgba, 1.0f);
     quad[1].rgba[3] = alpha;
     MrQ2::Vec3MAdd(entity.origin, frame->height - frame->origin_y, up, quad[1].position);
     MrQ2::Vec3MAdd(quad[1].position, -frame->origin_x, right, quad[1].position);
 
     quad[2].uv[0] = 1.0f;
     quad[2].uv[1] = 0.0f;
-    MrQ2::VecSplatN(quad[2].rgba, 4, 1.0f);
+    MrQ2::VecSplatN(quad[2].rgba, 1.0f);
     quad[2].rgba[3] = alpha;
     MrQ2::Vec3MAdd(entity.origin, frame->height - frame->origin_y, up, quad[2].position);
     MrQ2::Vec3MAdd(quad[2].position, frame->width - frame->origin_x, right, quad[2].position);
 
     quad[3].uv[0] = 1.0f;
     quad[3].uv[1] = 1.0f;
-    MrQ2::VecSplatN(quad[3].rgba, 4, 1.0f);
+    MrQ2::VecSplatN(quad[3].rgba, 1.0f);
     quad[3].rgba[3] = alpha;
     MrQ2::Vec3MAdd(entity.origin, -frame->origin_y, up, quad[3].position);
     MrQ2::Vec3MAdd(quad[3].position, frame->width - frame->origin_x, right, quad[3].position);
 
     BeginBatchArgs args;
-    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+    args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
     args.optional_tex = model->data.skins[frame_num];
     args.topology     = PrimitiveTopology::kTriangleList;
     args.depth_hack   = false;
@@ -1360,7 +1377,7 @@ void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t &
     }
 
     BeginBatchArgs args;
-    args.model_matrix = RenderMatrix{ RenderMatrix::Identity };
+    args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
     args.optional_tex = nullptr; // No texture
     args.topology     = PrimitiveTopology::kTriangleStrip;
     args.depth_hack   = false;

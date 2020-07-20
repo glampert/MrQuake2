@@ -210,7 +210,7 @@ struct alignas(16) RenderMatrix final
         float  m[4][4];
     };
 
-    enum IdentityInitializer { Identity };
+    enum IdentityInitializer { kIdentity };
 
     RenderMatrix() = default;         // Uninitialized matrix
     RenderMatrix(IdentityInitializer) // Identity matrix

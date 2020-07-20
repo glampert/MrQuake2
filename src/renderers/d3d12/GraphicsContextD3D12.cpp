@@ -7,6 +7,7 @@
 #include "BufferD3D12.hpp"
 #include "TextureD3D12.hpp"
 #include "PipelineStateD3D12.hpp"
+#include <pix.h>
 
 namespace MrQ2
 {
@@ -22,6 +23,9 @@ void GraphicsContextD3D12::Init(const DeviceD3D12 & device, const SwapChainD3D12
 
     m_current_viewport.MinDepth = 0.0f;
     m_current_viewport.MaxDepth = 1.0f;
+
+    auto r_debug_frame_events = GameInterface::Cvar::Get("r_debug_frame_events", "0", CvarWrapper::kFlagArchive);
+    m_gpu_markers_enabled = r_debug_frame_events.IsSet();
 }
 
 void GraphicsContextD3D12::Shutdown()
@@ -198,6 +202,22 @@ void GraphicsContextD3D12::SetAndUpdateConstantBuffer_Internal(const ConstantBuf
     const auto num_32bit_values = data_size / 4;
     m_command_list->SetGraphicsRoot32BitConstants(slot + RootSignatureD3D12::kRootParamIndexCBuffer0, num_32bit_values, data, 0);
     (void)cb; // unused
+}
+
+void GraphicsContextD3D12::PushMarker(const wchar_t * name)
+{
+    if (m_gpu_markers_enabled)
+    {
+        PIXBeginEvent(m_command_list, 0, name);
+    }
+}
+
+void GraphicsContextD3D12::PopMarker()
+{
+    if (m_gpu_markers_enabled)
+    {
+        PIXEndEvent(m_command_list);
+    }
 }
 
 } // MrQ2

@@ -144,17 +144,4 @@ void UploadContextD3D12::UploadTextureImmediate(const TextureUploadD3D12& upload
     ++m_next_fence_value;
 }
 
-void UploadContextD3D12::UploadTextureAsync(const TextureUploadD3D12& upload_info)
-{
-    // TODO
-    (void)upload_info;
-    MRQ2_ASSERT(false && "Not implemented!");
-}
-
-void UploadContextD3D12::Synchronize()
-{
-    // TODO
-    MRQ2_ASSERT(false && "Not implemented!");
-}
-
 } // namespace MrQ2
