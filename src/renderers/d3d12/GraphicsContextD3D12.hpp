@@ -4,7 +4,7 @@
 #pragma once
 
 #include "UtilsD3D12.hpp"
-#include "ShaderProgramD3D12.hpp"
+#include "RootSignatureD3D12.hpp"
 
 namespace MrQ2
 {

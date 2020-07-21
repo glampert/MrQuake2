@@ -85,6 +85,9 @@
     <ClCompile Include="..\..\src\renderers\d3d12\ShaderProgramD3D12.cpp">
       <Filter>Backend</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\renderers\d3d12\RootSignatureD3D12.cpp">
+      <Filter>Backend</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\renderers\d3d12\BufferD3D12.hpp">
@@ -161,6 +164,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\renderers\common\ImmediateModeBatching.hpp">
       <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\d3d12\RootSignatureD3D12.hpp">
+      <Filter>Backend</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -39,6 +39,7 @@
     <ClCompile Include="..\..\src\renderers\d3d12\GraphicsContextD3D12.cpp" />
     <ClCompile Include="..\..\src\renderers\d3d12\PipelineStateD3D12.cpp" />
     <ClCompile Include="..\..\src\renderers\d3d12\RenderInterfaceD3D12.cpp" />
+    <ClCompile Include="..\..\src\renderers\d3d12\RootSignatureD3D12.cpp" />
     <ClCompile Include="..\..\src\renderers\d3d12\ShaderProgramD3D12.cpp" />
     <ClCompile Include="..\..\src\renderers\d3d12\SwapChainD3D12.cpp" />
     <ClCompile Include="..\..\src\renderers\d3d12\TextureD3D12.cpp" />
@@ -65,6 +66,7 @@
     <ClInclude Include="..\..\src\renderers\d3d12\GraphicsContextD3D12.hpp" />
     <ClInclude Include="..\..\src\renderers\d3d12\PipelineStateD3D12.hpp" />
     <ClInclude Include="..\..\src\renderers\d3d12\RenderInterfaceD3D12.hpp" />
+    <ClInclude Include="..\..\src\renderers\d3d12\RootSignatureD3D12.hpp" />
     <ClInclude Include="..\..\src\renderers\d3d12\ShaderProgramD3D12.hpp" />
     <ClInclude Include="..\..\src\renderers\d3d12\SwapChainD3D12.hpp" />
     <ClInclude Include="..\..\src\renderers\d3d12\TextureD3D12.hpp" />
