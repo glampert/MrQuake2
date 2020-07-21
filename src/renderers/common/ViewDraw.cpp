@@ -189,7 +189,7 @@ void ViewDrawState::Init(const RenderDevice & device, const TextureStore & tex_s
     constexpr uint32_t kViewDrawBatchSize = 25000; // max vertices * num buffers
     m_vertex_buffers.Init(device, kViewDrawBatchSize);
 
-    m_per_draw_const_buffer.Init(device, sizeof(PerDrawShaderConstants), ConstantBuffer::kOptimizeForSingleDraw);
+    m_per_draw_shader_consts.Init(device, sizeof(PerDrawShaderConstants), ConstantBuffer::kOptimizeForSingleDraw);
 
     // Shaders
     const VertexInputLayout vertex_input_layout = {
@@ -249,7 +249,7 @@ void ViewDrawState::Shutdown()
     m_pipeline_translucent_world_geometry.Shutdown();
     m_pipeline_translucent_entities.Shutdown();
     m_render3d_shader.Shutdown();
-    m_per_draw_const_buffer.Shutdown();
+    m_per_draw_shader_consts.Shutdown();
     m_vertex_buffers.Shutdown();
 }
 
@@ -290,7 +290,7 @@ void ViewDrawState::EndRenderPass(const FrameData & frame_data, GraphicsContext 
             context.SetDepthRange(depth_min, depth_min + 0.3f * (depth_max - depth_min));
         }
 
-        context.SetAndUpdateConstantBufferForDraw(m_per_draw_const_buffer, cbuffer_slot, cmd.constants);
+        context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, cmd.consts);
 
         context.SetPrimitiveTopology(cmd.topology);
         context.SetTexture(cmd.texture->texture, 0);
@@ -310,7 +310,7 @@ MiniImBatch ViewDrawState::BeginBatch(const BeginBatchArgs & args)
     MRQ2_ASSERT(m_batch_open == false);
     MRQ2_ASSERT_ALIGN16(args.model_matrix.floats);
 
-    m_current_draw_cmd.constants.model_matrix = args.model_matrix;
+    m_current_draw_cmd.consts.model_matrix = args.model_matrix;
     m_current_draw_cmd.texture      = (args.optional_tex != nullptr) ? args.optional_tex : m_tex_white2x2;
     m_current_draw_cmd.topology     = args.topology;
     m_current_draw_cmd.depth_hack   = args.depth_hack;

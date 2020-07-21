@@ -38,7 +38,7 @@ public:
     static image_s * RegisterPic(const char * const name);
 
     static void SetSky(const char * const name, const float rotate, vec3_t axis);
-    static void DrawGetPicSize(int * out_w, int * out_h, const char * const name);
+    static void GetPicSize(int * out_w, int * out_h, const char * const name);
 
     static void BeginFrame(float camera_separation);
     static void EndFrame();
@@ -67,21 +67,20 @@ private:
     static ModelStore      sm_model_store;
     static ViewDrawState   sm_view_state;
 
+    // Constant buffers:
     struct PerFrameShaderConstants
     {
         vec4_t screen_dimensions;     // Only XY used.
         vec4_t texture_color_scaling; // [debug] multiplied with texture color
         vec4_t vertex_color_scaling;  // [debug] multiplied with vertex color
     };
-    static PerFrameShaderConstants sm_per_frame_shader_consts;
-    static ScratchConstantBuffers  sm_per_frame_const_buffers;
+    static ConstBuffers<PerFrameShaderConstants> sm_per_frame_shader_consts;
 
     struct PerViewShaderConstants
     {
         RenderMatrix view_proj_matrix;
     };
-    static PerViewShaderConstants sm_per_view_shader_consts;
-    static ScratchConstantBuffers sm_per_view_const_buffers;
+    static ConstBuffers<PerViewShaderConstants> sm_per_view_shader_consts;
 
     // Cached Cvars:
     static CvarWrapper sm_disable_texturing;

@@ -172,7 +172,7 @@ private:
 
     struct DrawCmd
     {
-        PerDrawShaderConstants constants;
+        PerDrawShaderConstants consts;
         const TextureImage *   texture;
         uint32_t               first_vert;
         uint32_t               vertex_count;
@@ -187,7 +187,7 @@ private:
     PipelineState        m_pipeline_translucent_world_geometry;
     PipelineState        m_pipeline_translucent_entities;
     ShaderProgram        m_render3d_shader;
-    ConstantBuffer       m_per_draw_const_buffer;
+    ConstantBuffer       m_per_draw_shader_consts;
     const TextureImage * m_tex_white2x2{ nullptr };
     bool                 m_batch_open{ false };
     VBuffers             m_vertex_buffers{};

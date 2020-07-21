@@ -193,6 +193,19 @@ void GraphicsContextD3D12::Draw(const uint32_t first_vertex, const uint32_t vert
 
 void GraphicsContextD3D12::SetAndUpdateConstantBuffer_Internal(const ConstantBufferD3D12 & cb, const uint32_t slot, const void * data, const uint32_t data_size)
 {
+    // This is a sort of workaround to simulate immediate mode APIs where a draw call is an implicit pipeline flush.
+    // In D3D12 when we update a constant buffer and insert a draw command in the command list no drawing actually
+    // takes place until the command list is executed/submitted, so if that constant buffer was modified in between
+    // we would not have the expected values from prior the draw call when the call is actually executed.
+    //
+    // Our "PerDraw" constant buffer is shared by all draw items, it gets updated before the draw, then a draw call is performed.
+    // In older APIs this would work fine because the draw was implicitly "immediate" but now we need to handle this in a different way.
+    // One option is to use the inline root constants as we do here, which copies the shader constant data directly into the command buffer,
+    // so in our case the constant buffer is only a dummy. Other options would be:
+    //
+    // - Have individual constant buffers for each draw item.
+    // - Use an instance buffer that contains the per-draw constants and access that in the shader with the instance index.
+
     MRQ2_ASSERT(slot < RootSignatureD3D12::kCBufferCount);
     MRQ2_ASSERT(data != nullptr && data_size != 0);
     MRQ2_ASSERT((data_size % 4) == 0); // Must be a multiple of 4

@@ -39,6 +39,32 @@ struct ModelSurface;
 /*
 ===============================================================================
 
+    ConstBuffers
+
+===============================================================================
+*/
+template<typename T>
+class ConstBuffers final
+{
+public:
+
+    T data{};
+
+    void Init(const RenderDevice & device) { m_buffers.Init(device, sizeof(T)); }
+    void Shutdown() { m_buffers.Shutdown(); }
+
+    ConstantBuffer & CurrentBuffer() { return m_buffers.CurrentBuffer(); }
+    void Upload() { m_buffers.CurrentBuffer().WriteStruct(data); }
+    void MoveToNextFrame() { m_buffers.MoveToNextFrame(); }
+
+private:
+
+    ScratchConstantBuffers m_buffers;
+};
+
+/*
+===============================================================================
+
     VertexBuffers
     - Multiple mapped vertex buffers helper.
 

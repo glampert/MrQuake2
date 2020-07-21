@@ -19,11 +19,8 @@ ModelStore      DLLInterface::sm_model_store;
 ViewDrawState   DLLInterface::sm_view_state;
 
 // Constant buffers:
-DLLInterface::PerFrameShaderConstants DLLInterface::sm_per_frame_shader_consts;
-ScratchConstantBuffers                DLLInterface::sm_per_frame_const_buffers;
-
-DLLInterface::PerViewShaderConstants  DLLInterface::sm_per_view_shader_consts;
-ScratchConstantBuffers                DLLInterface::sm_per_view_const_buffers;
+ConstBuffers<DLLInterface::PerFrameShaderConstants> DLLInterface::sm_per_frame_shader_consts;
+ConstBuffers<DLLInterface::PerViewShaderConstants>  DLLInterface::sm_per_view_shader_consts;
 
 // Cached Cvars:
 CvarWrapper DLLInterface::sm_disable_texturing;
@@ -70,16 +67,16 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
     sm_view_state.Init(sm_renderer.Device(), sm_texture_store);
 
     // Constant buffers:
-    sm_per_frame_const_buffers.Init(sm_renderer.Device(), sizeof(sm_per_frame_shader_consts));
-    sm_per_view_const_buffers.Init(sm_renderer.Device(),  sizeof(sm_per_view_shader_consts));
+    sm_per_frame_shader_consts.Init(sm_renderer.Device());
+    sm_per_view_shader_consts.Init(sm_renderer.Device());
 
     return true;
 }
 
 void DLLInterface::Shutdown()
 {
-    sm_per_view_const_buffers.Shutdown();
-    sm_per_frame_const_buffers.Shutdown();
+    sm_per_view_shader_consts.Shutdown();
+    sm_per_frame_shader_consts.Shutdown();
     sm_view_state.Shutdown();
     sm_model_store.Shutdown();
     sm_texture_store.Shutdown();
@@ -141,7 +138,7 @@ void DLLInterface::SetSky(const char * const name, const float rotate, vec3_t ax
     sm_view_state.Sky() = SkyBox{ sm_texture_store, name, rotate, axis };
 }
 
-void DLLInterface::DrawGetPicSize(int * out_w, int * out_h, const char * const name)
+void DLLInterface::GetPicSize(int * out_w, int * out_h, const char * const name)
 {
     // This can be called outside Begin/End frame.
     const TextureImage * const tex = sm_texture_store.FindOrLoad(name, TextureType::kPic);
@@ -164,29 +161,29 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
 
     sm_renderer.BeginFrame(clear_color, clear_depth, clear_stencil);
 
-    sm_per_frame_shader_consts.screen_dimensions[0] = static_cast<float>(sm_renderer.RenderWidth());
-    sm_per_frame_shader_consts.screen_dimensions[1] = static_cast<float>(sm_renderer.RenderHeight());
+    sm_per_frame_shader_consts.data.screen_dimensions[0] = static_cast<float>(sm_renderer.RenderWidth());
+    sm_per_frame_shader_consts.data.screen_dimensions[1] = static_cast<float>(sm_renderer.RenderHeight());
 
     if (sm_disable_texturing.IsSet()) // Use only debug vertex color
     {
-        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 0.0f);
-        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  1.0f);
+        VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 0.0f);
+        VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling,  1.0f);
     }
     else if (sm_blend_debug_color.IsSet()) // Blend debug vertex color with texture
     {
-        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 1.0f);
-        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  1.0f);
+        VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 1.0f);
+        VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling,  1.0f);
     }
     else // Normal rendering
     {
-        VecSplatN(sm_per_frame_shader_consts.texture_color_scaling, 1.0f);
-        VecSplatN(sm_per_frame_shader_consts.vertex_color_scaling,  0.0f);
+        VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 1.0f);
+        VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling,  0.0f);
     }
 
     auto & context = sm_renderer.Device().GraphicsContext();
     MRQ2_PUSH_GPU_MARKER(context, "BeginFrame");
 
-    sm_per_frame_const_buffers.CurrentBuffer().WriteStruct(sm_per_frame_shader_consts);
+    sm_per_frame_shader_consts.Upload();
     sm_sprite_batches.BeginFrame();
 }
 
@@ -200,13 +197,13 @@ void DLLInterface::EndFrame()
     auto & context = sm_renderer.Device().GraphicsContext();
     {
         MRQ2_SCOPED_GPU_MARKER(context, "Draw2DSprites");
-        sm_sprite_batches.EndFrame(context, sm_per_frame_const_buffers.CurrentBuffer(), sm_texture_store.tex_conchars);
+        sm_sprite_batches.EndFrame(context, sm_per_frame_shader_consts.CurrentBuffer(), sm_texture_store.tex_conchars);
     }
 
     MRQ2_POP_GPU_MARKER(context); // "EndFrame"
 
-    sm_per_frame_const_buffers.MoveToNextFrame();
-    sm_per_view_const_buffers.MoveToNextFrame();
+    sm_per_frame_shader_consts.MoveToNextFrame();
+    sm_per_view_shader_consts.MoveToNextFrame();
 
     sm_renderer.EndFrame();
 }
@@ -231,12 +228,12 @@ void DLLInterface::RenderView(refdef_t * const view_def)
     sm_view_state.RenderViewSetup(frame_data);
 
     // Update the constant buffers for this view
-    sm_per_view_shader_consts.view_proj_matrix = frame_data.view_proj_matrix;
-    sm_per_view_const_buffers.CurrentBuffer().WriteStruct(sm_per_view_shader_consts);
+    sm_per_view_shader_consts.data.view_proj_matrix = frame_data.view_proj_matrix;
+    sm_per_view_shader_consts.Upload();
 
     FixedSizeArray<const ConstantBuffer *, 2> cbuffers;
-    cbuffers.push_back(&sm_per_frame_const_buffers.CurrentBuffer()); // slot(0)
-    cbuffers.push_back(&sm_per_view_const_buffers.CurrentBuffer());  // slot(1)
+    cbuffers.push_back(&sm_per_frame_shader_consts.CurrentBuffer()); // slot(0)
+    cbuffers.push_back(&sm_per_view_shader_consts.CurrentBuffer());  // slot(1)
 
     sm_view_state.DoRenderView(frame_data, context, cbuffers);
 }

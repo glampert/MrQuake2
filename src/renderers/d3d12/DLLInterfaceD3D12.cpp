@@ -32,7 +32,7 @@ extern "C" MRQ2_RENDERLIB_DLL_EXPORT refexport_t GetRefAPI(refimport_t ri)
     re.SetSky              = &MrQ2::DLLInterface::SetSky;
     re.EndRegistration     = &MrQ2::DLLInterface::EndRegistration;
     re.RenderFrame         = &MrQ2::DLLInterface::RenderView;
-    re.DrawGetPicSize      = &MrQ2::DLLInterface::DrawGetPicSize;
+    re.DrawGetPicSize      = &MrQ2::DLLInterface::GetPicSize;
     re.DrawPic             = &MrQ2::DLLInterface::DrawPic;
     re.DrawStretchPic      = &MrQ2::DLLInterface::DrawStretchPic;
     re.DrawChar            = &MrQ2::DLLInterface::DrawChar;
