@@ -13,11 +13,11 @@ class TextureD3D12;
 
 struct TextureUploadD3D12 final
 {
-    const TextureD3D12* texture;
-    const void *        pixels;
-    uint32_t            width;
-    uint32_t            height;
-    bool                is_scrap;
+    const TextureD3D12 * texture;
+    const void *         pixels;
+    uint32_t             width;
+    uint32_t             height;
+    bool                 is_scrap;
 };
 
 class UploadContextD3D12 final
@@ -33,7 +33,7 @@ public:
     void Init(const DeviceD3D12 & device);
     void Shutdown();
 
-    void UploadTextureImmediate(const TextureUploadD3D12& upload_info);
+    void UploadTextureImmediate(const TextureUploadD3D12 & upload_info);
 
     // TODO:
     // Async texture upload support?

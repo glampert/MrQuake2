@@ -51,7 +51,7 @@ void UploadContextD3D12::Shutdown()
     m_device            = nullptr;
 }
 
-void UploadContextD3D12::UploadTextureImmediate(const TextureUploadD3D12& upload_info)
+void UploadContextD3D12::UploadTextureImmediate(const TextureUploadD3D12 & upload_info)
 {
     MRQ2_ASSERT(m_device != nullptr);
 
@@ -144,4 +144,4 @@ void UploadContextD3D12::UploadTextureImmediate(const TextureUploadD3D12& upload
     ++m_next_fence_value;
 }
 
-} // namespace MrQ2
+} // MrQ2

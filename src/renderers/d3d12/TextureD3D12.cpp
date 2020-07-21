@@ -9,7 +9,7 @@
 namespace MrQ2
 {
 
-void TextureD3D12::Init(const DeviceD3D12 & device, const uint32_t width, const uint32_t height, const bool is_scrap, const ColorRGBA32* const init_data)
+void TextureD3D12::Init(const DeviceD3D12 & device, const uint32_t width, const uint32_t height, const bool is_scrap, const ColorRGBA32 * const init_data)
 {
     MRQ2_ASSERT((width + height) != 0);
     MRQ2_ASSERT(m_resource == nullptr); // Shutdown first
