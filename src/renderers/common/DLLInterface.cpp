@@ -26,6 +26,7 @@ ConstBuffers<DLLInterface::PerViewShaderConstants>  DLLInterface::sm_per_view_sh
 CvarWrapper DLLInterface::sm_disable_texturing;
 CvarWrapper DLLInterface::sm_blend_debug_color;
 CvarWrapper DLLInterface::sm_draw_fps_counter;
+CvarWrapper DLLInterface::sm_no_draw;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -40,6 +41,7 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
     sm_disable_texturing = GameInterface::Cvar::Get("r_disable_texturing", "0", 0);
     sm_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
     sm_draw_fps_counter  = GameInterface::Cvar::Get("r_draw_fps_counter",  "0", CvarWrapper::kFlagArchive);
+    sm_no_draw           = GameInterface::Cvar::Get("r_no_draw",           "0", 0);
 
     int w, h;
     if (!GameInterface::Video::GetModeInfo(w, h, vid_mode.AsInt()))
@@ -153,8 +155,16 @@ void DLLInterface::GetPicSize(int * out_w, int * out_h, const char * const name)
     *out_h = tex->height;
 }
 
+void DLLInterface::CinematicSetPalette(const qbyte * const palette)
+{
+    TextureStore::SetCinematicPaletteFromRaw(palette);
+}
+
 void DLLInterface::BeginFrame(float /*camera_separation*/)
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     const float   clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // RGBA
     const float   clear_depth    = 1.0f;
     const uint8_t clear_stencil  = 0;
@@ -189,6 +199,9 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
 
 void DLLInterface::EndFrame()
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     if (sm_draw_fps_counter.IsSet())
     {
         DrawFpsCounter();
@@ -210,6 +223,9 @@ void DLLInterface::EndFrame()
 
 void DLLInterface::RenderView(refdef_t * const view_def)
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     MRQ2_ASSERT(view_def != nullptr);
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
 
@@ -240,6 +256,9 @@ void DLLInterface::RenderView(refdef_t * const view_def)
 
 void DLLInterface::DrawPic(const int x, const int y, const char * const name)
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
 
     const TextureImage * const tex = sm_texture_store.FindOrLoad(name, TextureType::kPic);
@@ -271,6 +290,9 @@ void DLLInterface::DrawPic(const int x, const int y, const char * const name)
 
 void DLLInterface::DrawStretchPic(const int x, const int y, const int w, const int h, const char * const name)
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
 
     const TextureImage * const tex = sm_texture_store.FindOrLoad(name, TextureType::kPic);
@@ -302,6 +324,9 @@ void DLLInterface::DrawStretchPic(const int x, const int y, const int w, const i
 
 void DLLInterface::DrawChar(const int x, const int y, int c)
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
 
     // Draws one 8*8 console graphic character with 0 being transparent.
@@ -333,6 +358,9 @@ void DLLInterface::DrawChar(const int x, const int y, int c)
 
 void DLLInterface::DrawString(int x, int y, const char * s)
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     while (*s)
     {
         DrawChar(x, y, *s);
@@ -343,6 +371,9 @@ void DLLInterface::DrawString(int x, int y, const char * s)
 
 void DLLInterface::DrawTileClear(int /*x*/, int /*y*/, int /*w*/, int /*h*/, const char * /*name*/)
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
 
     // TODO - Only used when letterboxing the screen for SW rendering, so not required ???
@@ -352,6 +383,9 @@ void DLLInterface::DrawTileClear(int /*x*/, int /*y*/, int /*w*/, int /*h*/, con
 
 void DLLInterface::DrawFill(const int x, const int y, const int w, const int h, const int c)
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
 
     const ColorRGBA32 color = TextureStore::ColorForIndex(c & 0xFF);
@@ -362,6 +396,9 @@ void DLLInterface::DrawFill(const int x, const int y, const int w, const int h, 
 
 void DLLInterface::DrawFadeScreen()
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
 
     // Fade alpha was 0.8 on ref_gl Draw_FadeScreen
@@ -376,6 +413,9 @@ void DLLInterface::DrawFadeScreen()
 
 void DLLInterface::DrawStretchRaw(const int x, const int y, int w, int h, const int cols, const int rows, const qbyte * const data)
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
 
     //
@@ -455,13 +495,11 @@ void DLLInterface::DrawStretchRaw(const int x, const int y, int w, int h, const 
     sm_sprite_batches.Get(SpriteBatch::kDrawPics).PushQuadTextured(float(x), float(y), float(w), float(h), cinematic_tex, kColorWhite);
 }
 
-void DLLInterface::CinematicSetPalette(const qbyte * const palette)
-{
-    TextureStore::SetCinematicPaletteFromRaw(palette);
-}
-
 void DLLInterface::DrawAltString(int x, int y, const char * s)
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     while (*s)
     {
         DrawChar(x, y, *s ^ 0x80);
@@ -472,6 +510,9 @@ void DLLInterface::DrawAltString(int x, int y, const char * s)
 
 void DLLInterface::DrawNumberBig(int x, int y, int color, int width, int value)
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     // Draw a big number using one of the 0-9 textures
     // color=0: normal color
     // color=1: alternate color (red numbers)
@@ -517,6 +558,9 @@ void DLLInterface::DrawNumberBig(int x, int y, int color, int width, int value)
 
 void DLLInterface::DrawFpsCounter()
 {
+    if (sm_no_draw.IsSet())
+        return;
+
     // Average multiple frames together to smooth changes out a bit.
     static constexpr uint32_t kMaxFrames = 4;
     struct FpsCounter

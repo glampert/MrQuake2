@@ -90,11 +90,11 @@ private:
     static bool CompileShaderFromFile(const wchar_t * filename, const char * entry_point, const char * shader_model, const bool debug, ID3DBlob ** out_blob);
     static bool LoadFromFxFile(const wchar_t * filename, const FxLoaderInfo & info, Blobs * out_blobs);
 
-    const DeviceD3D11 *      m_device{ nullptr };
-    Blobs                    m_shader_bytecode{};
-    D3D11_INPUT_ELEMENT_DESC m_input_layout_d3d[VertexInputLayoutD3D11::kMaxVertexElements] = {};
-    uint32_t                 m_input_layout_count{ 0 };
-    bool                     m_is_loaded{ false };
+    const DeviceD3D11 *           m_device{ nullptr };
+    D11ComPtr<ID3D11VertexShader> m_vertex_shader;
+    D11ComPtr<ID3D11PixelShader>  m_pixel_shader;
+    D11ComPtr<ID3D11InputLayout>  m_vertex_layout;
+    bool                          m_is_loaded{ false };
 };
 
 } // MrQ2

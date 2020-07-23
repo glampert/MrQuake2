@@ -34,24 +34,27 @@ bool ShaderProgramD3D11::LoadFromFile(const DeviceD3D11 & device, const VertexIn
 
     FxLoaderInfo loader_info{};
     loader_info.vs_entry = vs_entry;
-    loader_info.vs_model = "vs_4_0";
+    loader_info.vs_model = "vs_5_0";
     loader_info.ps_entry = ps_entry;
-    loader_info.ps_model = "ps_4_0";
+    loader_info.ps_model = "ps_5_0";
     loader_info.debug    = debug;
 
-    if (!LoadFromFxFile(full_shader_path_wide, loader_info, &m_shader_bytecode))
+    Blobs shader_bytecode{};
+    if (!LoadFromFxFile(full_shader_path_wide, loader_info, &shader_bytecode))
     {
         return false;
     }
 
-    // Convert and cache the D3D11 input layout
+    // Convert the D3D11 input layout
     const char * const d3d_input_layout_type_conv[] = { nullptr, "POSITION", "TEXCOORD", "COLOR" };
     static_assert(ArrayLength(d3d_input_layout_type_conv) == VertexInputLayoutD3D11::kElementTypeCount);
 
     const DXGI_FORMAT d3d_input_layout_format_conv[] = { DXGI_FORMAT_UNKNOWN, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT, DXGI_FORMAT_R32G32B32A32_FLOAT };
     static_assert(ArrayLength(d3d_input_layout_format_conv) == VertexInputLayoutD3D11::kElementFormatCount);
 
-    uint32_t e = 0;
+    uint32_t num_elements = 0;
+    D3D11_INPUT_ELEMENT_DESC input_layout_d3d[VertexInputLayoutD3D11::kMaxVertexElements] = {};
+
     for (const auto & element : input_layout.elements)
     {
         if (element.type   == VertexInputLayoutD3D11::kInvalidElementType ||
@@ -60,18 +63,44 @@ bool ShaderProgramD3D11::LoadFromFile(const DeviceD3D11 & device, const VertexIn
             continue;
         }
 
-        m_input_layout_d3d[e].SemanticName         = d3d_input_layout_type_conv[element.type];
-        m_input_layout_d3d[e].SemanticIndex        = 0;
-        m_input_layout_d3d[e].Format               = d3d_input_layout_format_conv[element.format];
-        m_input_layout_d3d[e].InputSlot            = 0;
-        m_input_layout_d3d[e].AlignedByteOffset    = element.offset;
-        m_input_layout_d3d[e].InputSlotClass       = D3D11_INPUT_PER_VERTEX_DATA;
-        m_input_layout_d3d[e].InstanceDataStepRate = 0;
-        ++e;
+        input_layout_d3d[num_elements].SemanticName         = d3d_input_layout_type_conv[element.type];
+        input_layout_d3d[num_elements].SemanticIndex        = 0;
+        input_layout_d3d[num_elements].Format               = d3d_input_layout_format_conv[element.format];
+        input_layout_d3d[num_elements].InputSlot            = 0;
+        input_layout_d3d[num_elements].AlignedByteOffset    = element.offset;
+        input_layout_d3d[num_elements].InputSlotClass       = D3D11_INPUT_PER_VERTEX_DATA;
+        input_layout_d3d[num_elements].InstanceDataStepRate = 0;
+        ++num_elements;
+    }
+
+    auto * device11 = device.device;
+
+    // Create the vertex shader:
+    HRESULT hr = device11->CreateVertexShader(shader_bytecode.vs_blob->GetBufferPointer(),
+                                            shader_bytecode.vs_blob->GetBufferSize(), nullptr, m_vertex_shader.GetAddressOf());
+    if (FAILED(hr))
+    {
+        GameInterface::Errorf("Failed to create vertex shader '%s'", vs_entry);
+    }
+
+    // Create the pixel shader:
+    hr = device11->CreatePixelShader(shader_bytecode.ps_blob->GetBufferPointer(),
+                                   shader_bytecode.ps_blob->GetBufferSize(), nullptr, m_pixel_shader.GetAddressOf());
+    if (FAILED(hr))
+    {
+        GameInterface::Errorf("Failed to create pixel shader '%s'", ps_entry);
+    }
+
+    // Input Layout:
+    MRQ2_ASSERT(num_elements != 0);
+    hr = device11->CreateInputLayout(input_layout_d3d, num_elements, shader_bytecode.vs_blob->GetBufferPointer(),
+                                   shader_bytecode.vs_blob->GetBufferSize(), m_vertex_layout.GetAddressOf());
+    if (FAILED(hr))
+    {
+        GameInterface::Errorf("Failed to create vertex input layout!");
     }
 
     m_device = &device;
-    m_input_layout_count = e;
     m_is_loaded = true;
 
     return true;
@@ -79,9 +108,11 @@ bool ShaderProgramD3D11::LoadFromFile(const DeviceD3D11 & device, const VertexIn
 
 void ShaderProgramD3D11::Shutdown()
 {
-    m_device          = nullptr;
-    m_shader_bytecode = {};
-    m_is_loaded       = false;
+    m_device        = nullptr;
+    m_vertex_shader = nullptr;
+    m_pixel_shader  = nullptr;
+    m_vertex_layout = nullptr;
+    m_is_loaded     = false;
 }
 
 bool ShaderProgramD3D11::CompileShaderFromFile(const wchar_t * filename, const char * entry_point, const char * shader_model, const bool debug, ID3DBlob ** out_blob)

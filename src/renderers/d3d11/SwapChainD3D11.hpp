@@ -8,13 +8,13 @@
 namespace MrQ2
 {
 
-class DeviceD3D11;
-class SwapChainD3D11;
-class SwapChainRenderTargetsD3D11;
-
 class SwapChainD3D11 final
 {
 public:
+
+    D11ComPtr<ID3D11Device>        device;
+    D11ComPtr<ID3D11DeviceContext> context;
+    D11ComPtr<IDXGISwapChain>      swap_chain;
 
     SwapChainD3D11() = default;
 
@@ -22,16 +22,22 @@ public:
     SwapChainD3D11(const SwapChainD3D11 &) = delete;
     SwapChainD3D11 & operator=(const SwapChainD3D11 &) = delete;
 
-    void Init(const DeviceD3D11 & device, HWND hWnd, const bool fullscreen, const int width, const int height);
+    void Init(HWND hWnd, const bool fullscreen, const int width, const int height, const bool debug);
     void Shutdown();
-
-    void BeginFrame(const SwapChainRenderTargetsD3D11 & render_targets);
-    void EndFrame(const SwapChainRenderTargetsD3D11 & render_targets);
+    void Present();
 };
 
 class SwapChainRenderTargetsD3D11 final
 {
 public:
+
+    // Frame buffer:
+    D11ComPtr<ID3D11Texture2D>        framebuffer_texture;
+    D11ComPtr<ID3D11RenderTargetView> framebuffer_rtv;
+
+    // Depth/stencil buffer:
+    D11ComPtr<ID3D11Texture2D>        depth_stencil_texture;
+    D11ComPtr<ID3D11DepthStencilView> depth_stencil_view;
 
     int render_target_width{ 0 };
     int render_target_height{ 0 };
@@ -42,7 +48,7 @@ public:
     SwapChainRenderTargetsD3D11(const SwapChainRenderTargetsD3D11 &) = delete;
     SwapChainRenderTargetsD3D11 & operator=(const SwapChainRenderTargetsD3D11 &) = delete;
 
-    void Init(const DeviceD3D11 & device, const SwapChainD3D11 & swap_chain, const int width, const int height);
+    void Init(const SwapChainD3D11 & sc, const int width, const int height);
     void Shutdown();
 };
 

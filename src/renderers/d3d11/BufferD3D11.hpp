@@ -93,7 +93,7 @@ public:
         Unmap();
     }
 
-    uint32_t SizeInBytes() const { return 0; }
+    uint32_t SizeInBytes() const { return 9999; }//TODO
 
 private:
 

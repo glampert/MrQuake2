@@ -39,6 +39,7 @@ public:
 
     static void SetSky(const char * const name, const float rotate, vec3_t axis);
     static void GetPicSize(int * out_w, int * out_h, const char * const name);
+    static void CinematicSetPalette(const qbyte * const palette);
 
     static void BeginFrame(float camera_separation);
     static void EndFrame();
@@ -52,7 +53,6 @@ public:
     static void DrawFill(const int x, const int y, const int w, const int h, const int c);
     static void DrawFadeScreen();
     static void DrawStretchRaw(const int x, const int y, int w, int h, const int cols, const int rows, const qbyte * const data);
-    static void CinematicSetPalette(const qbyte * const palette);
 
     // Not part of the Quake2 DLL renderer interface
     static void DrawAltString(int x, int y, const char * s);
@@ -86,6 +86,7 @@ private:
     static CvarWrapper sm_disable_texturing;
     static CvarWrapper sm_blend_debug_color;
     static CvarWrapper sm_draw_fps_counter;
+    static CvarWrapper sm_no_draw;
 };
 
 } // MrQ2
