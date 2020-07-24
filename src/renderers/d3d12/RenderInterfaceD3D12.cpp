@@ -77,4 +77,9 @@ void RenderInterfaceD3D12::EndFrame()
     m_swap_chain.EndFrame(m_render_targets);
 }
 
+void RenderInterfaceD3D12::WaitForGpu()
+{
+    m_swap_chain.FullGpuSynch();
+}
+
 } // MrQ2

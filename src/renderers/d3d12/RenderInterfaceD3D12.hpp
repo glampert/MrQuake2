@@ -34,6 +34,7 @@ public:
 
     void BeginFrame(const float clear_color[4], const float clear_depth, const uint8_t clear_stencil);
     void EndFrame();
+    void WaitForGpu();
 
     int RenderWidth() const;
     int RenderHeight() const;

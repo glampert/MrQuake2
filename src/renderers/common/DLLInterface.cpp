@@ -77,6 +77,7 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
 
 void DLLInterface::Shutdown()
 {
+    sm_renderer.WaitForGpu();
     sm_per_view_shader_consts.Shutdown();
     sm_per_frame_shader_consts.Shutdown();
     sm_view_state.Shutdown();
