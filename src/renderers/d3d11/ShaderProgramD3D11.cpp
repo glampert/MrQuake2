@@ -77,7 +77,7 @@ bool ShaderProgramD3D11::LoadFromFile(const DeviceD3D11 & device, const VertexIn
 
     // Create the vertex shader:
     HRESULT hr = device11->CreateVertexShader(shader_bytecode.vs_blob->GetBufferPointer(),
-                                            shader_bytecode.vs_blob->GetBufferSize(), nullptr, m_vertex_shader.GetAddressOf());
+                                              shader_bytecode.vs_blob->GetBufferSize(), nullptr, m_vertex_shader.GetAddressOf());
     if (FAILED(hr))
     {
         GameInterface::Errorf("Failed to create vertex shader '%s'", vs_entry);
@@ -85,7 +85,7 @@ bool ShaderProgramD3D11::LoadFromFile(const DeviceD3D11 & device, const VertexIn
 
     // Create the pixel shader:
     hr = device11->CreatePixelShader(shader_bytecode.ps_blob->GetBufferPointer(),
-                                   shader_bytecode.ps_blob->GetBufferSize(), nullptr, m_pixel_shader.GetAddressOf());
+                                     shader_bytecode.ps_blob->GetBufferSize(), nullptr, m_pixel_shader.GetAddressOf());
     if (FAILED(hr))
     {
         GameInterface::Errorf("Failed to create pixel shader '%s'", ps_entry);
@@ -94,7 +94,7 @@ bool ShaderProgramD3D11::LoadFromFile(const DeviceD3D11 & device, const VertexIn
     // Input Layout:
     MRQ2_ASSERT(num_elements != 0);
     hr = device11->CreateInputLayout(input_layout_d3d, num_elements, shader_bytecode.vs_blob->GetBufferPointer(),
-                                   shader_bytecode.vs_blob->GetBufferSize(), m_vertex_layout.GetAddressOf());
+                                     shader_bytecode.vs_blob->GetBufferSize(), m_vertex_layout.GetAddressOf());
     if (FAILED(hr))
     {
         GameInterface::Errorf("Failed to create vertex input layout!");

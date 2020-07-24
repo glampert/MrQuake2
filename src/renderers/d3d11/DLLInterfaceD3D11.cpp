@@ -7,6 +7,7 @@
 #include "../common/DLLInterface.hpp"
 
 // Dx11 libraries
+#pragma comment(lib, "dxgi")
 #pragma comment(lib, "d3d11")
 #pragma comment(lib, "dxguid")
 #pragma comment(lib, "d3dcompiler")

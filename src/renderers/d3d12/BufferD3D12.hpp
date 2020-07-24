@@ -23,13 +23,13 @@ public:
     BufferD3D12(const BufferD3D12 &) = delete;
     BufferD3D12 & operator=(const BufferD3D12 &) = delete;
 
-    bool InitUntypedBuffer(const DeviceD3D12 & device, const uint32_t size_in_bytes);
     void Shutdown();
-
     void * Map();
     void Unmap();
 
 protected:
+
+    bool InitUntypedBuffer(const DeviceD3D12 & device, const uint32_t size_in_bytes);
 
     D12ComPtr<ID3D12Resource> m_resource;
 };

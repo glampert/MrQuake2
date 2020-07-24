@@ -35,14 +35,28 @@ public:
     void SetCullEnabled(const bool enabled);
 
     void Finalize() const;
-    bool IsFinalized() const { return true; } // TODO
+    bool IsFinalized() const { return (m_flags & kFinalized) != 0; }
 
 private:
 
-    const DeviceD3D11 *        m_device{ nullptr };
-    const ShaderProgramD3D11 * m_shader_prog{ nullptr };
-    float                      m_blend_factor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    PrimitiveTopologyD3D11     m_topology{ PrimitiveTopologyD3D11::kTriangleList };
+    enum Flags : uint32_t
+    {
+        kNoFlags           = 0,
+        kFinalized         = (1 << 1),
+        kDepthTestEnabled  = (1 << 2),
+        kDepthWriteEnabled = (1 << 3),
+        kAlphaBlendEnabled = (1 << 4),
+        kCullEnabled       = (1 << 5),
+    };
+
+    const DeviceD3D11 *                        m_device{ nullptr };
+    const ShaderProgramD3D11 *                 m_shader_prog{ nullptr };
+    mutable D11ComPtr<ID3D11DepthStencilState> m_ds_state{};
+    mutable D11ComPtr<ID3D11RasterizerState>   m_rasterizer_state{};
+    mutable D11ComPtr<ID3D11BlendState>        m_blend_state{};
+    mutable uint32_t                           m_flags{ kNoFlags };
+    float                                      m_blend_factor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    PrimitiveTopologyD3D11                     m_topology{ PrimitiveTopologyD3D11::kTriangleList };
 };
 
 } // MrQ2

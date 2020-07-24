@@ -9,10 +9,11 @@
 namespace MrQ2
 {
 
-void TextureD3D12::Init(const DeviceD3D12 & device, const uint32_t width, const uint32_t height, const bool is_scrap, const ColorRGBA32 * const init_data)
+void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, const uint32_t width, const uint32_t height, const bool is_scrap, const ColorRGBA32 * const init_data)
 {
     MRQ2_ASSERT((width + height) != 0);
-    MRQ2_ASSERT(m_resource == nullptr); // Shutdown first
+    MRQ2_ASSERT(m_device == nullptr); // Shutdown first
+    (void)type; // unused for now
 
     m_srv_descriptor = device.descriptor_heap->AllocateDescriptor(DescriptorD3D12::kSRV);
     m_is_descriptor_shared = false;
@@ -65,12 +66,13 @@ void TextureD3D12::Init(const DeviceD3D12 & device, const uint32_t width, const 
 
 void TextureD3D12::Init(const TextureD3D12 & other)
 {
-    MRQ2_ASSERT(m_resource == nullptr); // Shutdown first
+    MRQ2_ASSERT(m_device == nullptr); // Shutdown first
     MRQ2_ASSERT(other.m_resource != nullptr);
 
     // Share the other texture resource(s)
     m_resource             = other.m_resource;
     m_srv_descriptor       = other.m_srv_descriptor;
+    m_device               = other.m_device;
     m_is_descriptor_shared = true;
 }
 

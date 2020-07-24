@@ -8,6 +8,8 @@
 namespace MrQ2
 {
 
+enum class TextureType : std::uint8_t;
+
 class TextureD3D12 final
 {
     friend class UploadContextD3D12;
@@ -15,7 +17,7 @@ class TextureD3D12 final
 
 public:
 
-    void Init(const DeviceD3D12 & device, const uint32_t width, const uint32_t height, const bool is_scrap, const ColorRGBA32 * const init_data);
+    void Init(const DeviceD3D12 & device, const TextureType type, const uint32_t width, const uint32_t height, const bool is_scrap, const ColorRGBA32 * const init_data);
     void Init(const TextureD3D12 & other); // Init from existing texture sharing the resource and descriptor (for the scrap texture)
     void Shutdown();
 

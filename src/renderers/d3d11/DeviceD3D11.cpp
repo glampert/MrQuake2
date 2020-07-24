@@ -16,6 +16,8 @@ void DeviceD3D11::Init(const SwapChainD3D11 & sc, const bool debug, UploadContex
     context          = sc.context.Get();
     debug_validation = debug;
 
+    D11CHECK(sc.device->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, 1, &m_multisample_quality_levels_rgba));
+
     // Device creation and shutdown is handled by the SwapChain.
 }
 

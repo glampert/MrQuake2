@@ -4,7 +4,6 @@
 #pragma once
 
 #include "UtilsD3D11.hpp"
-#include "ShaderProgramD3D11.hpp"
 
 namespace MrQ2
 {
@@ -62,21 +61,27 @@ public:
 
 private:
 
-    const DeviceD3D11 *                 m_device{ nullptr };
-    const SwapChainD3D11 *              m_swap_chain{ nullptr };
-    const SwapChainRenderTargetsD3D11 * m_render_targets{ nullptr };
+    // These match the D3D12 global RootSignature
+    static constexpr uint32_t kCBufferSlotCount = 3;
+    static constexpr uint32_t kTextureSlotCount = 1;
+
+    const DeviceD3D11 *                  m_device{ nullptr };
+    const SwapChainD3D11 *               m_swap_chain{ nullptr };
+    const SwapChainRenderTargetsD3D11 *  m_render_targets{ nullptr };
+    ID3D11DeviceContext *                m_context{ nullptr };
+    D11ComPtr<ID3DUserDefinedAnnotation> m_annotations{ nullptr };
 
     // Cached states:
-    const PipelineStateD3D11 *          m_current_pipeline_state{ nullptr };
-    //D3D12_GPU_VIRTUAL_ADDRESS           m_current_vb{};
-    //D3D12_GPU_VIRTUAL_ADDRESS           m_current_ib{};
-    //D3D12_GPU_VIRTUAL_ADDRESS           m_current_cb[RootSignatureD3D12::kCBufferCount] = {};
-    //D3D12_GPU_DESCRIPTOR_HANDLE         m_current_texture[RootSignatureD3D12::kTextureCount] = {};
-    D3D11_VIEWPORT                      m_current_viewport{};
-    RECT                                m_current_scissor_rect{};
-    PrimitiveTopologyD3D11              m_current_topology{ PrimitiveTopologyD3D11::kCount };
-    bool                                m_depth_range_changed{ false };
-    bool                                m_gpu_markers_enabled{ false };
+    const PipelineStateD3D11 *           m_current_pipeline_state{ nullptr };
+    const VertexBufferD3D11 *            m_current_vb{ nullptr };
+    const IndexBufferD3D11 *             m_current_ib{ nullptr };
+    const ConstantBufferD3D11 *          m_current_cb[kCBufferSlotCount] = {};
+    const TextureD3D11 *                 m_current_texture[kTextureSlotCount] = {};
+    D3D11_VIEWPORT                       m_current_viewport{};
+    RECT                                 m_current_scissor_rect{};
+    PrimitiveTopologyD3D11               m_current_topology{ PrimitiveTopologyD3D11::kCount };
+    bool                                 m_depth_range_changed{ false };
+    bool                                 m_gpu_markers_enabled{ false };
 
     void SetAndUpdateConstantBuffer_Internal(const ConstantBufferD3D11 & cb, const uint32_t slot, const void * data, const uint32_t data_size);
 };

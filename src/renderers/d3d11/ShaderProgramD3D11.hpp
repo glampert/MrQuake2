@@ -10,6 +10,7 @@ namespace MrQ2
 
 class DeviceD3D11;
 class PipelineStateD3D11;
+class GraphicsContextD3D11;
 
 struct VertexInputLayoutD3D11 final
 {
@@ -48,6 +49,7 @@ struct VertexInputLayoutD3D11 final
 class ShaderProgramD3D11 final
 {
     friend PipelineStateD3D11;
+    friend GraphicsContextD3D11;
 
 public:
 

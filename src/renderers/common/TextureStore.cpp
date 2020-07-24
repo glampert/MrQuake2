@@ -110,7 +110,7 @@ TextureImage * TextureStore::CreateScrap(const int size, const ColorRGBA32 * pix
     Construct(new_scrap, pix, m_registration_num, TextureType::kPic, /*use_scrap =*/true,
               size, size, Vec2u16{ 0,0 }, Vec2u16{ std::uint16_t(size), std::uint16_t(size) }, "pics/scrap.pcx");
 
-    new_scrap->texture.Init(*m_device, size, size, /*is_scrap =*/true, new_scrap->pixels);
+    new_scrap->texture.Init(*m_device, TextureType::kPic, size, size, /*is_scrap =*/true, new_scrap->pixels);
     return new_scrap;
 }
 
@@ -131,7 +131,7 @@ TextureImage * TextureStore::CreateTexture(const ColorRGBA32 * pix, std::uint32_
     else
     {
         MRQ2_ASSERT(m_device != nullptr);
-        new_tex->texture.Init(*m_device, w, h, /*is_scrap =*/false, new_tex->pixels);
+        new_tex->texture.Init(*m_device, tt, w, h, /*is_scrap =*/false, new_tex->pixels);
     }
 
     return new_tex;

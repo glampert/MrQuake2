@@ -16,6 +16,7 @@ class DeviceD3D11 final
 {
     UploadContextD3D11   * m_upload_ctx{ nullptr };
     GraphicsContextD3D11 * m_graphics_ctx{ nullptr };
+    uint32_t m_multisample_quality_levels_rgba{ 0 };
 
 public:
 
@@ -34,6 +35,13 @@ public:
 
     void Init(const SwapChainD3D11 & sc, const bool debug, UploadContextD3D11 & up_ctx, GraphicsContextD3D11 & gfx_ctx);
     void Shutdown();
+
+    uint32_t MultisampleQualityLevel(const DXGI_FORMAT fmt) const
+    {
+        MRQ2_ASSERT(fmt == DXGI_FORMAT_R8G8B8A8_UNORM); // only format supported at the moment
+        (void)fmt;
+        return m_multisample_quality_levels_rgba;
+    }
 
     // Public to renderers/common
     UploadContextD3D11   & UploadContext()   const { return *m_upload_ctx;   }

@@ -23,13 +23,16 @@ public:
     BufferD3D11(const BufferD3D11 &) = delete;
     BufferD3D11 & operator=(const BufferD3D11 &) = delete;
 
-    bool InitUntypedBuffer(const DeviceD3D11 & device, const uint32_t size_in_bytes);
     void Shutdown();
-
     void * Map();
     void Unmap();
 
 protected:
+
+    void InitBufferInternal(const DeviceD3D11 & device, const D3D11_BUFFER_DESC & buffer_desc);
+
+    const DeviceD3D11 *     m_device{ nullptr };
+    D11ComPtr<ID3D11Buffer> m_resource;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -42,10 +45,13 @@ public:
 
     bool Init(const DeviceD3D11 & device, const uint32_t buffer_size_in_bytes, const uint32_t vertex_stride_in_bytes);
 
-    uint32_t SizeInBytes()   const { return 0; }
-    uint32_t StrideInBytes() const { return 0; }
+    uint32_t SizeInBytes()   const { return m_size_in_bytes; }
+    uint32_t StrideInBytes() const { return m_stride_in_bytes; }
 
 private:
+
+    uint32_t m_size_in_bytes{ 0 };
+    uint32_t m_stride_in_bytes{ 0 };
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -64,11 +70,14 @@ public:
 
     bool Init(const DeviceD3D11 & device, const uint32_t buffer_size_in_bytes, const IndexFormat format);
 
-    uint32_t    SizeInBytes()   const { return 0; }
-    uint32_t    StrideInBytes() const { return 0; }
-    IndexFormat Format()        const { return kFormatUInt16; }
+    uint32_t    SizeInBytes()   const { return m_size_in_bytes; }
+    uint32_t    StrideInBytes() const { return (m_index_format == kFormatUInt16) ? sizeof(uint16_t) : sizeof(uint32_t); }
+    IndexFormat Format()        const { return m_index_format; }
 
 private:
+
+    uint32_t    m_size_in_bytes{ 0 };
+    IndexFormat m_index_format{};
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -93,11 +102,12 @@ public:
         Unmap();
     }
 
-    uint32_t SizeInBytes() const { return 9999; }//TODO
+    uint32_t SizeInBytes() const { return m_size_in_bytes; }
 
 private:
 
-    Flags m_flags{ kNoFlags };
+    uint32_t m_size_in_bytes{ 0 };
+    Flags    m_flags{ kNoFlags };
 };
 
 ///////////////////////////////////////////////////////////////////////////////

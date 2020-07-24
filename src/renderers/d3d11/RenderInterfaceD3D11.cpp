@@ -3,6 +3,8 @@
 //
 
 #include "RenderInterfaceD3D11.hpp"
+#include <dxgidebug.h>
+#include <dxgi1_3.h>
 
 namespace MrQ2
 {
@@ -27,12 +29,24 @@ void RenderInterfaceD3D11::Shutdown()
 {
     GameInterface::Printf("**** RenderInterfaceD3D11::Shutdown ****");
 
+    const bool debug_check_leaks = m_device.debug_validation;
+
     m_graphics_ctx.Shutdown();
     m_upload_ctx.Shutdown();
     m_render_targets.Shutdown();
     m_device.Shutdown();
     m_swap_chain.Shutdown();
     m_window.Shutdown();
+
+    // At this point there should be no D3D objects left.
+    if (debug_check_leaks)
+    {
+        D11ComPtr<IDXGIDebug1> debug_interface;
+        if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug_interface))))
+        {
+            debug_interface->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
+        }
+    }
 }
 
 void RenderInterfaceD3D11::BeginFrame(const float clear_color[4], const float clear_depth, const uint8_t clear_stencil)
