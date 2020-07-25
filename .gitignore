@@ -5,7 +5,7 @@
 
 # Don't submit local Q2 data/assets or RenderDoc frame capture dumps
 data/
-renderdoc_captures/
+renderdoc/
 
 # User-specific files
 *.suo

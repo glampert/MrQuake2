@@ -444,18 +444,9 @@ void ViewDrawState::DoRenderView(FrameData & frame_data, GraphicsContext & conte
     {
         MRQ2_SCOPED_GPU_MARKER(context, "RenderOpaqueGeometry");
         BeginRenderPass();
-        {
-            MRQ2_SCOPED_GPU_MARKER(context, "RenderWorldModel");
-            RenderWorldModel(frame_data);
-        }
-        {
-            MRQ2_SCOPED_GPU_MARKER(context, "RenderSkyBox");
-            RenderSkyBox(frame_data);
-        }
-        {
-            MRQ2_SCOPED_GPU_MARKER(context, "RenderSolidEntities");
-            RenderSolidEntities(frame_data);
-        }
+        RenderWorldModel(frame_data);
+        RenderSkyBox(frame_data);
+        RenderSolidEntities(frame_data);
         EndRenderPass(frame_data, context, cbuffers, m_pipeline_solid_geometry);
     }
 

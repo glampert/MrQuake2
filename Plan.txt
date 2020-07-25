@@ -16,3 +16,5 @@
 - Make bullet hits in the walls leave a damage decal.
 
 - Do some CPU profiling with Optick (brofiler)!
+
+- Get texture mipmapping working.

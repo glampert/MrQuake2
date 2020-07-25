@@ -23,9 +23,9 @@ namespace RenderDocUtils
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static RENDERDOC_API_1_1_2 * g_renderdoc_api = nullptr;
+static RENDERDOC_API_1_4_1 * g_renderdoc_api = nullptr;
 static HMODULE               g_renderdoc_dll = nullptr;
-static const char * const    g_captures_path = "\\renderdoc_captures\\mrquake2";
+static const char * const    g_captures_path = "\\renderdoc\\mrquake2";
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -53,7 +53,7 @@ bool Initialize()
         return false;
     }
 
-    const int ret = get_api_func(eRENDERDOC_API_Version_1_1_2, (void **)&g_renderdoc_api);
+    const int ret = get_api_func(eRENDERDOC_API_Version_1_4_1, (void **)&g_renderdoc_api);
     if (ret != 1)
     {
         GameInterface::Printf("RENDERDOC_GetAPI() failed with error %i", ret);
@@ -69,7 +69,7 @@ bool Initialize()
 
     // Both Quake and the Visual Studio debugger already claim the default F12 capture key.
     RENDERDOC_InputButton capture_keys[] = { eRENDERDOC_Key_F11 };
-    g_renderdoc_api->SetCaptureKeys(capture_keys, int(ArrayLength(capture_keys)));
+    g_renderdoc_api->SetCaptureKeys(capture_keys, static_cast<int>(ArrayLength(capture_keys)));
 
     // Path where captures will be saved (created if needed)
     std::string capture_dir = Win32Window::CurrentWorkingDir();
