@@ -19,7 +19,8 @@ struct VertexShaderOutput
 
 cbuffer PerFrameShaderConstants : register(b0)
 {
-    float4 screen_dimensions;
+    float3 screen_dimensions;
+    float  forced_mip_level;
     float4 texture_color_scaling;
     float4 vertex_color_scaling;
 };
@@ -58,7 +59,17 @@ float4 PS_main(VertexShaderOutput input) : SV_TARGET
 {
     // Handles both opaque and translucent geometry
 
-    float4 tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
+    float4 tex_color;
+    if (forced_mip_level >= 0.0f)
+    {
+        // Sample specific mipmap level for debugging
+        tex_color = diffuse_texture.SampleLevel(diffuse_sampler, input.uv, forced_mip_level);
+    }
+    else
+    {
+        tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
+    }
+
     tex_color *= texture_color_scaling;
 
     float4 vert_color = input.rgba;

@@ -264,7 +264,7 @@ ModelInstance * ModelStore::LoadNewModel(const char * const name)
     switch (id)
     {
     case IDBSPHEADER :
-        LoadBrushModel(*this, *m_tex_store, *new_model, file.data_ptr, file.length);
+        LoadBrushModel(*m_tex_store, *new_model, file.data_ptr, file.length);
         break;
     case IDSPRITEHEADER :
         LoadSpriteModel(*m_tex_store, *new_model, file.data_ptr, file.length);
@@ -291,7 +291,7 @@ void ModelStore::ReferenceAllTextures(ModelInstance & mdl)
                 {
                     // Update to current registration num - no need to do a Find()
                     auto * tex = const_cast<TextureImage *>(mdl.data.texinfos[i].teximage);
-                    tex->reg_num = m_tex_store->RegistrationNum();
+                    tex->m_reg_num = m_tex_store->RegistrationNum();
                 }
             }
             break;

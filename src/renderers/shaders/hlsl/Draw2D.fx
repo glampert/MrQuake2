@@ -18,7 +18,8 @@ struct VertexShaderOutput
 
 cbuffer PerFrameShaderConstants : register(b0)
 {
-    float4 screen_dimensions;
+    float3 screen_dimensions;
+    float  forced_mip_level;
     float4 texture_color_scaling;
     float4 vertex_color_scaling;
 };

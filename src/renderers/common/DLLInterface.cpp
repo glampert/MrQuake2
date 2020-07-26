@@ -23,6 +23,7 @@ ConstBuffers<DLLInterface::PerFrameShaderConstants> DLLInterface::sm_per_frame_s
 ConstBuffers<DLLInterface::PerViewShaderConstants>  DLLInterface::sm_per_view_shader_consts;
 
 // Cached Cvars:
+CvarWrapper DLLInterface::sm_force_mip_level;
 CvarWrapper DLLInterface::sm_disable_texturing;
 CvarWrapper DLLInterface::sm_blend_debug_color;
 CvarWrapper DLLInterface::sm_draw_fps_counter;
@@ -38,10 +39,11 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
     auto r_renderdoc = GameInterface::Cvar::Get("r_renderdoc", "0",    CvarWrapper::kFlagArchive);
     auto r_debug     = GameInterface::Cvar::Get("r_debug",     "0",    CvarWrapper::kFlagArchive);
 
-    sm_disable_texturing = GameInterface::Cvar::Get("r_disable_texturing", "0", 0);
-    sm_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
-    sm_draw_fps_counter  = GameInterface::Cvar::Get("r_draw_fps_counter",  "0", CvarWrapper::kFlagArchive);
-    sm_no_draw           = GameInterface::Cvar::Get("r_no_draw",           "0", 0);
+    sm_force_mip_level   = GameInterface::Cvar::Get("r_force_mip_level",   "-1", 0);
+    sm_disable_texturing = GameInterface::Cvar::Get("r_disable_texturing", "0",  0);
+    sm_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0",  0);
+    sm_draw_fps_counter  = GameInterface::Cvar::Get("r_draw_fps_counter",  "0",  CvarWrapper::kFlagArchive);
+    sm_no_draw           = GameInterface::Cvar::Get("r_no_draw",           "0",  0);
 
     int w, h;
     if (!GameInterface::Video::GetModeInfo(w, h, vid_mode.AsInt()))
@@ -152,8 +154,8 @@ void DLLInterface::GetPicSize(int * out_w, int * out_h, const char * const name)
         return;
     }
 
-    *out_w = tex->width;
-    *out_h = tex->height;
+    *out_w = tex->Width();
+    *out_h = tex->Height();
 }
 
 void DLLInterface::CinematicSetPalette(const qbyte * const palette)
@@ -174,6 +176,7 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
 
     sm_per_frame_shader_consts.data.screen_dimensions[0] = static_cast<float>(sm_renderer.RenderWidth());
     sm_per_frame_shader_consts.data.screen_dimensions[1] = static_cast<float>(sm_renderer.RenderHeight());
+    sm_per_frame_shader_consts.data.forced_mip_level = sm_force_mip_level.AsFloat();
 
     if (sm_disable_texturing.IsSet()) // Use only debug vertex color
     {
@@ -271,16 +274,16 @@ void DLLInterface::DrawPic(const int x, const int y, const char * const name)
 
     const auto fx = float(x);
     const auto fy = float(y);
-    const auto fw = float(tex->width);
-    const auto fh = float(tex->height);
+    const auto fw = float(tex->Width());
+    const auto fh = float(tex->Height());
     const ColorRGBA32 kColorWhite = 0xFFFFFFFF;
 
-    if (tex->from_scrap)
+    if (tex->IsScrapImage())
     {
-        const auto u0 = float(tex->scrap_uv0.x) / TextureStore::kScrapSize;
-        const auto v0 = float(tex->scrap_uv0.y) / TextureStore::kScrapSize;
-        const auto u1 = float(tex->scrap_uv1.x) / TextureStore::kScrapSize;
-        const auto v1 = float(tex->scrap_uv1.y) / TextureStore::kScrapSize;
+        const auto u0 = float(tex->ScrapUV0().x) / TextureStore::kScrapSize;
+        const auto v0 = float(tex->ScrapUV0().y) / TextureStore::kScrapSize;
+        const auto u1 = float(tex->ScrapUV1().x) / TextureStore::kScrapSize;
+        const auto v1 = float(tex->ScrapUV1().y) / TextureStore::kScrapSize;
         sm_sprite_batches.Get(SpriteBatch::kDrawPics).PushQuadTexturedUVs(fx, fy, fw, fh, u0, v0, u1, v1, tex, kColorWhite);
     }
     else
@@ -309,12 +312,12 @@ void DLLInterface::DrawStretchPic(const int x, const int y, const int w, const i
     const auto fh = float(h);
     const ColorRGBA32 kColorWhite = 0xFFFFFFFF;
 
-    if (tex->from_scrap)
+    if (tex->IsScrapImage())
     {
-        const auto u0 = float(tex->scrap_uv0.x) / TextureStore::kScrapSize;
-        const auto v0 = float(tex->scrap_uv0.y) / TextureStore::kScrapSize;
-        const auto u1 = float(tex->scrap_uv1.x) / TextureStore::kScrapSize;
-        const auto v1 = float(tex->scrap_uv1.y) / TextureStore::kScrapSize;
+        const auto u0 = float(tex->ScrapUV0().x) / TextureStore::kScrapSize;
+        const auto v0 = float(tex->ScrapUV0().y) / TextureStore::kScrapSize;
+        const auto u1 = float(tex->ScrapUV1().x) / TextureStore::kScrapSize;
+        const auto v1 = float(tex->ScrapUV1().y) / TextureStore::kScrapSize;
         sm_sprite_batches.Get(SpriteBatch::kDrawPics).PushQuadTexturedUVs(fx, fy, fw, fh, u0, v0, u1, v1, tex, kColorWhite);
     }
     else
@@ -428,7 +431,7 @@ void DLLInterface::DrawStretchRaw(const int x, const int y, int w, int h, const 
     const TextureImage * const cinematic_tex = sm_texture_store.tex_cinframe;
     MRQ2_ASSERT(cinematic_tex != nullptr);
 
-    ColorRGBA32 * const cinematic_buffer = const_cast<ColorRGBA32 *>(cinematic_tex->pixels);
+    ColorRGBA32 * const cinematic_buffer = const_cast<ColorRGBA32 *>(cinematic_tex->BasePixels());
     MRQ2_ASSERT(cinematic_buffer != nullptr);
 
     const ColorRGBA32 * const cinematic_palette = TextureStore::CinematicPalette();
@@ -484,10 +487,10 @@ void DLLInterface::DrawStretchRaw(const int x, const int y, int w, int h, const 
 
     // Update the cinematic GPU texture from our CPU buffer
     TextureUpload upload_info{};
-    upload_info.texture  = &cinematic_tex->texture;
-    upload_info.pixels   = cinematic_tex->pixels;
-    upload_info.width    = cinematic_tex->width;
-    upload_info.height   = cinematic_tex->height;
+    upload_info.texture  = &cinematic_tex->BackendTexture();
+    upload_info.pixels   = cinematic_tex->BasePixels();
+    upload_info.width    = cinematic_tex->Width();
+    upload_info.height   = cinematic_tex->Height();
     upload_info.is_scrap = true; // This texture is a temporary, do not transition to shader resource in the D3D12 backend.
     sm_renderer.Device().UploadContext().UploadTextureImmediate(upload_info);
 

@@ -2,6 +2,7 @@
 // TextureD3D12.cpp
 //
 
+#include "../common/TextureStore.hpp"
 #include "TextureD3D12.hpp"
 #include "DeviceD3D12.hpp"
 #include "UploadContextD3D12.hpp"
@@ -9,9 +10,11 @@
 namespace MrQ2
 {
 
-void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, const uint32_t width, const uint32_t height, const bool is_scrap, const ColorRGBA32 * const init_data)
+void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, const uint32_t width, const uint32_t height,
+                        const bool is_scrap, const ColorRGBA32 * mip_init_data[], const Vec2u16 mip_dimensions[], const uint32_t num_mip_levels)
 {
     MRQ2_ASSERT((width + height) != 0);
+    MRQ2_ASSERT(num_mip_levels >= 1 && num_mip_levels <= TextureImage::kMaxMipLevels);
     MRQ2_ASSERT(m_device == nullptr); // Shutdown first
     (void)type; // unused for now
 
@@ -41,16 +44,13 @@ void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, cons
     D12SetDebugName(m_resource, L"Texture2D");
 
     // Upload texture pixels:
-    if (init_data != nullptr)
-    {
-        TextureUploadD3D12 upload_info{};
-        upload_info.texture  = this;
-        upload_info.pixels   = init_data;
-        upload_info.width    = width;
-        upload_info.height   = height;
-        upload_info.is_scrap = is_scrap;
-        device.UploadContext().UploadTextureImmediate(upload_info);
-    }
+    TextureUploadD3D12 upload_info{};
+    upload_info.texture  = this;
+    upload_info.pixels   = mip_init_data[0];
+    upload_info.width    = width;
+    upload_info.height   = height;
+    upload_info.is_scrap = is_scrap;
+    device.UploadContext().UploadTextureImmediate(upload_info);
 
     // Create texture view:
     D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};

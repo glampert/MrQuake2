@@ -11,15 +11,63 @@
 #include "common/q_common.h"
 #include "common/q_files.h"
 
+///////////////////////////////////////////////////////////////////////////////
 // STB Image Write (stbiw)
+///////////////////////////////////////////////////////////////////////////////
+
 #define STBIW_ASSERT(expr) MRQ2_ASSERT(expr)
+#define STB_IMAGE_WRITE_STATIC
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "external/stb/stb_image_write.h"
 
-namespace MrQ2
+///////////////////////////////////////////////////////////////////////////////
+// STB Image Resize (stbir)
+///////////////////////////////////////////////////////////////////////////////
+
+struct StbIR_AllocHeader
 {
+    size_t alloc_total;
+    size_t padding;
+};
+
+static inline void * StbIR_MemAlloc(const size_t size_bytes)
+{
+    constexpr size_t alignment = 16;
+    const size_t alloc_total = sizeof(StbIR_AllocHeader) + size_bytes + alignment;
+    static_assert((sizeof(StbIR_AllocHeader) % alignment) == 0);
+
+    void * memory = MrQ2::MemAllocTracked(alloc_total, MrQ2::MemTag::kTextures);
+    void * aligned_ptr = MrQ2::AlignPtr(memory, alignment);
+
+    auto * header = static_cast<StbIR_AllocHeader *>(aligned_ptr);
+    header->alloc_total = alloc_total;
+    header->padding = 0;
+
+    void * user_memory = header + 1;
+    return user_memory;
+}
+
+static inline void StbIR_MemFree(const void * ptr)
+{
+    auto * header = reinterpret_cast<const StbIR_AllocHeader *>(static_cast<const uint8_t *>(ptr) - sizeof(StbIR_AllocHeader));
+
+    MRQ2_ASSERT(header->alloc_total != 0);
+    MRQ2_ASSERT(header->padding == 0);
+
+    MrQ2::MemFreeTracked(header, header->alloc_total, MrQ2::MemTag::kTextures);
+}
+
+#define STBIR_ASSERT(expr) MRQ2_ASSERT(expr)
+#define STBIR_MALLOC(count, context) StbIR_MemAlloc(count)
+#define STBIR_FREE(ptr, context) StbIR_MemFree(ptr)
+#define STB_IMAGE_RESIZE_STATIC
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "external/stb/stb_image_resize.h"
 
 ///////////////////////////////////////////////////////////////////////////////
+
+namespace MrQ2
+{
 
 // Verbose debugging
 constexpr bool kLogLoadTextures = false;
@@ -36,10 +84,138 @@ static const char * const TextureType_Strings[] = {
 static_assert(ArrayLength(TextureType_Strings) == unsigned(TextureType::kCount), "Update this if the enum changes!");
 
 ///////////////////////////////////////////////////////////////////////////////
+// TextureImage
+///////////////////////////////////////////////////////////////////////////////
+
+void TextureImage::GenerateMipMaps()
+{
+    const bool no_mipmaps    = TextureStore::no_mipmaps.IsSet();
+    const bool debug_mipmaps = TextureStore::debug_mipmaps.IsSet();
+
+    if (no_mipmaps)
+    {
+        return;
+    }
+
+    if (Width() == 1 && Height() == 1)
+    {
+        // If the base surface happens to be a 1x1 pixels image, then we can't subdivide it any further.
+        // A 2x2 image can still generate one 1x1 mipmap level.
+        return;
+    }
+
+    // All sub-surface mipmaps will be allocated in a contiguous
+    // block of memory. Align the start of each portion belonging
+    // to a surface to 16 bytes.
+    constexpr uint32_t alignment = 16;
+
+    // Initial image is the base surface (mipmap level = 0).
+    // Always use the initial image to generate all mipmaps
+    // to avoid propagating errors.
+    const uint32_t  initial_width  = Width();
+    const uint32_t  initial_height = Height();
+    const uint8_t * base_image_pixels = m_mip_levels.base_pixels;
+
+    if (debug_mipmaps)
+    {
+        // Fill the base texture with a debug color as well.
+        const ColorRGBA32 c = RandomDebugColor();
+        const auto num_pixels = (initial_width * initial_height);
+        auto * rgba_pixels = (ColorRGBA32 *)base_image_pixels;
+        for (size_t p = 0; p < num_pixels; ++p)
+        {
+            rgba_pixels[p] = c;
+        }
+    }
+
+    uint32_t target_width  = initial_width;
+    uint32_t target_height = initial_height;
+    uint32_t mipmap_count  = 1; // Mip 0 is the initial image.
+    uint32_t mipmap_memory = 0;
+
+    // First, figure out how much memory to allocate.
+    // Stop when any of the dimensions reach 1.
+    while (mipmap_count != kMaxMipLevels)
+    {
+        target_width  = std::max(1u, target_width  / 2);
+        target_height = std::max(1u, target_height / 2);
+
+        mipmap_memory += ((target_width * target_height * kBytesPerPixel) + alignment);
+        mipmap_count++;
+
+        if (target_width == 1 && target_height == 1)
+        {
+            break;
+        }
+    }
+
+    // Allocate exact memory needed:
+    uint8_t * const mipmap_pixels = static_cast<uint8_t *>(MemAllocTracked(mipmap_memory, MemTag::kTextures));
+
+    // Mipmap surface generation:
+    uint8_t * mip_data_start_ptr = mipmap_pixels;
+    target_width  = initial_width;
+    target_height = initial_height;
+    mipmap_count  = 1;
+
+    while (mipmap_count != kMaxMipLevels)
+    {
+        target_width  = std::max(1u, target_width  / 2);
+        target_height = std::max(1u, target_height / 2);
+
+        if (debug_mipmaps) // Fill each mipmap with a random color
+        {
+            const ColorRGBA32 c = RandomDebugColor();
+            const auto num_pixels = (target_width * target_height);
+            auto * rgba_pixels = reinterpret_cast<ColorRGBA32 *>(mip_data_start_ptr);
+            for (size_t p = 0; p < num_pixels; ++p)
+            {
+                rgba_pixels[p] = c;
+            }
+        }
+        else
+        {
+            stbir_resize_uint8(
+                // Source:
+                base_image_pixels,
+                initial_width,
+                initial_height,
+                0,
+                // Destination:
+                mip_data_start_ptr,
+                target_width,
+                target_height,
+                0,
+                // NumChannels (RGBA):
+                4);
+        }
+
+        m_mip_levels.offsets_to_mip_pixels[mipmap_count] = static_cast<uint32_t>(mip_data_start_ptr - mipmap_pixels);
+        m_mip_levels.dimensions[mipmap_count].x = static_cast<uint16_t>(target_width);
+        m_mip_levels.dimensions[mipmap_count].y = static_cast<uint16_t>(target_height);
+
+        mip_data_start_ptr += (target_width * target_height * kBytesPerPixel);
+        mip_data_start_ptr = static_cast<uint8_t *>(AlignPtr(mip_data_start_ptr, alignment));
+        mipmap_count++;
+
+        if (target_width == 1 && target_height == 1)
+        {
+            break;
+        }
+    }
+
+    m_mip_levels.num_levels = mipmap_count;
+    m_mip_levels.mip_memory = mipmap_memory;
+    m_mip_levels.mip_pixels = mipmap_pixels;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // TextureStore
 ///////////////////////////////////////////////////////////////////////////////
 
 ColorRGBA32 TextureStore::sm_cinematic_palette[256];
+CvarWrapper TextureStore::no_mipmaps;
+CvarWrapper TextureStore::debug_mipmaps;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -47,6 +223,9 @@ void TextureStore::Init(const RenderDevice & device)
 {
     MRQ2_ASSERT(m_device == nullptr);
     m_device = &device;
+
+    no_mipmaps    = GameInterface::Cvar::Get("r_no_mipmaps",    "0", CvarWrapper::kFlagArchive);
+    debug_mipmaps = GameInterface::Cvar::Get("r_debug_mipmaps", "0", 0);
 
     m_teximages_cache.reserve(kTexturePoolSize);
     MemTagsTrackAlloc(m_teximages_cache.capacity() * sizeof(TextureImage *), MemTag::kTextures);
@@ -89,10 +268,10 @@ void TextureStore::UploadScrapIfNeeded()
         MRQ2_ASSERT(tex_scrap != nullptr);
 
         TextureUpload upload_info{};
-        upload_info.texture  = &tex_scrap->texture;
-        upload_info.pixels   = tex_scrap->pixels;
-        upload_info.width    = tex_scrap->width;
-        upload_info.height   = tex_scrap->height;
+        upload_info.texture  = &tex_scrap->m_texture;
+        upload_info.pixels   = tex_scrap->BasePixels();
+        upload_info.width    = tex_scrap->Width();
+        upload_info.height   = tex_scrap->Height();
         upload_info.is_scrap = true;
 
         m_device->UploadContext().UploadTextureImmediate(upload_info);
@@ -102,36 +281,59 @@ void TextureStore::UploadScrapIfNeeded()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-TextureImage * TextureStore::CreateScrap(const int size, const ColorRGBA32 * pix)
+TextureImage * TextureStore::CreateScrap(uint32_t size, const ColorRGBA32 * pixels)
 {
     MRQ2_ASSERT(m_device != nullptr);
 
     TextureImage * new_scrap = m_teximages_pool.Allocate();
-    Construct(new_scrap, pix, m_registration_num, TextureType::kPic, /*use_scrap =*/true,
-              size, size, Vec2u16{ 0,0 }, Vec2u16{ std::uint16_t(size), std::uint16_t(size) }, "pics/scrap.pcx");
+    ::new(new_scrap) TextureImage{ pixels, m_registration_num, TextureType::kPic, /*from_scrap =*/true,
+                                   size, size, Vec2u16{0,0}, Vec2u16{ std::uint16_t(size), std::uint16_t(size) },
+                                   "pics/scrap.pcx" };
 
-    new_scrap->texture.Init(*m_device, TextureType::kPic, size, size, /*is_scrap =*/true, new_scrap->pixels);
+    constexpr uint32_t  num_mip_levels = 1;
+    const ColorRGBA32 * mip_init_data[num_mip_levels]  = { new_scrap->BasePixels() };
+    const Vec2u16       mip_dimensions[num_mip_levels] = { new_scrap->MipMapDimensions(0) };
+
+    new_scrap->m_texture.Init(*m_device, TextureType::kPic, size, size, /*is_scrap =*/true, mip_init_data, mip_dimensions, num_mip_levels);
     return new_scrap;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-TextureImage * TextureStore::CreateTexture(const ColorRGBA32 * pix, std::uint32_t regn, TextureType tt, bool use_scrap,
-                                           int w, int h, Vec2u16 scrap0, Vec2u16 scrap1, const char * name)
+TextureImage * TextureStore::CreateTexture(const ColorRGBA32 * pixels, uint32_t reg_num, TextureType tt, bool from_scrap,
+                                           uint32_t w, uint32_t h, Vec2u16 scrap0, Vec2u16 scrap1, const char * const name)
 {
     TextureImage * new_tex = m_teximages_pool.Allocate();
-    Construct(new_tex, pix, regn, tt, use_scrap, w, h, scrap0, scrap1, name);
+    ::new(new_tex) TextureImage{ pixels, reg_num, tt, from_scrap, w, h, scrap0, scrap1, name };
 
-    if (use_scrap)
+    if (from_scrap)
     {
         MRQ2_ASSERT(tex_scrap != nullptr);
-        new_tex->texture.Init(tex_scrap->texture);
+        new_tex->m_texture.Init(tex_scrap->m_texture);
         m_scrap_dirty = true; // Upload the texture on next opportunity
     }
     else
     {
         MRQ2_ASSERT(m_device != nullptr);
-        new_tex->texture.Init(*m_device, tt, w, h, /*is_scrap =*/false, new_tex->pixels);
+
+        if (new_tex->SupportsMipMaps())
+        {
+            new_tex->GenerateMipMaps();
+        }
+
+        const uint32_t num_mip_levels = new_tex->NumMipMapLevels();
+        MRQ2_ASSERT(num_mip_levels >= 1 && num_mip_levels <= TextureImage::kMaxMipLevels);
+
+        const ColorRGBA32 * mip_init_data[TextureImage::kMaxMipLevels] = {};
+        Vec2u16 mip_dimensions[TextureImage::kMaxMipLevels] = {};
+
+        for (uint32_t mip = 0; mip < num_mip_levels; ++mip)
+        {
+            mip_init_data[mip]  = new_tex->MipMapPixels(mip);
+            mip_dimensions[mip] = new_tex->MipMapDimensions(mip);
+        }
+
+        new_tex->m_texture.Init(*m_device, tt, w, h, /*is_scrap =*/false, mip_init_data, mip_dimensions, num_mip_levels);
     }
 
     return new_tex;
@@ -141,7 +343,7 @@ TextureImage * TextureStore::CreateTexture(const ColorRGBA32 * pix, std::uint32_
 
 void TextureStore::DestroyTexture(TextureImage * tex)
 {
-    tex->texture.Shutdown();
+    tex->m_texture.Shutdown();
     Destroy(tex);
     m_teximages_pool.Deallocate(tex);
 }
@@ -173,10 +375,10 @@ void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const ch
     {
         for (const TextureImage * tex : m_teximages_cache)
         {
-            std::snprintf(fullname, sizeof(fullname), "%s/%s.tga", path, tex->name.CStrNoExt(filename));
+            std::snprintf(fullname, sizeof(fullname), "%s/%s.tga", path, tex->Name().CStrNoExt(filename));
             GameInterface::FS::CreatePath(fullname);
 
-            if (stbi_write_tga(fullname, tex->width, tex->height, kNComponents, tex->pixels) == 0)
+            if (stbi_write_tga(fullname, tex->Width(), tex->Height(), kNComponents, tex->BasePixels()) == 0)
             {
                 GameInterface::Printf("Failed to write image '%s'", fullname);
             }
@@ -186,11 +388,11 @@ void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const ch
     {
         for (const TextureImage * tex : m_teximages_cache)
         {
-            std::snprintf(fullname, sizeof(fullname), "%s/%s.png", path, tex->name.CStrNoExt(filename));
+            std::snprintf(fullname, sizeof(fullname), "%s/%s.png", path, tex->Name().CStrNoExt(filename));
             GameInterface::FS::CreatePath(fullname);
 
-            const int stride = tex->width * kNComponents;
-            if (stbi_write_png(fullname, tex->width, tex->height, kNComponents, tex->pixels, stride) == 0)
+            const int stride = tex->Width() * kNComponents;
+            if (stbi_write_png(fullname, tex->Width(), tex->Height(), kNComponents, tex->BasePixels(), stride) == 0)
             {
                 GameInterface::Printf("Failed to write image '%s'", fullname);
             }
@@ -331,7 +533,7 @@ void TextureStore::EndRegistration()
     int num_removed = 0;
     auto remove_pred = [this, &num_removed](TextureImage * tex)
     {
-        if (tex->reg_num != m_registration_num)
+        if (tex->m_reg_num != m_registration_num)
         {
             DestroyTexture(tex);
             ++num_removed;
@@ -398,9 +600,9 @@ const TextureImage * TextureStore::Find(const char * const name, const TextureTy
     for (TextureImage * tex : m_teximages_cache)
     {
         // If name and type match, we are done.
-        if ((name_hash == tex->name.Hash()) && (tt == tex->type))
+        if ((name_hash == tex->Name().Hash()) && (tt == tex->Type()))
         {
-            tex->reg_num = m_registration_num;
+            tex->m_reg_num = m_registration_num;
             return tex;
         }
     }
@@ -505,7 +707,7 @@ TextureImage * TextureStore::LoadTGAImpl(const char * const name, const TextureT
     }
 
     // TGAs are always expanded to RGBA, so no extra conversion is needed.
-    return CreateTexture(pic32, m_registration_num, tt, /*use_scrap =*/false, width, height, {0,0}, {0,0}, name);
+    return CreateTexture(pic32, m_registration_num, tt, /*from_scrap =*/false, width, height, {0,0}, {0,0}, name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -531,8 +733,7 @@ TextureImage * TextureStore::LoadWALImpl(const char * const name)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-TextureImage * TextureStore::ScrapTryAlloc8Bit(const Color8 * const pic8, const int width, const int height,
-                                               const char * const name, const TextureType tt)
+TextureImage * TextureStore::ScrapTryAlloc8Bit(const Color8 * const pic8, const int width, const int height, const char * const name, const TextureType tt)
 {
     MRQ2_ASSERT(width > 0 && height > 0);
     MRQ2_ASSERT(m_scrap_inited);
@@ -601,13 +802,12 @@ TextureImage * TextureStore::ScrapTryAlloc8Bit(const Color8 * const pic8, const 
     uv1.y = std::uint16_t(sy + height);
 
     // Pass ownership of the pixel data
-    return CreateTexture(pic32, m_registration_num, tt, /*use_scrap =*/true, width, height, uv0, uv1, name);
+    return CreateTexture(pic32, m_registration_num, tt, /*from_scrap =*/true, width, height, uv0, uv1, name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-TextureImage * TextureStore::Common8BitTexSetup(const Color8 * const pic8, const int width, const int height,
-                                                const char * const name, const TextureType tt)
+TextureImage * TextureStore::Common8BitTexSetup(const Color8 * const pic8, const int width, const int height, const char * const name, const TextureType tt)
 {
     MRQ2_ASSERT(width > 0 && height > 0);
 
@@ -615,7 +815,7 @@ TextureImage * TextureStore::Common8BitTexSetup(const Color8 * const pic8, const
     UnPalettize8To32(width, height, pic8, sm_global_palette, pic32);
 
     // Pass ownership of the pixel data
-    return CreateTexture(pic32, m_registration_num, tt, /*use_scrap =*/false, width, height, {0,0}, {0,0}, name);
+    return CreateTexture(pic32, m_registration_num, tt, /*from_scrap =*/false, width, height, {0,0}, {0,0}, name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

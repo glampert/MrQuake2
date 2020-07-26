@@ -32,11 +32,11 @@ struct ModelSurface;
 */
 enum class TextureType : std::uint8_t
 {
-    kSkin,   // Usually PCX
-    kSprite, // Usually PCX
-    kWall,   // Custom WALL format (miptex_t)
-    kSky,    // PCX or TGA
-    kPic,    // Usually PCX
+    kSkin,   // Usually PCX          (mipmaps=yes)
+    kSprite, // Usually PCX          (mipmaps=yes)
+    kWall,   // WALL/miptex_t format (mipmaps=yes)
+    kSky,    // PCX or TGA           (mipmaps=yes)
+    kPic,    // Usually PCX          (mipmaps=no)
 
     // Number of items in the enum - not a valid texture type.
     kCount
@@ -51,46 +51,134 @@ enum class TextureType : std::uint8_t
 */
 class TextureImage final
 {
+    friend class TextureStore;
+    friend class ModelStore;
+
 public:
-
-    const PathName       name;          // Texture filename/unique id (must be the first field - game code assumes this).
-    const ColorRGBA32  * pixels;        // Pointer to heap memory with image pixels (or into scrap atlas).
-    const ModelSurface * texture_chain; // For sort-by-texture world drawing.
-    std::uint32_t        reg_num;       // Registration num, so we know if currently referenced by the level being played.
-    const TextureType    type;          // Types of textures used by Quake.
-    const bool           from_scrap;    // True if allocated from the scrap atlas.
-    const int            width;         // Width in pixels.
-    const int            height;        // Height in pixels.
-    const Vec2u16        scrap_uv0;     // Offsets into the scrap if this is allocate from the scrap, zero otherwise.
-    const Vec2u16        scrap_uv1;     // If not zero, this is a scrap image. In such case, use these instead of width & height.
-    Texture              texture;       // Back-end renderer texture object.
-
-    TextureImage(const ColorRGBA32 * const pix, const std::uint32_t regn, const TextureType tt, const bool use_scrap,
-                 const int w, const int h, const Vec2u16 scrap0, const Vec2u16 scrap1, const char * const tex_name)
-        : name{ tex_name }
-        , pixels{ pix }
-        , texture_chain{ nullptr }
-        , reg_num{ regn }
-        , type{ tt }
-        , from_scrap{ use_scrap }
-        , width{ w }
-        , height{ h }
-        , scrap_uv0{ scrap0 }
-        , scrap_uv1{ scrap1 }
-        , texture{}
-    { }
-
-    ~TextureImage()
-    {
-        if (!from_scrap && pixels != nullptr)
-        {
-            MemFreeTracked(pixels, (width * height * 4), MemTag::kTextures);
-        }
-    }
 
     // Disallow copy.
     TextureImage(const TextureImage &) = delete;
     TextureImage & operator=(const TextureImage &) = delete;
+
+    ~TextureImage()
+    {
+        // Memory is owned by the TextureImage unless it is using the scrap atlas.
+        if (!m_is_scrap_image)
+        {
+            if (m_mip_levels.base_pixels != nullptr)
+            {
+                MemFreeTracked(m_mip_levels.base_pixels, m_mip_levels.base_memory, MemTag::kTextures);
+            }
+
+            if (m_mip_levels.mip_pixels != nullptr)
+            {
+                MemFreeTracked(m_mip_levels.mip_pixels, m_mip_levels.mip_memory, MemTag::kTextures);
+            }
+        }
+    }
+
+    const PathName & Name() const { return m_name; }
+    const Texture  & BackendTexture() const { return m_texture; }
+    TextureType Type() const { return m_type; }
+
+    // Scrap atlas
+    bool IsScrapImage() const { return m_is_scrap_image; }
+    Vec2u16 ScrapUV0()  const { return m_scrap_uv0; }
+    Vec2u16 ScrapUV1()  const { return m_scrap_uv1; }
+
+    // Draw by texture linked list used by the world renderer
+    void SetDrawChainPtr(const ModelSurface * p) const { m_draw_chain = p; }
+    const ModelSurface * DrawChainPtr() const { return m_draw_chain; }
+
+    // Mipmaps
+    bool SupportsMipMaps() const { return m_type < TextureType::kPic; }
+    bool HasMipMaps() const { return m_mip_levels.num_levels > 1; }
+    uint32_t NumMipMapLevels() const { return m_mip_levels.num_levels; }
+
+    const ColorRGBA32 * BasePixels() const
+    {
+        return reinterpret_cast<const ColorRGBA32 *>(m_mip_levels.base_pixels);
+    }
+
+    const ColorRGBA32 * MipMapPixels(const uint32_t mip_level) const
+    {
+        MRQ2_ASSERT(mip_level < m_mip_levels.num_levels);
+        if (mip_level == 0)
+        {
+            return reinterpret_cast<const ColorRGBA32 *>(m_mip_levels.base_pixels);
+        }
+        else
+        {
+            MRQ2_ASSERT(m_mip_levels.mip_pixels != nullptr);
+            return reinterpret_cast<const ColorRGBA32 *>(m_mip_levels.mip_pixels + m_mip_levels.offsets_to_mip_pixels[mip_level]);
+        }
+    }
+
+    Vec2u16 MipMapDimensions(const uint32_t mip_level) const
+    {
+        MRQ2_ASSERT(mip_level < m_mip_levels.num_levels);
+        return m_mip_levels.dimensions[mip_level];
+    }
+
+    int Width(const uint32_t mip_level = 0) const
+    {
+        MRQ2_ASSERT(mip_level < m_mip_levels.num_levels);
+        return m_mip_levels.dimensions[mip_level].x;
+    }
+
+    int Height(const uint32_t mip_level = 0) const
+    {
+        MRQ2_ASSERT(mip_level < m_mip_levels.num_levels);
+        return m_mip_levels.dimensions[mip_level].y;
+    }
+
+    void GenerateMipMaps();
+
+    static constexpr uint32_t kMaxMipLevels  = 8; // Level 0 is the base texture, 7 mipmaps in total.
+    static constexpr uint32_t kBytesPerPixel = 4; // All textures are RGBA_U8
+
+private:
+
+    struct MipLevels
+    {
+        uint32_t        num_levels;
+        uint32_t        base_memory;
+        uint32_t        mip_memory;
+        const uint8_t * base_pixels; // Pixels for mip level 0 (the base level / original image)
+        const uint8_t * mip_pixels;  // Memory for any additional mip levels. offsets_to_mip_pixels[1..num_levels] points to the beginning of each.
+        Vec2u16         dimensions[kMaxMipLevels];
+        uint32_t        offsets_to_mip_pixels[kMaxMipLevels];
+    };
+
+    const PathName               m_name;                  // Texture filename/unique id (must be the first field - game code assumes this).
+    MipLevels                    m_mip_levels{};          // Dimensions and offsets for each mipmap level. Always at least one.
+    mutable const ModelSurface * m_draw_chain{ nullptr }; // For sort-by-texture world drawing.
+    uint32_t                     m_reg_num{ 0 };          // Registration number, so we know if currently referenced by the level being played.
+    const TextureType            m_type;                  // Types of textures used by Quake.
+    const bool                   m_is_scrap_image;        // True if allocated from the scrap atlas.
+    const Vec2u16                m_scrap_uv0;             // Offsets into the scrap if this is allocate from the scrap, zero otherwise.
+    const Vec2u16                m_scrap_uv1;             // If not zero, this is a scrap image. In such case, use these instead of width & height.
+    Texture                      m_texture;               // Back-end renderer texture object.
+
+    // Initialize with a single mipmap level (level 0)
+    TextureImage(const ColorRGBA32 * const mip0_pixels, const uint32_t reg_num, const TextureType type, const bool from_scrap,
+                 const uint32_t mip0_width, const uint32_t mip0_height, const Vec2u16 scrap_uv0, const Vec2u16 scrap_uv1, const char * const tex_name)
+        : m_name{ tex_name }
+        , m_reg_num{ reg_num }
+        , m_type{ type }
+        , m_is_scrap_image{ from_scrap }
+        , m_scrap_uv0{ scrap_uv0 }
+        , m_scrap_uv1{ scrap_uv1 }
+    {
+        MRQ2_ASSERT(mip0_width  <= UINT16_MAX);
+        MRQ2_ASSERT(mip0_height <= UINT16_MAX);
+
+        m_mip_levels.num_levels      = 1;
+        m_mip_levels.base_memory     = (mip0_width * mip0_height * kBytesPerPixel);
+        m_mip_levels.base_pixels     = reinterpret_cast<const uint8_t *>(mip0_pixels); // NOTE: Takes ownership of the memory
+        m_mip_levels.dimensions[0].x = static_cast<uint16_t>(mip0_width);
+        m_mip_levels.dimensions[0].y = static_cast<uint16_t>(mip0_height);
+    }
 };
 
 /*
@@ -144,11 +232,15 @@ public:
     // palette=nullptr sets back the global palette.
     static void SetCinematicPaletteFromRaw(const std::uint8_t * palette);
 
+    // Cached Cvars
+    static CvarWrapper no_mipmaps;
+    static CvarWrapper debug_mipmaps;
+
 private:
 
-    TextureImage * CreateScrap(const int size, const ColorRGBA32 * pix);
-    TextureImage * CreateTexture(const ColorRGBA32 * pix, std::uint32_t regn, TextureType tt, bool use_scrap,
-                                 int w, int h, Vec2u16 scrap0, Vec2u16 scrap1, const char * name);
+    TextureImage * CreateScrap(uint32_t size, const ColorRGBA32 * pixels);
+    TextureImage * CreateTexture(const ColorRGBA32 * pixels, uint32_t reg_num, TextureType tt, bool from_scrap,
+                                 uint32_t w, uint32_t h, Vec2u16 scrap0, Vec2u16 scrap1, const char * name);
 
     void DestroyTexture(TextureImage * tex);
     void DestroyAllLoadedTextures();

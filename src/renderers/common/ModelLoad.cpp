@@ -626,10 +626,10 @@ static void BuildPolygonFromSurface(ModelInstance & mdl, ModelSurface & surf)
         }
 
         s = Vec3Dot(vec, surf.texinfo->vecs[0]) + surf.texinfo->vecs[0][3];
-        s /= surf.texinfo->teximage->width;
+        s /= surf.texinfo->teximage->Width();
 
         t = Vec3Dot(vec, surf.texinfo->vecs[1]) + surf.texinfo->vecs[1][3];
-        t /= surf.texinfo->teximage->height;
+        t /= surf.texinfo->teximage->Height();
 
         // Vertex position:
         Vec3Add(total, vec, total);
@@ -1160,7 +1160,7 @@ static void SetUpSubModels(ModelStore & mdl_store, ModelInstance & mdl)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void LoadBrushModel(ModelStore & mdl_store, TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len)
+void ModelStore::LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len)
 {
     MRQ2_ASSERT(mdl_data != nullptr);
     MRQ2_ASSERT(mdl_data_len > 0);
@@ -1196,7 +1196,7 @@ void LoadBrushModel(ModelStore & mdl_store, TextureStore & tex_store, ModelInsta
     BMod::LoadLeafs(mdl, mdl_data, header->lumps[LUMP_LEAFS]);
     BMod::LoadNodes(mdl, mdl_data, header->lumps[LUMP_NODES]);
     BMod::LoadSubModels(mdl, mdl_data, header->lumps[LUMP_MODELS]);
-    BMod::SetUpSubModels(mdl_store, mdl);
+    BMod::SetUpSubModels(*this, mdl);
     mdl.data.num_frames = 2; // regular and alternate animation
 
     // Make sure all images are referenced now:
@@ -1208,7 +1208,7 @@ void LoadBrushModel(ModelStore & mdl_store, TextureStore & tex_store, ModelInsta
         }
 
         auto * tex = const_cast<TextureImage *>(mdl.data.texinfos[i].teximage);
-        tex->reg_num = tex_store.RegistrationNum();
+        tex->m_reg_num = tex_store.RegistrationNum();
     }
 
     if (kVerboseModelLoading)
@@ -1221,7 +1221,7 @@ void LoadBrushModel(ModelStore & mdl_store, TextureStore & tex_store, ModelInsta
 // SPRITE MODELS:
 ///////////////////////////////////////////////////////////////////////////////
 
-void LoadSpriteModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len)
+void ModelStore::LoadSpriteModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len)
 {
     MRQ2_ASSERT(mdl_data != nullptr);
     MRQ2_ASSERT(mdl_data_len > 0);
@@ -1272,7 +1272,7 @@ void LoadSpriteModel(TextureStore & tex_store, ModelInstance & mdl, const void *
 // ALIAS MD2 MODELS:
 ///////////////////////////////////////////////////////////////////////////////
 
-void LoadAliasMD2Model(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len)
+void ModelStore::LoadAliasMD2Model(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len)
 {
     MRQ2_ASSERT(mdl_data != nullptr);
     MRQ2_ASSERT(mdl_data_len > 0);

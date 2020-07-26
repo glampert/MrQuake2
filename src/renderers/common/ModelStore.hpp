@@ -41,6 +41,11 @@ public:
     const ModelInstance * Find(const char * name, ModelType mt);       // Must be in cache, returns null otherwise
     const ModelInstance * FindOrLoad(const char * name, ModelType mt); // Load if necessary
 
+    // Defined in ModelLoad.cpp
+    void LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
+    static void LoadSpriteModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
+    static void LoadAliasMD2Model(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
+
 private:
 
     ModelInstance * CreateModel(const char * name, ModelType mt, std::uint32_t regn, bool inline_mdl);
@@ -63,14 +68,5 @@ private:
     ModelInstance * m_world_model = nullptr; // Cached pointer to currently loaded map
     TextureStore  * m_tex_store   = nullptr;
 };
-
-// ============================================================================
-
-// Defined in ModelLoad.cpp
-void LoadBrushModel(ModelStore & mdl_store, TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
-void LoadSpriteModel(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
-void LoadAliasMD2Model(TextureStore & tex_store, ModelInstance & mdl, const void * const mdl_data, const int mdl_data_len);
-
-// ============================================================================
 
 } // MrQ2

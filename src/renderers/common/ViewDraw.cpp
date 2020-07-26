@@ -15,7 +15,7 @@ namespace MrQ2
 ///////////////////////////////////////////////////////////////////////////////
 
 // Returns the proper texture for a given time and base texture.
-static TextureImage * TextureAnimation(const ModelTexInfo * const tex)
+static const TextureImage * TextureAnimation(const ModelTexInfo * const tex)
 {
     MRQ2_ASSERT(tex != nullptr);
     const TextureImage * out = nullptr;
@@ -38,8 +38,7 @@ static TextureImage * TextureAnimation(const ModelTexInfo * const tex)
         out = tex->teximage;
     }
 
-    // Ugly, but we need to set the texture_chain ptr for the world model rendering...
-    return const_cast<TextureImage *>(out);
+    return out;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -293,7 +292,7 @@ void ViewDrawState::EndRenderPass(const FrameData & frame_data, GraphicsContext 
         context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, cmd.consts);
 
         context.SetPrimitiveTopology(cmd.topology);
-        context.SetTexture(cmd.texture->texture, 0);
+        context.SetTexture(cmd.texture->BackendTexture(), 0);
         context.Draw(cmd.first_vert, cmd.vertex_count);
 
         // Restore to default if we did a depth-hacked draw.
@@ -628,11 +627,11 @@ void ViewDrawState::RecursiveWorldNode(const FrameData & frame_data,
         }
         else // Opaque texture chain
         {
-            TextureImage * image = TextureAnimation(surf->texinfo);
+            const TextureImage * image = TextureAnimation(surf->texinfo);
             MRQ2_ASSERT(image != nullptr);
 
-            surf->texture_chain  = image->texture_chain;
-            image->texture_chain = surf;
+            surf->texture_chain = image->DrawChainPtr();
+            image->SetDrawChainPtr(surf);
         }
     }
 
@@ -733,10 +732,10 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
     // Draw with sorting by texture:
     for (TextureImage * tex : tex_store)
     {
-        MRQ2_ASSERT(tex->width > 0 && tex->height > 0);
-        MRQ2_ASSERT(tex->type != TextureType::kCount);
+        MRQ2_ASSERT(tex->Width() > 0 && tex->Height() > 0);
+        MRQ2_ASSERT(tex->Type() != TextureType::kCount);
 
-        if (tex->texture_chain == nullptr)
+        if (tex->DrawChainPtr() == nullptr)
         {
             continue;
         }
@@ -746,7 +745,7 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
             args.optional_tex = tex;
             MiniImBatch batch = BeginBatch(args);
             {
-                for (const ModelSurface * surf = tex->texture_chain; surf; surf = surf->texture_chain)
+                for (const ModelSurface * surf = tex->DrawChainPtr(); surf; surf = surf->texture_chain)
                 {
                     // Need at least one triangle.
                     if (surf->polys == nullptr || surf->polys->num_verts < 3)
@@ -760,7 +759,7 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
         }
 
         // All world geometry using this texture has been drawn, clear for the next frame.
-        tex->texture_chain = nullptr;
+        tex->SetDrawChainPtr(nullptr);
     }
 }
 

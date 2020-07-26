@@ -96,6 +96,11 @@ constexpr float DegToRad(const float degrees)
     return degrees * (3.14159265358979323846f / 180.0f);
 }
 
+inline void * AlignPtr(const void * value, const std::size_t alignment)
+{
+    return reinterpret_cast<void *>((reinterpret_cast<std::uintptr_t>(value) + (alignment - 1)) & ~(alignment - 1));
+}
+
 template<int N>
 inline void VecSplatN(float (&vec)[N], const float val)
 {

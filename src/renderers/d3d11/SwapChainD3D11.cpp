@@ -47,6 +47,7 @@ void SwapChainD3D11::Init(HWND hWnd, const bool fullscreen, const int width, con
     sd.BufferDesc.RefreshRate.Numerator   = 60;
     sd.BufferDesc.RefreshRate.Denominator = 1;
     sd.BufferUsage                        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    sd.SwapEffect                         = DXGI_SWAP_EFFECT_DISCARD;
     sd.OutputWindow                       = hWnd;
     sd.SampleDesc.Count                   = 1;
     sd.SampleDesc.Quality                 = 0;

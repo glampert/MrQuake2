@@ -18,8 +18,12 @@ class TextureD3D11 final
 
 public:
 
-    void Init(const DeviceD3D11 & device, const TextureType type, const uint32_t width, const uint32_t height, const bool is_scrap, const ColorRGBA32 * const init_data);
-    void Init(const TextureD3D11 & other); // Init from existing texture sharing the resource and sampler/SRV (for the scrap texture)
+    void Init(const DeviceD3D11 & device, const TextureType type, const uint32_t width, const uint32_t height,
+              const bool is_scrap, const ColorRGBA32 * mip_init_data[], const Vec2u16 mip_dimensions[], const uint32_t num_mip_levels);
+
+    // Init from existing texture sharing the resource and sampler/SRV (for the scrap texture)
+    void Init(const TextureD3D11 & other);
+
     void Shutdown();
 
 private:

@@ -46,7 +46,7 @@ void SpriteBatch::EndFrame(GraphicsContext & context, const ConstantBuffer & cbu
     // Fast path - one texture for the whole batch:
     if (opt_tex_atlas != nullptr)
     {
-        context.SetTexture(opt_tex_atlas->texture, 0);
+        context.SetTexture(opt_tex_atlas->BackendTexture(), 0);
 
         const auto first_vertex = 0u;
         const auto vertex_count = draw_buf.used_verts;
@@ -56,7 +56,7 @@ void SpriteBatch::EndFrame(GraphicsContext & context, const ConstantBuffer & cbu
     {
         for (const DeferredTexQuad & d : m_deferred_textured_quads)
         {
-            context.SetTexture(d.tex->texture, 0);
+            context.SetTexture(d.tex->BackendTexture(), 0);
 
             const auto first_vertex = d.quad_start_vtx;
             const auto vertex_count = 6u; // one quad
