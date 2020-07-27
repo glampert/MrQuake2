@@ -87,6 +87,33 @@ static_assert(ArrayLength(TextureType_Strings) == unsigned(TextureType::kCount),
 // TextureImage
 ///////////////////////////////////////////////////////////////////////////////
 
+static void MipDebugFill(const uint32_t mip, const uint32_t w, const uint32_t h, uint8_t * pixels)
+{
+    static const ColorRGBA32 s_mip_debug_colors[] = {
+        BytesToColor(200, 200, 200, 255),
+        BytesToColor(185, 185, 185, 255),
+        BytesToColor(160, 160, 160, 255),
+        BytesToColor(145, 145, 145, 255),
+        BytesToColor(120, 120, 120, 255),
+        BytesToColor(100, 100, 100, 255),
+        BytesToColor(80,  80,  80,  255),
+        BytesToColor(65,  65,  65,  255),
+    };
+
+    static_assert(ArrayLength(s_mip_debug_colors) == TextureImage::kMaxMipLevels);
+    MRQ2_ASSERT(mip < TextureImage::kMaxMipLevels);
+
+    const size_t num_pixels = w * h;
+    auto * rgba_pixels = reinterpret_cast<ColorRGBA32 *>(pixels);
+
+    for (size_t p = 0; p < num_pixels; ++p)
+    {
+        rgba_pixels[p] = s_mip_debug_colors[mip];
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void TextureImage::GenerateMipMaps()
 {
     const bool no_mipmaps    = TextureStore::no_mipmaps.IsSet();
@@ -112,20 +139,14 @@ void TextureImage::GenerateMipMaps()
     // Initial image is the base surface (mipmap level = 0).
     // Always use the initial image to generate all mipmaps
     // to avoid propagating errors.
-    const uint32_t  initial_width  = Width();
-    const uint32_t  initial_height = Height();
-    const uint8_t * base_image_pixels = m_mip_levels.base_pixels;
+    const uint32_t initial_width  = Width();
+    const uint32_t initial_height = Height();
+    const uint8_t * const base_image_pixels = m_mip_levels.base_pixels;
 
     if (debug_mipmaps)
     {
         // Fill the base texture with a debug color as well.
-        const ColorRGBA32 c = RandomDebugColor();
-        const auto num_pixels = (initial_width * initial_height);
-        auto * rgba_pixels = (ColorRGBA32 *)base_image_pixels;
-        for (size_t p = 0; p < num_pixels; ++p)
-        {
-            rgba_pixels[p] = c;
-        }
+        MipDebugFill(0, initial_width, initial_height, const_cast<uint8_t *>(base_image_pixels));
     }
 
     uint32_t target_width  = initial_width;
@@ -165,13 +186,7 @@ void TextureImage::GenerateMipMaps()
 
         if (debug_mipmaps) // Fill each mipmap with a random color
         {
-            const ColorRGBA32 c = RandomDebugColor();
-            const auto num_pixels = (target_width * target_height);
-            auto * rgba_pixels = reinterpret_cast<ColorRGBA32 *>(mip_data_start_ptr);
-            for (size_t p = 0; p < num_pixels; ++p)
-            {
-                rgba_pixels[p] = c;
-            }
+            MipDebugFill(mipmap_count, target_width, target_height, mip_data_start_ptr);
         }
         else
         {
@@ -281,12 +296,34 @@ void TextureStore::UploadScrapIfNeeded()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-TextureImage * TextureStore::CreateScrap(uint32_t size, const ColorRGBA32 * pixels)
+TextureImage * TextureStore::CreateCinematicTexture()
+{
+    MRQ2_ASSERT(m_device != nullptr);
+
+    constexpr uint32_t Dims = kQuakeCinematicImgSize;
+    auto * pixels = new(MemTag::kTextures) ColorRGBA32[Dims * Dims];
+    std::memset(pixels, 0, sizeof(ColorRGBA32) * (Dims * Dims));
+
+    // Create a one mip level texture tagged as a scrap image.
+    TextureImage * new_cinframe = m_teximages_pool.Allocate();
+    ::new(new_cinframe) TextureImage{ pixels, m_registration_num, TextureType::kPic, /*scrap =*/true, Dims, Dims, {}, {}, "pics/cinframe.pcx" };
+
+    constexpr uint32_t  num_mip_levels = 1;
+    const ColorRGBA32 * mip_init_data[num_mip_levels]  = { new_cinframe->BasePixels() };
+    const Vec2u16       mip_dimensions[num_mip_levels] = { new_cinframe->MipMapDimensions(0) };
+
+    new_cinframe->m_texture.Init(*m_device, TextureType::kPic, Dims, Dims, /*is_scrap =*/true, mip_init_data, mip_dimensions, num_mip_levels);
+    return new_cinframe;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+TextureImage * TextureStore::CreateScrapTexture(const uint32_t size, const ColorRGBA32 * pixels)
 {
     MRQ2_ASSERT(m_device != nullptr);
 
     TextureImage * new_scrap = m_teximages_pool.Allocate();
-    ::new(new_scrap) TextureImage{ pixels, m_registration_num, TextureType::kPic, /*from_scrap =*/true,
+    ::new(new_scrap) TextureImage{ pixels, m_registration_num, TextureType::kPic, /*scrap =*/true,
                                    size, size, Vec2u16{0,0}, Vec2u16{ std::uint16_t(size), std::uint16_t(size) },
                                    "pics/scrap.pcx" };
 
@@ -310,7 +347,7 @@ TextureImage * TextureStore::CreateTexture(const ColorRGBA32 * pixels, uint32_t 
     {
         MRQ2_ASSERT(tex_scrap != nullptr);
         new_tex->m_texture.Init(tex_scrap->m_texture);
-        m_scrap_dirty = true; // Upload the texture on next opportunity
+        m_scrap_dirty = true; // Upload the scrap texture on next opportunity
     }
     else
     {
@@ -462,20 +499,20 @@ void TextureStore::TouchResidentTextures()
     // Create the scrap texture if needed
     if (!m_scrap_inited)
     {
-        m_teximages_cache.push_back(CreateScrap(m_scrap.Size(), m_scrap.pixels.get()));
+        m_teximages_cache.push_back(CreateScrapTexture(m_scrap.Size(), m_scrap.pixels.get()));
         m_scrap_inited = true;
     }
 
     // This texture is generated at runtime
     if (tex_white2x2 == nullptr)
     {
-        constexpr int Dim = 2;
+        constexpr uint32_t Dims = 2;
 
-        auto * pixels = new(MemTag::kTextures) ColorRGBA32[Dim * Dim];
-        std::memset(pixels, 0xFF, sizeof(ColorRGBA32) * (Dim * Dim));
+        auto * pixels = new(MemTag::kTextures) ColorRGBA32[Dims * Dims];
+        std::memset(pixels, 0xFF, sizeof(ColorRGBA32) * (Dims * Dims));
 
         TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic, false,
-                                           Dim, Dim, {0,0}, {0,0}, "pics/white2x2.pcx"); // with a fake filename
+                                           Dims, Dims, {}, {}, "pics/white2x2.pcx"); // with a fake filename
         m_teximages_cache.push_back(tex);
         tex_white2x2 = tex;
     }
@@ -484,7 +521,7 @@ void TextureStore::TouchResidentTextures()
     if (tex_debug == nullptr)
     {
         TextureImage * tex = CreateTexture(MakeCheckerPattern(), m_registration_num, TextureType::kPic, false,
-                                           kCheckerDim, kCheckerDim, {0,0}, {0,0}, "pics/debug.pcx"); // with a fake filename
+                                           kCheckerDim, kCheckerDim, {}, {}, "pics/debug.pcx"); // with a fake filename
         m_teximages_cache.push_back(tex);
         tex_debug = tex;
     }
@@ -492,13 +529,7 @@ void TextureStore::TouchResidentTextures()
     // Cinematic frame texture is also a resident buffer
     if (tex_cinframe == nullptr)
     {
-        constexpr int Dim = kQuakeCinematicImgSize;
-
-        auto * pixels = new (MemTag::kTextures) ColorRGBA32[Dim * Dim];
-        std::memset(pixels, 0, sizeof(ColorRGBA32) * (Dim * Dim));
-
-        TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic, false,
-                                           Dim, Dim, {0,0}, {0,0}, "pics/cinframe.pcx"); // with a fake filename
+        TextureImage * tex = CreateCinematicTexture();
         m_teximages_cache.push_back(tex);
         tex_cinframe = tex;
     }

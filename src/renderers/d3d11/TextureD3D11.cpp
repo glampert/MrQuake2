@@ -5,7 +5,6 @@
 #include "../common/TextureStore.hpp"
 #include "TextureD3D11.hpp"
 #include "DeviceD3D11.hpp"
-#include "UploadContextD3D11.hpp"
 
 namespace MrQ2
 {
@@ -14,14 +13,14 @@ void TextureD3D11::Init(const DeviceD3D11 & device, const TextureType type, cons
                         const bool is_scrap, const ColorRGBA32 * mip_init_data[], const Vec2u16 mip_dimensions[], const uint32_t num_mip_levels)
 {
     MRQ2_ASSERT((width + height) != 0);
+    MRQ2_ASSERT(mip_init_data[0] != nullptr);
     MRQ2_ASSERT(num_mip_levels >= 1 && num_mip_levels <= TextureImage::kMaxMipLevels);
     MRQ2_ASSERT(m_device == nullptr); // Shutdown first
-    (void)is_scrap;
 
     const uint32_t ms_quality_levels = device.MultisampleQualityLevel(DXGI_FORMAT_R8G8B8A8_UNORM);
 
     D3D11_TEXTURE2D_DESC tex2d_desc  = {};
-    tex2d_desc.Usage                 = D3D11_USAGE_DEFAULT;
+    tex2d_desc.Usage                 = (is_scrap ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE);
     tex2d_desc.BindFlags             = D3D11_BIND_SHADER_RESOURCE;
     tex2d_desc.Format                = DXGI_FORMAT_R8G8B8A8_UNORM;
     tex2d_desc.Width                 = width;
@@ -77,52 +76,84 @@ void TextureD3D11::Shutdown()
     m_srv      = nullptr;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Texture filtering:
+///////////////////////////////////////////////////////////////////////////////
+
+static const D3D11_FILTER g_d3d_tex_filtering_options[] = {
+    D3D11_FILTER_MIN_MAG_MIP_POINT,        // 0 nearest
+    D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT, // 1 bilinear
+    D3D11_FILTER_MIN_MAG_MIP_LINEAR,       // 2 trilinear
+    D3D11_FILTER_ANISOTROPIC,              // 3 anisotropic
+};
+
+static const char * const g_tex_filtering_names[] = {
+    "nearest",
+    "bilinear",
+    "trilinear",
+    "anisotropic",
+};
+
 D3D11_FILTER TextureD3D11::FilterForTextureType(const TextureType type)
 {
-    static const CvarWrapper r_tex_filtering = GameInterface::Cvar::Get("r_tex_filtering", "0", CvarWrapper::kFlagArchive);
-
-    static const D3D11_FILTER s_filtering_options[] = {
-        D3D11_FILTER_MIN_MAG_MIP_POINT,               // 0
-        D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR,        // 1
-        D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT,  // 2
-        D3D11_FILTER_MIN_POINT_MAG_MIP_LINEAR,        // 3
-        D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT,        // 4
-        D3D11_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR, // 5
-        D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT,        // 6
-        D3D11_FILTER_MIN_MAG_MIP_LINEAR,              // 7
-        D3D11_FILTER_ANISOTROPIC,                     // 8
-    };
-
     if (type < TextureType::kPic) // with mipmaps
     {
-        size_t opt = r_tex_filtering.AsInt();
+        static auto r_tex_filtering = GameInterface::Cvar::Get("r_tex_filtering", "0", CvarWrapper::kFlagArchive);
 
-        if (opt >= ArrayLength(s_filtering_options))
+        uint32_t opt = r_tex_filtering.AsInt();
+        if (opt >= ArrayLength(g_d3d_tex_filtering_options))
         {
-            opt = ArrayLength(s_filtering_options) - 1;
+            opt = ArrayLength(g_d3d_tex_filtering_options) - 1;
         }
 
-        return s_filtering_options[opt];
+        return g_d3d_tex_filtering_options[opt];
     }
-    else // no mipmaps (UI/Cinematic frames)
+    else // no mipmaps (UI/Cinematic frames), use point/nearest sampling
     {
         return D3D11_FILTER_MIN_MAG_MIP_POINT;
     }
+}
 
-        /*
-    switch (type)
+void TextureD3D11::ChangeTextureFilterCmd()
+{
+    const int arg_count = GameInterface::Cmd::Argc();
+    if (arg_count < 2)
     {
-    // TODO: Maybe have a Cvar to select between different filter modes?
-    // Should also generate mipmaps for the non-UI textures!!!
-    // Bi/Tri-linear filtering for cinematics? In that case, need a new type for them...
-    case TextureType::kSkin   : return D3D11_FILTER_MIN_MAG_MIP_POINT;
-    case TextureType::kSprite : return D3D11_FILTER_MIN_MAG_MIP_POINT;
-    case TextureType::kWall   : return D3D11_FILTER_MIN_MAG_MIP_POINT;
-    case TextureType::kSky    : return D3D11_FILTER_MIN_MAG_MIP_POINT;
-    case TextureType::kPic    : return D3D11_FILTER_MIN_MAG_MIP_POINT;
-    default : GameInterface::Errorf("Invalid TextureType enum!");
-    } // switch
-	*/
+        GameInterface::Printf("Usage: set_tex_filer <nearest|bilinear|trilinear|anisotropic|?>");
+        return;
+    }
+
+    const char * const filter_name = GameInterface::Cmd::Argv(1);
+    if (std::strcmp(filter_name, "?") == 0)
+    {
+        static auto r_tex_filtering = GameInterface::Cvar::Get("r_tex_filtering", "0", CvarWrapper::kFlagArchive);
+        const int opt = r_tex_filtering.AsInt();
+
+        GameInterface::Printf("Current texture filtering is: '%s' (%i)", g_tex_filtering_names[opt], opt);
+        return;
+    }
+
+    bool found_filter = false;
+    for (int i = 0; i < (int)ArrayLength(g_tex_filtering_names); ++i)
+    {
+        if (std::strcmp(filter_name, g_tex_filtering_names[i]) == 0)
+        {
+            GameInterface::Printf("Setting texture filtering to '%s' (%i)", g_tex_filtering_names[i], i);
+            GameInterface::Cvar::SetValue("r_tex_filtering", i);
+            found_filter = true;
+            break;
+        }
+    }
+
+    if (found_filter)
+    {
+        GameInterface::Printf("Restarting renderer backend...");
+        GameInterface::Cmd::AppendCommandText("vid_restart");
+    }
+    else
+    {
+        GameInterface::Printf("Invalid argument: '%s'", filter_name);
+    }
 }
 
 } // namespace MrQ2

@@ -26,9 +26,11 @@ public:
 
     void Shutdown();
 
-private:
-
+    // Internal
     static D3D11_FILTER FilterForTextureType(const TextureType type);
+    static void ChangeTextureFilterCmd();
+
+private:
 
     const DeviceD3D11 *                 m_device{ nullptr };
     D11ComPtr<ID3D11Texture2D>          m_resource;

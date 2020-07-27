@@ -56,6 +56,9 @@ class TextureImage final
 
 public:
 
+    static constexpr int kMaxMipLevels  = 8; // Level 0 is the base texture, 7 mipmaps in total.
+    static constexpr int kBytesPerPixel = 4; // All textures are RGBA_U8
+
     // Disallow copy.
     TextureImage(const TextureImage &) = delete;
     TextureImage & operator=(const TextureImage &) = delete;
@@ -134,9 +137,6 @@ public:
 
     void GenerateMipMaps();
 
-    static constexpr uint32_t kMaxMipLevels  = 8; // Level 0 is the base texture, 7 mipmaps in total.
-    static constexpr uint32_t kBytesPerPixel = 4; // All textures are RGBA_U8
-
 private:
 
     struct MipLevels
@@ -161,12 +161,12 @@ private:
     Texture                      m_texture;               // Back-end renderer texture object.
 
     // Initialize with a single mipmap level (level 0)
-    TextureImage(const ColorRGBA32 * const mip0_pixels, const uint32_t reg_num, const TextureType type, const bool from_scrap,
+    TextureImage(const ColorRGBA32 * const mip0_pixels, const uint32_t reg_num, const TextureType type, const bool scrap,
                  const uint32_t mip0_width, const uint32_t mip0_height, const Vec2u16 scrap_uv0, const Vec2u16 scrap_uv1, const char * const tex_name)
         : m_name{ tex_name }
         , m_reg_num{ reg_num }
         , m_type{ type }
-        , m_is_scrap_image{ from_scrap }
+        , m_is_scrap_image{ scrap }
         , m_scrap_uv0{ scrap_uv0 }
         , m_scrap_uv1{ scrap_uv1 }
     {
@@ -232,13 +232,14 @@ public:
     // palette=nullptr sets back the global palette.
     static void SetCinematicPaletteFromRaw(const std::uint8_t * palette);
 
-    // Cached Cvars
+    // Cached Cvars:
     static CvarWrapper no_mipmaps;
     static CvarWrapper debug_mipmaps;
 
 private:
 
-    TextureImage * CreateScrap(uint32_t size, const ColorRGBA32 * pixels);
+    TextureImage * CreateCinematicTexture();
+    TextureImage * CreateScrapTexture(const uint32_t size, const ColorRGBA32 * pixels);
     TextureImage * CreateTexture(const ColorRGBA32 * pixels, uint32_t reg_num, TextureType tt, bool from_scrap,
                                  uint32_t w, uint32_t h, Vec2u16 scrap0, Vec2u16 scrap1, const char * name);
 
