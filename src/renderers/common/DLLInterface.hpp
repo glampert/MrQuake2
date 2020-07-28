@@ -61,6 +61,9 @@ public:
 
 private:
 
+    static void ChangeTextureFilterCmd();
+    static void DumpAllTexturesCmd();
+
     static RenderInterface sm_renderer;
     static SpriteBatches   sm_sprite_batches;
     static TextureStore    sm_texture_store;

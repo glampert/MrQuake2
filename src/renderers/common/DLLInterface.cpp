@@ -74,11 +74,17 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
     sm_per_frame_shader_consts.Init(sm_renderer.Device());
     sm_per_view_shader_consts.Init(sm_renderer.Device());
 
+    GameInterface::Cmd::RegisterCommand("set_tex_filer", &ChangeTextureFilterCmd);
+    GameInterface::Cmd::RegisterCommand("dump_textures", &DumpAllTexturesCmd);
+
     return true;
 }
 
 void DLLInterface::Shutdown()
 {
+    GameInterface::Cmd::RemoveCommand("set_tex_filer");
+    GameInterface::Cmd::RemoveCommand("dump_textures");
+
     sm_renderer.WaitForGpu();
     sm_per_view_shader_consts.Shutdown();
     sm_per_frame_shader_consts.Shutdown();
@@ -485,13 +491,17 @@ void DLLInterface::DrawStretchRaw(const int x, const int y, int w, int h, const 
     h += 45; // FIXME HACK - Image scaling is probably broken.
              // Cinematics are not filling up the buffer as they should...
 
+    constexpr uint32_t  num_mip_levels = 1;
+    const ColorRGBA32 * mip_init_data[num_mip_levels]  = { cinematic_tex->BasePixels() };
+    const Vec2u16       mip_dimensions[num_mip_levels] = { cinematic_tex->MipMapDimensions(0) };
+
     // Update the cinematic GPU texture from our CPU buffer
     TextureUpload upload_info{};
     upload_info.texture  = &cinematic_tex->BackendTexture();
-    upload_info.pixels   = cinematic_tex->BasePixels();
-    upload_info.width    = cinematic_tex->Width();
-    upload_info.height   = cinematic_tex->Height();
-    upload_info.is_scrap = true; // This texture is a temporary, do not transition to shader resource in the D3D12 backend.
+    upload_info.is_scrap = true; // This texture is a temporary.
+    upload_info.mipmaps.num_mip_levels = num_mip_levels;
+    upload_info.mipmaps.mip_init_data  = mip_init_data;
+    upload_info.mipmaps.mip_dimensions = mip_dimensions;
     sm_renderer.Device().UploadContext().UploadTextureImmediate(upload_info);
 
     // Draw a fullscreen quadrilateral with the cinematic texture applied to it
@@ -605,6 +615,68 @@ void DLLInterface::DrawFpsCounter()
 
     // Draw it at the top-left corner of the screen
     DrawAltString(10, 10, text);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Debug commands
+///////////////////////////////////////////////////////////////////////////////
+
+void DLLInterface::ChangeTextureFilterCmd()
+{
+    const int arg_count = GameInterface::Cmd::Argc();
+    if (arg_count < 2)
+    {
+        GameInterface::Printf("Usage: set_tex_filer <nearest|bilinear|trilinear|anisotropic|?>");
+        return;
+    }
+
+    const char * const filter_name = GameInterface::Cmd::Argv(1);
+    if (std::strcmp(filter_name, "?") == 0)
+    {
+        auto r_tex_filtering = GameInterface::Cvar::Get("r_tex_filtering", "0", CvarWrapper::kFlagArchive);
+        const int opt = r_tex_filtering.AsInt();
+
+        GameInterface::Printf("Current texture filtering is: '%s' (%i)", TextureFilterOptionNames[opt], opt);
+        return;
+    }
+
+    bool found_filter = false;
+    for (int i = 0; i < kNumTextureFilterOptions; ++i)
+    {
+        if (std::strcmp(filter_name, TextureFilterOptionNames[i]) == 0)
+        {
+            GameInterface::Printf("Setting texture filtering to '%s' (%i)", TextureFilterOptionNames[i], i);
+            GameInterface::Cvar::SetValue("r_tex_filtering", i);
+            found_filter = true;
+            break;
+        }
+    }
+
+    if (found_filter)
+    {
+        GameInterface::Printf("Restarting renderer backend...");
+        GameInterface::Cmd::AppendCommandText("vid_restart");
+    }
+    else
+    {
+        GameInterface::Printf("Invalid argument: '%s'", filter_name);
+    }
+}
+
+void DLLInterface::DumpAllTexturesCmd()
+{
+    const int arg_count = GameInterface::Cmd::Argc();
+    if (arg_count < 4)
+    {
+        GameInterface::Printf("Usage: dump_textures <file_path> <png|tga> <dump_mipmaps=y|n>");
+        return;
+    }
+
+    const char * const file_path    = GameInterface::Cmd::Argv(1);
+    const char * const image_type   = GameInterface::Cmd::Argv(2);
+    const char * const dump_mipmaps = GameInterface::Cmd::Argv(3);
+
+    sm_texture_store.DumpAllLoadedTexturesToFile(file_path, image_type, (dump_mipmaps[0] == 'y') ? true : false);
 }
 
 } // namespace MrQ2

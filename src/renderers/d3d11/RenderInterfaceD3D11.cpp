@@ -23,15 +23,11 @@ void RenderInterfaceD3D11::Init(HINSTANCE hInst, WNDPROC wndProc, const int widt
     m_render_targets.Init(m_swap_chain, width, height);
     m_upload_ctx.Init(m_device);
     m_graphics_ctx.Init(m_device, m_swap_chain, m_render_targets);
-
-    GameInterface::Cmd::RegisterCommand("set_tex_filer", &Texture::ChangeTextureFilterCmd);
 }
 
 void RenderInterfaceD3D11::Shutdown()
 {
     GameInterface::Printf("**** RenderInterfaceD3D11::Shutdown ****");
-
-    GameInterface::Cmd::RemoveCommand("set_tex_filer");
 
     const bool debug_check_leaks = m_device.debug_validation;
 

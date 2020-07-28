@@ -59,10 +59,6 @@ void RenderInterfaceD3D12::BeginFrame(const float clear_color[4], const float cl
     m_frame_started = true;
 
     m_swap_chain.BeginFrame(m_render_targets);
-
-    auto * cmd_list = m_swap_chain.command_list.Get();
-    cmd_list->SetDescriptorHeaps(1, m_descriptor_heap.GetHeapAddr(DescriptorD3D12::kSRV));
-
     m_graphics_ctx.BeginFrame(clear_color, clear_depth, clear_stencil);
     m_graphics_ctx.SetViewport(0, 0, RenderWidth(), RenderHeight());
     m_graphics_ctx.SetScissorRect(0, 0, RenderWidth(), RenderHeight());

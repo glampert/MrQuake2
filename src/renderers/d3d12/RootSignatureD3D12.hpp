@@ -19,13 +19,15 @@ struct RootSignatureD3D12 final
         kRootParamIndexCBuffer1, // PerViewShaderConstants
         kRootParamIndexCBuffer2, // PerDrawShaderConstants
 
-        // Textures
+        // Textures/samplers
         kRootParamIndexTexture0,
+        kRootParamIndexSampler0,
 
         // Internal counts
         kCBufferCount = 3,
         kTextureCount = 1,
-        kRootParameterCount = kCBufferCount + kTextureCount,
+        kSamplerCount = 1,
+        kRootParameterCount = kCBufferCount + kTextureCount + kSamplerCount,
 
         // In 32bit values
         kMaxInlineRootConstants = 16
@@ -33,7 +35,7 @@ struct RootSignatureD3D12 final
 
     D12ComPtr<ID3D12RootSignature> root_sig{};
 
-    void Init(const DeviceD3D12 & device, const D3D12_ROOT_SIGNATURE_DESC & root_sig_desc);
+    void Init(const DeviceD3D12 & device, const D3D12_VERSIONED_ROOT_SIGNATURE_DESC & root_sig_desc);
     void Shutdown() { root_sig = nullptr; }
 
     static RootSignatureD3D12 sm_global;

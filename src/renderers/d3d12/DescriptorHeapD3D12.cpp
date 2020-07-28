@@ -10,12 +10,12 @@ namespace MrQ2
 
 void DescriptorHeapD3D12::Init(const DeviceD3D12 & device)
 {
-    // SRV, DSV, RTV
-    const D3D12_DESCRIPTOR_HEAP_TYPE d3d_types[]  = { D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,    D3D12_DESCRIPTOR_HEAP_TYPE_DSV,  D3D12_DESCRIPTOR_HEAP_TYPE_RTV  };
-    const D3D12_DESCRIPTOR_HEAP_FLAGS d3d_flags[] = { D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, D3D12_DESCRIPTOR_HEAP_FLAG_NONE };
-    const wchar_t * const debug_names[]           = { L"SRVDescriptorHeap",    L"DSVDescriptorHeap",    L"RTVDescriptorHeap"    };
-    const uint32_t descriptor_counts[]            = { kMaxSrvDescriptors,      kMaxDsvDescriptors,      kMaxRtvDescriptors      };
-    ArrayBase<DescriptorD3D12> * free_lists[]     = { &m_free_srv_descriptors, &m_free_dsv_descriptors, &m_free_rtv_descriptors };
+    // SRV, DSV, RTV, Sampler
+    const D3D12_DESCRIPTOR_HEAP_TYPE d3d_types[]  = { D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,    D3D12_DESCRIPTOR_HEAP_TYPE_DSV,  D3D12_DESCRIPTOR_HEAP_TYPE_RTV,  D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER };
+    const D3D12_DESCRIPTOR_HEAP_FLAGS d3d_flags[] = { D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE };
+    const wchar_t * const debug_names[]           = { L"SRVDescriptorHeap",    L"DSVDescriptorHeap",    L"RTVDescriptorHeap",    L"SamplerDescriptorHeap"    };
+    const uint32_t descriptor_counts[]            = { kMaxSrvDescriptors,      kMaxDsvDescriptors,      kMaxRtvDescriptors,      kMaxSamplerDescriptors      };
+    ArrayBase<DescriptorD3D12> * free_lists[]     = { &m_free_srv_descriptors, &m_free_dsv_descriptors, &m_free_rtv_descriptors, &m_free_sampler_descriptors };
 
     for (size_t i = 0; i < DescriptorD3D12::kTypeCount; ++i)
     {

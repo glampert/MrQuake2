@@ -18,6 +18,7 @@ struct DescriptorD3D12 final
         kSRV, // Shader Resource View
         kDSV, // Depth-Stencil View
         kRTV, // RenderTarget View
+        kSampler,
         kTypeCount
     };
 
@@ -30,9 +31,10 @@ class DescriptorHeapD3D12 final
 {
 public:
 
-    static constexpr uint32_t kMaxSrvDescriptors = 1024;
-    static constexpr uint32_t kMaxDsvDescriptors = kD12NumFrameBuffers;
-    static constexpr uint32_t kMaxRtvDescriptors = kD12NumFrameBuffers;
+    static constexpr uint32_t kMaxSrvDescriptors     = 1024;
+    static constexpr uint32_t kMaxDsvDescriptors     = kD12NumFrameBuffers;
+    static constexpr uint32_t kMaxRtvDescriptors     = kD12NumFrameBuffers;
+    static constexpr uint32_t kMaxSamplerDescriptors = 1024;
 
     DescriptorHeapD3D12() = default;
 
@@ -69,9 +71,10 @@ private:
 
     HeapInfo m_heaps[DescriptorD3D12::kTypeCount];
 
-    FixedSizeArray<DescriptorD3D12, kMaxSrvDescriptors> m_free_srv_descriptors;
-    FixedSizeArray<DescriptorD3D12, kMaxDsvDescriptors> m_free_dsv_descriptors;
-    FixedSizeArray<DescriptorD3D12, kMaxRtvDescriptors> m_free_rtv_descriptors;
+    FixedSizeArray<DescriptorD3D12, kMaxSrvDescriptors>     m_free_srv_descriptors;
+    FixedSizeArray<DescriptorD3D12, kMaxDsvDescriptors>     m_free_dsv_descriptors;
+    FixedSizeArray<DescriptorD3D12, kMaxRtvDescriptors>     m_free_rtv_descriptors;
+    FixedSizeArray<DescriptorD3D12, kMaxSamplerDescriptors> m_free_sampler_descriptors;
 };
 
 } // MrQ2

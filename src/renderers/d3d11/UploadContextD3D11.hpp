@@ -14,10 +14,13 @@ class TextureD3D11;
 struct TextureUploadD3D11 final
 {
     const TextureD3D11 * texture;
-    const void *         pixels;
-    uint32_t             width;
-    uint32_t             height;
-    bool                 is_scrap;
+    bool is_scrap;
+
+    struct {
+        uint32_t             num_mip_levels;
+        const ColorRGBA32 ** mip_init_data;
+        const Vec2u16 *      mip_dimensions;
+    } mipmaps;
 };
 
 class UploadContextD3D11 final

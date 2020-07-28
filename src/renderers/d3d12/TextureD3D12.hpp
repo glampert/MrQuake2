@@ -17,8 +17,9 @@ class TextureD3D12 final
 
 public:
 
-    void Init(const DeviceD3D12 & device, const TextureType type, const uint32_t width, const uint32_t height,
-              const bool is_scrap, const ColorRGBA32 * mip_init_data[], const Vec2u16 mip_dimensions[], const uint32_t num_mip_levels);
+    void Init(const DeviceD3D12 & device, const TextureType type, const bool is_scrap,
+              const ColorRGBA32 * mip_init_data[], const Vec2u16 mip_dimensions[],
+              const uint32_t num_mip_levels, const char * const debug_name);
 
     // Init from existing texture sharing the resource and descriptor (for the scrap texture)
     void Init(const TextureD3D12 & other);
@@ -29,8 +30,12 @@ private:
 
     D12ComPtr<ID3D12Resource> m_resource;
     DescriptorD3D12           m_srv_descriptor{};
+    DescriptorD3D12           m_sampler_descriptor{};
     const DeviceD3D12 *       m_device{ nullptr };
-    bool                      m_is_descriptor_shared{ false };
+    bool                      m_shared_descriptors{ false };
+    wchar_t                   m_debug_name[64] = {};
+
+    static D3D12_FILTER FilterForTextureType(const TextureType type);
 };
 
 } // MrQ2

@@ -2,6 +2,7 @@
 // GraphicsContextD3D12.cpp
 //
 
+#include "DeviceD3D12.hpp"
 #include "GraphicsContextD3D12.hpp"
 #include "SwapChainD3D12.hpp"
 #include "BufferD3D12.hpp"
@@ -45,6 +46,13 @@ void GraphicsContextD3D12::BeginFrame(const float clear_color[4], const float cl
     m_command_list->ClearDepthStencilView(m_render_targets->depth_render_target_descriptor.cpu_handle,
                                           D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,
                                           clear_depth, clear_stencil, 0, nullptr);
+
+    // Set all the shader visible destructor heaps:
+    ID3D12DescriptorHeap * descriptor_heaps[] = {
+        *m_device->descriptor_heap->GetHeapAddr(DescriptorD3D12::kSRV),
+        *m_device->descriptor_heap->GetHeapAddr(DescriptorD3D12::kSampler)
+    };
+    m_command_list->SetDescriptorHeaps(ArrayLength(descriptor_heaps), descriptor_heaps);
 }
 
 void GraphicsContextD3D12::EndFrame()
@@ -141,6 +149,7 @@ void GraphicsContextD3D12::SetTexture(const TextureD3D12 & texture, const uint32
     {
         m_current_texture[slot] = texture.m_srv_descriptor.gpu_handle;
         m_command_list->SetGraphicsRootDescriptorTable(slot + RootSignatureD3D12::kRootParamIndexTexture0, m_current_texture[slot]);
+        m_command_list->SetGraphicsRootDescriptorTable(slot + RootSignatureD3D12::kRootParamIndexSampler0, texture.m_sampler_descriptor.gpu_handle);
     }
 }
 

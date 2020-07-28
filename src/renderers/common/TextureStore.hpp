@@ -209,7 +209,7 @@ public:
     const TextureImage * FindOrLoad(const char * name, TextureType tt); // Load if necessary
 
     // Dumps all loaded textures to the correct paths, creating dirs as needed.
-    void DumpAllLoadedTexturesToFile(const char * path, const char * file_type) const;
+    void DumpAllLoadedTexturesToFile(const char * path, const char * file_type, bool dump_mipmaps) const;
 
     // TextureStore iteration:
     auto begin() { return m_teximages_cache.begin(); }
@@ -312,6 +312,9 @@ private:
 
 bool TGALoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height);
 bool PCXLoadFromFile(const char * filename, Color8 ** pic, int * width, int * height, ColorRGBA32 * palette);
+
+constexpr int kNumTextureFilterOptions = 4;
+extern const char * const TextureFilterOptionNames[kNumTextureFilterOptions];
 
 // Packed color format is 0xAABBGGRR
 

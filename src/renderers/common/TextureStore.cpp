@@ -73,6 +73,13 @@ namespace MrQ2
 constexpr bool kLogLoadTextures = false;
 constexpr bool kLogFindTextures = false;
 
+const char * const TextureFilterOptionNames[kNumTextureFilterOptions] = {
+    "nearest",
+    "bilinear",
+    "trilinear",
+    "anisotropic",
+};
+
 static const char * const TextureType_Strings[] = {
     "kSkin",
     "kSprite",
@@ -87,28 +94,35 @@ static_assert(ArrayLength(TextureType_Strings) == unsigned(TextureType::kCount),
 // TextureImage
 ///////////////////////////////////////////////////////////////////////////////
 
-static void MipDebugFill(const uint32_t mip, const uint32_t w, const uint32_t h, uint8_t * pixels)
+static void MipDebugBorder(const uint32_t mip, const uint32_t w, const uint32_t h, uint8_t * pixels)
 {
-    static const ColorRGBA32 s_mip_debug_colors[] = {
-        BytesToColor(200, 200, 200, 255),
-        BytesToColor(185, 185, 185, 255),
-        BytesToColor(160, 160, 160, 255),
-        BytesToColor(145, 145, 145, 255),
-        BytesToColor(120, 120, 120, 255),
-        BytesToColor(100, 100, 100, 255),
-        BytesToColor(80,  80,  80,  255),
-        BytesToColor(65,  65,  65,  255),
-    };
-
-    static_assert(ArrayLength(s_mip_debug_colors) == TextureImage::kMaxMipLevels);
-    MRQ2_ASSERT(mip < TextureImage::kMaxMipLevels);
-
-    const size_t num_pixels = w * h;
+    // Add a one pixel colored border around each mip
     auto * rgba_pixels = reinterpret_cast<ColorRGBA32 *>(pixels);
+    const ColorRGBA32 c = DebugColorsTable[mip];
+    size_t x, y;
 
-    for (size_t p = 0; p < num_pixels; ++p)
+    // top row
+    for (x = 0, y = 0; x < w; ++x)
     {
-        rgba_pixels[p] = s_mip_debug_colors[mip];
+        rgba_pixels[x + (y * w)] = c;
+    }
+
+    // bottom row
+    for (x = 0, y = h - 1; x < w; ++x)
+    {
+        rgba_pixels[x + (y * w)] = c;
+    }
+
+    // left column
+    for (x = 0, y = 0; y < h; ++y)
+    {
+        rgba_pixels[x + (y * w)] = c;
+    }
+
+    // right column
+    for (x = w - 1, y = 0; y < h; ++y)
+    {
+        rgba_pixels[x + (y * w)] = c;
     }
 }
 
@@ -145,8 +159,8 @@ void TextureImage::GenerateMipMaps()
 
     if (debug_mipmaps)
     {
-        // Fill the base texture with a debug color as well.
-        MipDebugFill(0, initial_width, initial_height, const_cast<uint8_t *>(base_image_pixels));
+        // Add the debug border to the base texture as well.
+        MipDebugBorder(0, initial_width, initial_height, const_cast<uint8_t *>(base_image_pixels));
     }
 
     uint32_t target_width  = initial_width;
@@ -184,25 +198,23 @@ void TextureImage::GenerateMipMaps()
         target_width  = std::max(1u, target_width  / 2);
         target_height = std::max(1u, target_height / 2);
 
-        if (debug_mipmaps) // Fill each mipmap with a random color
+        stbir_resize_uint8(
+            // Source:
+            base_image_pixels,
+            initial_width,
+            initial_height,
+            0,
+            // Destination:
+            mip_data_start_ptr,
+            target_width,
+            target_height,
+            0,
+            // NumChannels (RGBA):
+            4);
+
+        if (debug_mipmaps) // Add a debug border to each mipmap
         {
-            MipDebugFill(mipmap_count, target_width, target_height, mip_data_start_ptr);
-        }
-        else
-        {
-            stbir_resize_uint8(
-                // Source:
-                base_image_pixels,
-                initial_width,
-                initial_height,
-                0,
-                // Destination:
-                mip_data_start_ptr,
-                target_width,
-                target_height,
-                0,
-                // NumChannels (RGBA):
-                4);
+            MipDebugBorder(mipmap_count, target_width, target_height, mip_data_start_ptr);
         }
 
         m_mip_levels.offsets_to_mip_pixels[mipmap_count] = static_cast<uint32_t>(mip_data_start_ptr - mipmap_pixels);
@@ -282,14 +294,18 @@ void TextureStore::UploadScrapIfNeeded()
     {
         MRQ2_ASSERT(tex_scrap != nullptr);
 
+        constexpr uint32_t  num_mip_levels = 1;
+        const ColorRGBA32 * mip_init_data[num_mip_levels]  = { tex_scrap->BasePixels() };
+        const Vec2u16       mip_dimensions[num_mip_levels] = { tex_scrap->MipMapDimensions(0) };
+
         TextureUpload upload_info{};
         upload_info.texture  = &tex_scrap->m_texture;
-        upload_info.pixels   = tex_scrap->BasePixels();
-        upload_info.width    = tex_scrap->Width();
-        upload_info.height   = tex_scrap->Height();
         upload_info.is_scrap = true;
-
+        upload_info.mipmaps.num_mip_levels = num_mip_levels;
+        upload_info.mipmaps.mip_init_data  = mip_init_data;
+        upload_info.mipmaps.mip_dimensions = mip_dimensions;
         m_device->UploadContext().UploadTextureImmediate(upload_info);
+
         m_scrap_dirty = false;
     }
 }
@@ -312,7 +328,7 @@ TextureImage * TextureStore::CreateCinematicTexture()
     const ColorRGBA32 * mip_init_data[num_mip_levels]  = { new_cinframe->BasePixels() };
     const Vec2u16       mip_dimensions[num_mip_levels] = { new_cinframe->MipMapDimensions(0) };
 
-    new_cinframe->m_texture.Init(*m_device, TextureType::kPic, Dims, Dims, /*is_scrap =*/true, mip_init_data, mip_dimensions, num_mip_levels);
+    new_cinframe->m_texture.Init(*m_device, TextureType::kPic, /*is_scrap =*/true, mip_init_data, mip_dimensions, num_mip_levels, new_cinframe->Name().CStr());
     return new_cinframe;
 }
 
@@ -331,7 +347,7 @@ TextureImage * TextureStore::CreateScrapTexture(const uint32_t size, const Color
     const ColorRGBA32 * mip_init_data[num_mip_levels]  = { new_scrap->BasePixels() };
     const Vec2u16       mip_dimensions[num_mip_levels] = { new_scrap->MipMapDimensions(0) };
 
-    new_scrap->m_texture.Init(*m_device, TextureType::kPic, size, size, /*is_scrap =*/true, mip_init_data, mip_dimensions, num_mip_levels);
+    new_scrap->m_texture.Init(*m_device, TextureType::kPic, /*is_scrap =*/true, mip_init_data, mip_dimensions, num_mip_levels, new_scrap->Name().CStr());
     return new_scrap;
 }
 
@@ -370,7 +386,7 @@ TextureImage * TextureStore::CreateTexture(const ColorRGBA32 * pixels, uint32_t 
             mip_dimensions[mip] = new_tex->MipMapDimensions(mip);
         }
 
-        new_tex->m_texture.Init(*m_device, tt, w, h, /*is_scrap =*/false, mip_init_data, mip_dimensions, num_mip_levels);
+        new_tex->m_texture.Init(*m_device, tt, /*is_scrap =*/false, mip_init_data, mip_dimensions, num_mip_levels, name);
     }
 
     return new_tex;
@@ -399,25 +415,36 @@ void TextureStore::DestroyAllLoadedTextures()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const char * const file_type) const
+void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const char * const file_type, const bool dump_mipmaps) const
 {
     MRQ2_ASSERT(path != nullptr && path[0] != '\0');
     MRQ2_ASSERT(file_type != nullptr && file_type[0] != '\0');
 
-    constexpr int kNComponents = 4; // always RGBA
-    char fullname[1024];
-    char filename[512];
+    char fullname[1024] = {};
+    char filename[512] = {};
 
     if (std::strncmp(file_type, "tga", 3) == 0)
     {
         for (const TextureImage * tex : m_teximages_cache)
         {
-            std::snprintf(fullname, sizeof(fullname), "%s/%s.tga", path, tex->Name().CStrNoExt(filename));
+            sprintf_s(fullname, "%s/%s.tga", path, tex->Name().CStrNoExt(filename));
             GameInterface::FS::CreatePath(fullname);
 
-            if (stbi_write_tga(fullname, tex->Width(), tex->Height(), kNComponents, tex->BasePixels()) == 0)
+            if (stbi_write_tga(fullname, tex->Width(), tex->Height(), TextureImage::kBytesPerPixel, tex->BasePixels()) == 0)
             {
                 GameInterface::Printf("Failed to write image '%s'", fullname);
+            }
+
+            if (dump_mipmaps && tex->HasMipMaps())
+            {
+                for (uint32_t mip = 1; mip < tex->NumMipMapLevels(); ++mip)
+                {
+                    sprintf_s(fullname, "%s/%s_mip%u.tga", path, tex->Name().CStrNoExt(filename), mip);
+                    if (stbi_write_tga(fullname, tex->Width(mip), tex->Height(mip), TextureImage::kBytesPerPixel, tex->MipMapPixels(mip)) == 0)
+                    {
+                        GameInterface::Printf("Failed to write image '%s'", fullname);
+                    }
+                }
             }
         }
     }
@@ -425,13 +452,26 @@ void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const ch
     {
         for (const TextureImage * tex : m_teximages_cache)
         {
-            std::snprintf(fullname, sizeof(fullname), "%s/%s.png", path, tex->Name().CStrNoExt(filename));
+            sprintf_s(fullname, "%s/%s.png", path, tex->Name().CStrNoExt(filename));
             GameInterface::FS::CreatePath(fullname);
 
-            const int stride = tex->Width() * kNComponents;
-            if (stbi_write_png(fullname, tex->Width(), tex->Height(), kNComponents, tex->BasePixels(), stride) == 0)
+            int stride = tex->Width() * TextureImage::kBytesPerPixel;
+            if (stbi_write_png(fullname, tex->Width(), tex->Height(), TextureImage::kBytesPerPixel, tex->BasePixels(), stride) == 0)
             {
                 GameInterface::Printf("Failed to write image '%s'", fullname);
+            }
+
+            if (dump_mipmaps && tex->HasMipMaps())
+            {
+                for (uint32_t mip = 1; mip < tex->NumMipMapLevels(); ++mip)
+                {
+                    sprintf_s(fullname, "%s/%s_mip%u.png", path, tex->Name().CStrNoExt(filename), mip);
+                    stride = tex->Width(mip) * TextureImage::kBytesPerPixel;
+                    if (stbi_write_png(fullname, tex->Width(mip), tex->Height(mip), TextureImage::kBytesPerPixel, tex->MipMapPixels(mip), stride) == 0)
+                    {
+                        GameInterface::Printf("Failed to write image '%s'", fullname);
+                    }
+                }
             }
         }
     }
@@ -597,7 +637,7 @@ const char * TextureStore::NameFixup(const char * const in, const TextureType tt
         // like "conchars", otherwise the full file path is specified in the 'name' string.
         if (tex_name[0] != '/' && tex_name[0] != '\\')
         {
-            std::snprintf(s_temp_name, sizeof(s_temp_name), "pics/%s.pcx", tex_name);
+            sprintf_s(s_temp_name, "pics/%s.pcx", tex_name);
             tex_name = s_temp_name; // Override with local string
         }
         else
