@@ -54,6 +54,7 @@ public:
 
     // Draw calls
     void Draw(const uint32_t first_vertex, const uint32_t vertex_count);
+    void DrawIndexed(const uint32_t first_index, const uint32_t index_count, const uint32_t base_vertex);
 
     // Debug markers
     void PushMarker(const wchar_t * name);

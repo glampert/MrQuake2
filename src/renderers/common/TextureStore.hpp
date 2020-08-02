@@ -161,10 +161,10 @@ private:
     Texture                      m_texture;               // Back-end renderer texture object.
 
     // Initialize with a single mipmap level (level 0)
-    TextureImage(const ColorRGBA32 * const mip0_pixels, const uint32_t reg_num, const TextureType type, const bool scrap,
+    TextureImage(const ColorRGBA32 * const mip0_pixels, const uint32_t registration_number, const TextureType type, const bool scrap,
                  const uint32_t mip0_width, const uint32_t mip0_height, const Vec2u16 scrap_uv0, const Vec2u16 scrap_uv1, const char * const tex_name)
         : m_name{ tex_name }
-        , m_reg_num{ reg_num }
+        , m_reg_num{ registration_number }
         , m_type{ type }
         , m_is_scrap_image{ scrap }
         , m_scrap_uv0{ scrap_uv0 }
@@ -197,7 +197,9 @@ public:
 
     void Init(const RenderDevice & device);
     void Shutdown();
+
     void UploadScrapIfNeeded();
+    const RenderDevice & Device() const { return *m_device; }
 
     // Registration sequence:
     void BeginRegistration();

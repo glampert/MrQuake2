@@ -5,6 +5,7 @@
 
 #include "ModelStore.hpp"
 #include "TextureStore.hpp"
+#include "ImmediateModeBatching.hpp"
 
 // Quake includes
 #include "common/q_common.h"
@@ -406,19 +407,6 @@ static bool TestTriangle(const int pi1, const int pi2, const int pi3,
 constexpr float kTriangulationEpsilon  = 0.001f;
 constexpr int   kTriangulationMaxVerts = 128; // Per polygon
 
-#define EMIT_TRIANGLE(ptr, v0, v1, v2)                                                    \
-    do {                                                                                  \
-        if (triangles_done == num_triangles)                                              \
-        {                                                                                 \
-            GameInterface::Errorf("BMod::TriangulatePolygon: Triangle list overflowed!"); \
-        }                                                                                 \
-        (ptr)->vertexes[0] = v0;                                                          \
-        (ptr)->vertexes[1] = v1;                                                          \
-        (ptr)->vertexes[2] = v2;                                                          \
-        (ptr)++;                                                                          \
-        triangles_done++;                                                                 \
-    } while (0)
-
 ///////////////////////////////////////////////////////////////////////////////
 
 // Algorithm used below is an "Ear clipping"-based triangulation algorithm, adapted
@@ -481,13 +469,28 @@ static void TriangulatePolygon(ModelPoly & poly)
         active[i] = true;
     }
 
+    auto EmitTriangle = [&triangles_done, &num_triangles, &tris_ptr](int v0, int v1, int v2)
+    {
+        if (triangles_done == num_triangles)
+        {
+            GameInterface::Errorf("BMod::TriangulatePolygon: Triangle list overflowed!");
+        }
+
+        tris_ptr->vertexes[0] = v0;
+        tris_ptr->vertexes[1] = v1;
+        tris_ptr->vertexes[2] = v2;
+
+        ++tris_ptr;
+        ++triangles_done;
+    };
+
     // Triangulation loop:
     for (;;)
     {
         if (p2 == m2)
         {
             // Only three vertexes remain. We're done.
-            EMIT_TRIANGLE(tris_ptr, m1, p1, p2);
+            EmitTriangle(m1, p1, p2);
             break;
         }
 
@@ -533,7 +536,7 @@ static void TriangulatePolygon(ModelPoly & poly)
         {
             // Output the triangle m1, p1, p2:
             active[p1] = false;
-            EMIT_TRIANGLE(tris_ptr, m1, p1, p2);
+            EmitTriangle(m1, p1, p2);
             p1 = NextActive(p1, num_verts, active);
             p2 = NextActive(p2, num_verts, active);
             last_positive = true;
@@ -543,7 +546,7 @@ static void TriangulatePolygon(ModelPoly & poly)
         {
             // Output the triangle m2, m1, p1:
             active[m1] = false;
-            EMIT_TRIANGLE(tris_ptr, m2, m1, p1);
+            EmitTriangle(m2, m1, p1);
             m1 = PrevActive(m1, num_verts, active);
             m2 = PrevActive(m2, num_verts, active);
             last_positive = false;
@@ -579,8 +582,6 @@ static void TriangulatePolygon(ModelPoly & poly)
         GameInterface::Printf("WARNING - BMod::TriangulatePolygon: Unexpected triangle count!");
     }
 }
-
-#undef EMIT_TRIANGLE
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1209,6 +1210,107 @@ void ModelStore::LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, c
 
         auto * tex = const_cast<TextureImage *>(mdl.data.texinfos[i].teximage);
         tex->m_reg_num = tex_store.RegistrationNum();
+    }
+
+    // Vertex/Index buffer setup:
+    if (kUseVertexAndIndexBuffers)
+    {
+        const int num_surfaces = mdl.data.num_surfaces;
+        const ModelSurface * const surfaces = mdl.data.surfaces;
+
+        int vertex_count = 0;
+        int index_count  = 0;
+
+        for (int s = 0; s < num_surfaces; ++s)
+        {
+            const ModelSurface & surf = surfaces[s];
+
+            for (const ModelPoly * poly = surf.polys; poly != nullptr; poly = poly->next)
+            {
+                if (poly->triangles == nullptr) // Only indexed polygons
+                {
+                    MRQ2_ASSERT(surf.texinfo->flags & SURF_WARP);
+                    continue;
+                }
+
+                const int num_triangles = (poly->num_verts - 2);
+                MRQ2_ASSERT(num_triangles > 0);
+
+                vertex_count += poly->num_verts;
+                index_count  += num_triangles * 3;
+            }
+        }
+
+        MRQ2_ASSERT(vertex_count > 0);
+        MRQ2_ASSERT(index_count  > 0);
+
+        auto & device = tex_store.Device();
+
+        mdl.vb.Init(device, vertex_count * sizeof(DrawVertex3D),  sizeof(DrawVertex3D));
+        mdl.ib.Init(device, index_count  * sizeof(std::uint16_t), IndexBuffer::kFormatUInt16);
+
+        auto * vertex_iter = static_cast<DrawVertex3D  *>(mdl.vb.Map());
+        auto * index_iter  = static_cast<std::uint16_t *>(mdl.ib.Map());
+
+        int vertex_buffer_offset = 0;
+        int index_buffer_offset  = 0;
+
+        for (int s = 0; s < num_surfaces; ++s)
+        {
+            const ModelSurface & surf = surfaces[s];
+
+            for (ModelPoly * poly = surf.polys; poly != nullptr; poly = poly->next)
+            {
+                if (poly->triangles == nullptr) // Only indexed polygons
+                {
+                    MRQ2_ASSERT(surf.texinfo->flags & SURF_WARP);
+                    poly->index_buffer = {};
+                    continue;
+                }
+
+                // Vertex Buffer
+                for (int v = 0; v < poly->num_verts; ++v)
+                {
+                    const PolyVertex & poly_vert = poly->vertexes[v];
+
+                    vertex_iter->position[0] = poly_vert.position[0];
+                    vertex_iter->position[1] = poly_vert.position[1];
+                    vertex_iter->position[2] = poly_vert.position[2];
+
+                    vertex_iter->uv[0] = poly_vert.texture_s;
+                    vertex_iter->uv[1] = poly_vert.texture_t;
+
+                    ColorFloats(surf.debug_color, vertex_iter->rgba[0], vertex_iter->rgba[1], vertex_iter->rgba[2], vertex_iter->rgba[3]);
+                    ++vertex_iter;
+                }
+
+                // Index Buffer
+                const int num_triangles = (poly->num_verts - 2);
+                MRQ2_ASSERT(num_triangles > 0);
+
+                poly->index_buffer.first_index = index_buffer_offset;
+                poly->index_buffer.index_count = num_triangles * 3;
+                poly->index_buffer.base_vertex = vertex_buffer_offset;
+
+                for (int t = 0; t < num_triangles; ++t)
+                {
+                    const ModelTriangle & mdl_tri = poly->triangles[t];
+                    for (int v = 0; v < 3; ++v)
+                    {
+                        *index_iter++ = mdl_tri.vertexes[v];
+                    }
+                }
+
+                index_buffer_offset += num_triangles * 3;
+                MRQ2_ASSERT(index_buffer_offset <= index_count);
+
+                vertex_buffer_offset += poly->num_verts;
+                MRQ2_ASSERT(vertex_buffer_offset <= vertex_count);
+            }
+        }
+
+        mdl.ib.Unmap();
+        mdl.vb.Unmap();
     }
 
     if (kVerboseModelLoading)

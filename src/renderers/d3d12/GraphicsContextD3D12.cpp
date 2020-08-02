@@ -200,6 +200,13 @@ void GraphicsContextD3D12::Draw(const uint32_t first_vertex, const uint32_t vert
     m_command_list->DrawInstanced(vertex_count, instance_count, first_vertex, first_instance);
 }
 
+void GraphicsContextD3D12::DrawIndexed(const uint32_t first_index, const uint32_t index_count, const uint32_t base_vertex)
+{
+    const auto instance_count = 1u;
+    const auto first_instance = 0u;
+    m_command_list->DrawIndexedInstanced(index_count, instance_count, first_index, base_vertex, first_instance);
+}
+
 void GraphicsContextD3D12::SetAndUpdateConstantBuffer_Internal(const ConstantBufferD3D12 & cb, const uint32_t slot, const void * data, const uint32_t data_size)
 {
     // This is a sort of workaround to simulate immediate mode APIs where a draw call is an implicit pipeline flush.

@@ -7,6 +7,7 @@
 
 #include "Common.hpp"
 #include "Memory.hpp"
+#include "RenderInterface.hpp"
 
 namespace MrQ2
 {
@@ -65,6 +66,9 @@ constexpr int kMaxMD2SkinHeight = 480;
 // From q_files.h
 constexpr int kMaxMD2Skins  = 32;
 constexpr int kMaxLightmaps = 4;
+
+// Use vertex/index buffers for static world geometry instead of immediate mode batching?
+constexpr bool kUseVertexAndIndexBuffers = true;
 
 /*
 ===============================================================================
@@ -138,7 +142,14 @@ struct ModelPoly
     int num_verts;             // size of vertexes[], since it's dynamically allocated
     PolyVertex * vertexes;     // array of polygon vertexes. Never null
     ModelTriangle * triangles; // (num_verts - 2) triangles with indexes into vertexes[]
-    const ModelPoly * next;
+    ModelPoly * next;
+
+    // Range in the ModelInstance index buffer for this polygon (see kUseVertexAndIndexBuffers).
+    struct IbRange {
+        int first_index;
+        int index_count;
+        int base_vertex;
+    } index_buffer;
 };
 
 //
@@ -318,12 +329,16 @@ public:
     // Memory hunk backing the model's data.
     MemHunk hunk;
 
+    // Optional Vertex and Index buffer for static world geometry.
+    VertexBuffer vb;
+    IndexBuffer  ib;
+
     // Initializing constructor.
-    ModelInstance(const char * const mdl_name, const ModelType mt, const std::uint32_t regn, const bool inline_mdl)
+    ModelInstance(const char * const mdl_name, const ModelType mdl_type, const std::uint32_t registration_number, const bool inline_mdl)
         : name{ mdl_name }
-        , type{ mt }
+        , type{ mdl_type }
         , is_inline{ inline_mdl }
-        , reg_num{ regn }
+        , reg_num{ registration_number }
     {
         std::memset(&data, 0, sizeof(data));
     }

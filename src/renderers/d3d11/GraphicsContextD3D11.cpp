@@ -211,6 +211,11 @@ void GraphicsContextD3D11::Draw(const uint32_t first_vertex, const uint32_t vert
     m_context->Draw(vertex_count, first_vertex);
 }
 
+void GraphicsContextD3D11::DrawIndexed(const uint32_t first_index, const uint32_t index_count, const uint32_t base_vertex)
+{
+    m_context->DrawIndexed(index_count, first_index, base_vertex);
+}
+
 void GraphicsContextD3D11::SetAndUpdateConstantBuffer_Internal(const ConstantBufferD3D11 & cb, const uint32_t slot, const void * data, const uint32_t data_size)
 {
     MRQ2_ASSERT(slot < kCBufferSlotCount);

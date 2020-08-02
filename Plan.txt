@@ -1,6 +1,4 @@
 
-- Finish renderer refactor, tidy up D3d11 and D3D12 back-ends.
-
 - Move static world geometry rendering to use vertex buffers instead of submitting every frame.
   MD2s can stay as they are for now and get regenerated and sumitted per-frame with the MiniImBatch.
 
@@ -16,5 +14,3 @@
 - Make bullet hits in the walls leave a damage decal.
 
 - Do some CPU profiling with Optick (brofiler)!
-
-- Get texture mipmapping working.

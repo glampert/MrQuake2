@@ -5,8 +5,6 @@
 
 #include "ViewDraw.hpp"
 
-#include <DirectXMath.h>
-
 namespace MrQ2
 {
 
@@ -176,6 +174,7 @@ void ViewDrawState::Init(const RenderDevice & device, const TextureStore & tex_s
 {
     m_tex_white2x2 = tex_store.tex_white2x2;
 
+    m_use_vertex_index_buffers = GameInterface::Cvar::Get("r_use_vertex_index_buffers", "1", CvarWrapper::kFlagArchive);
     m_force_null_entity_models = GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0);
     m_lerp_entity_models       = GameInterface::Cvar::Get("r_lerp_entity_models", "1", 0);
     m_skip_draw_alpha_surfs    = GameInterface::Cvar::Get("r_skip_draw_alpha_surfs", "0", 0);
@@ -435,6 +434,9 @@ void ViewDrawState::SetUpFrustum(FrameData & frame_data) const
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// TODO: tidy
+static std::vector<ModelPoly::IbRange> s_poly_ib;
+
 void ViewDrawState::DoRenderView(FrameData & frame_data, GraphicsContext & context, const ArrayBase<const ConstantBuffer *> & cbuffers)
 {
     //
@@ -444,6 +446,36 @@ void ViewDrawState::DoRenderView(FrameData & frame_data, GraphicsContext & conte
         MRQ2_SCOPED_GPU_MARKER(context, "RenderOpaqueGeometry");
         BeginRenderPass();
         RenderWorldModel(frame_data);
+
+        // TODO: tidy
+        if (m_use_vertex_index_buffers.IsSet() && kUseVertexAndIndexBuffers)
+        {
+            context.SetPipelineState(m_pipeline_solid_geometry);
+
+            context.SetVertexBuffer(frame_data.world_model.vb);
+            context.SetIndexBuffer(frame_data.world_model.ib);
+
+            uint32_t cbuffer_slot = 0;
+            for (; cbuffer_slot < cbuffers.size(); ++cbuffer_slot)
+            {
+                context.SetConstantBuffer(*cbuffers[cbuffer_slot], cbuffer_slot);
+            }
+
+            context.SetPrimitiveTopology(PrimitiveTopology::kTriangleList);
+            context.SetTexture(frame_data.tex_store.tex_debug->BackendTexture(), 0);
+
+            for (auto & r : s_poly_ib)
+            {
+                PerDrawShaderConstants consts;
+                consts.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
+                context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, consts);
+
+                context.DrawIndexed(r.first_index, r.index_count, r.base_vertex);
+            }
+
+            s_poly_ib.clear();
+        }
+
         RenderSkyBox(frame_data);
         RenderSolidEntities(frame_data);
         EndRenderPass(frame_data, context, cbuffers, m_pipeline_solid_geometry);
@@ -722,7 +754,9 @@ void ViewDrawState::MarkLeaves(ModelInstance & world_mdl)
 void ViewDrawState::DrawTextureChains(FrameData & frame_data)
 {
     TextureStore & tex_store = frame_data.tex_store;
-    const bool do_draw = !m_skip_draw_texture_chains.IsSet();
+
+    const bool do_draw   = !m_skip_draw_texture_chains.IsSet();
+    const bool use_vb_ib = m_use_vertex_index_buffers.IsSet();
 
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
@@ -742,8 +776,7 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
 
         if (do_draw)
         {
-            args.optional_tex = tex;
-            MiniImBatch batch = BeginBatch(args);
+            if (use_vb_ib && kUseVertexAndIndexBuffers)
             {
                 for (const ModelSurface * surf = tex->DrawChainPtr(); surf; surf = surf->texture_chain)
                 {
@@ -752,10 +785,32 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
                     {
                         continue;
                     }
-                    batch.PushModelSurface(*surf);
+
+                    for (const ModelPoly * poly = surf->polys; poly; poly = poly->next)
+                    {
+                        MRQ2_ASSERT(poly->index_buffer.first_index >= 0);
+                        MRQ2_ASSERT(poly->index_buffer.index_count >  0);
+                        s_poly_ib.push_back(poly->index_buffer);
+                    }
                 }
             }
-            EndBatch(batch);
+            else
+            {
+                args.optional_tex = tex;
+                MiniImBatch batch = BeginBatch(args);
+                {
+                    for (const ModelSurface * surf = tex->DrawChainPtr(); surf; surf = surf->texture_chain)
+                    {
+                        // Need at least one triangle.
+                        if (surf->polys == nullptr || surf->polys->num_verts < 3)
+                        {
+                            continue;
+                        }
+                        batch.PushModelSurface(*surf);
+                    }
+                }
+                EndBatch(batch);
+            }
         }
 
         // All world geometry using this texture has been drawn, clear for the next frame.
