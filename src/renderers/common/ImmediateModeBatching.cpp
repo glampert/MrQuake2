@@ -30,14 +30,14 @@ void SpriteBatch::Shutdown()
 
 void SpriteBatch::BeginFrame()
 {
-    m_buffers.Begin();
+    m_buffers.BeginFrame();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void SpriteBatch::EndFrame(GraphicsContext & context, const ConstantBuffer & cbuff, const PipelineState & pipeline_state, const TextureImage * opt_tex_atlas)
 {
-    const auto draw_buf = m_buffers.End();
+    const auto draw_buf = m_buffers.EndFrame();
 
     context.SetPipelineState(pipeline_state);
     context.SetVertexBuffer(*draw_buf.buffer_ptr);

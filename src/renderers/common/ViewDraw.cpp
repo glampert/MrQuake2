@@ -13,7 +13,7 @@ namespace MrQ2
 ///////////////////////////////////////////////////////////////////////////////
 
 // Returns the proper texture for a given time and base texture.
-static const TextureImage * TextureAnimation(const ModelTexInfo * const tex)
+static const TextureImage * TextureAnimation(const ModelTexInfo * tex, const int frame_num)
 {
     MRQ2_ASSERT(tex != nullptr);
     const TextureImage * out = nullptr;
@@ -25,14 +25,13 @@ static const TextureImage * TextureAnimation(const ModelTexInfo * const tex)
     }
     else // Find next image frame
     {
-        /* TODO - texture scrolling
-        int c = currententity->frame % tex->num_frames;
+        int c = frame_num % tex->num_frames;
         while (c)
         {
             tex = tex->next;
             --c;
         }
-        */
+
         out = tex->teximage;
     }
 
@@ -182,6 +181,7 @@ void ViewDrawState::Init(const RenderDevice & device, const TextureStore & tex_s
     m_skip_draw_world          = GameInterface::Cvar::Get("r_skip_draw_world", "0", 0);
     m_skip_draw_sky            = GameInterface::Cvar::Get("r_skip_draw_sky", "0", 0);
     m_skip_draw_entities       = GameInterface::Cvar::Get("r_skip_draw_entities", "0", 0);
+    m_skip_brush_mods          = GameInterface::Cvar::Get("r_skip_brush_mods", "0", 0);
     m_intensity                = GameInterface::Cvar::Get("r_intensity", "2", 0);
 
     constexpr uint32_t kViewDrawBatchSize = 25000; // max vertices * num buffers
@@ -241,7 +241,11 @@ void ViewDrawState::Shutdown()
     m_skybox = {};
     m_alpha_world_surfaces = nullptr;
     m_tex_white2x2 = nullptr;
-    m_draw_cmds.clear();
+
+    for (int pass = 0; pass < kRenderPassCount; ++pass)
+    {
+        m_draw_cmds[pass].clear();
+    }
 
     m_pipeline_solid_geometry.Shutdown();
     m_pipeline_translucent_world_geometry.Shutdown();
@@ -249,56 +253,6 @@ void ViewDrawState::Shutdown()
     m_render3d_shader.Shutdown();
     m_per_draw_shader_consts.Shutdown();
     m_vertex_buffers.Shutdown();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void ViewDrawState::BeginRenderPass()
-{
-    MRQ2_ASSERT(m_batch_open == false);
-    MRQ2_ASSERT(m_draw_cmds.empty());
-
-    m_vertex_buffers.Begin();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void ViewDrawState::EndRenderPass(const FrameData & frame_data, GraphicsContext & context, const ArrayBase<const ConstantBuffer *> & cbuffers, const PipelineState & pipeline_state)
-{
-    MRQ2_ASSERT(m_batch_open == false);
-
-    const auto draw_buf = m_vertex_buffers.End();
-
-    context.SetPipelineState(pipeline_state);
-    context.SetVertexBuffer(*draw_buf.buffer_ptr);
-
-    uint32_t cbuffer_slot = 0;
-    for (; cbuffer_slot < cbuffers.size(); ++cbuffer_slot)
-    {
-        context.SetConstantBuffer(*cbuffers[cbuffer_slot], cbuffer_slot);
-    }
-
-    for (const DrawCmd & cmd : m_draw_cmds)
-    {
-        // Depth hack to prevent weapons from poking into geometry.
-        if (cmd.depth_hack)
-        {
-            constexpr float depth_min = 0.0f;
-            constexpr float depth_max = 1.0f;
-            context.SetDepthRange(depth_min, depth_min + 0.3f * (depth_max - depth_min));
-        }
-
-        context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, cmd.consts);
-
-        context.SetPrimitiveTopology(cmd.topology);
-        context.SetTexture(cmd.texture->BackendTexture(), 0);
-        context.Draw(cmd.first_vert, cmd.vertex_count);
-
-        // Restore to default if we did a depth-hacked draw.
-        context.RestoreDepthRange();
-    }
-
-    m_draw_cmds.clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -333,7 +287,8 @@ void ViewDrawState::EndBatch(MiniImBatch & batch)
 
     m_vertex_buffers.Increment(batch.UsedVerts());
 
-    m_draw_cmds.push_back(m_current_draw_cmd);
+    MRQ2_ASSERT(m_current_pass < kRenderPassCount);
+    m_draw_cmds[m_current_pass].push_back(m_current_draw_cmd);
     m_current_draw_cmd = {};
 
     batch.Clear();
@@ -434,72 +389,125 @@ void ViewDrawState::SetUpFrustum(FrameData & frame_data) const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// TODO: tidy
-static std::vector<ModelPoly::IbRange> s_poly_ib;
-
-void ViewDrawState::DoRenderView(FrameData & frame_data, GraphicsContext & context, const ArrayBase<const ConstantBuffer *> & cbuffers)
+const PipelineState & ViewDrawState::PipelineStateForPass(const int pass) const
 {
+    switch (pass)
+    {
+    case kPass_SolidGeometry:
+        return m_pipeline_solid_geometry;
+    case kPass_TranslucentSurfaces:
+        return m_pipeline_translucent_world_geometry;
+    case kPass_TranslucentEntities:
+        return m_pipeline_translucent_entities;
+    default:
+        GameInterface::Errorf("Invalid pass index!");
+    } // switch
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::BatchImmediateModeDrawCmds()
+{
+    MRQ2_ASSERT(m_batch_open == false);
+    MRQ2_ASSERT(m_current_pass == kPass_Invalid);
+
+    for (int pass = 0; pass < kRenderPassCount; ++pass)
+    {
+        MRQ2_ASSERT(m_draw_cmds[pass].empty());
+    }
+
+    m_vertex_buffers.BeginFrame();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::FlushImmediateModeDrawCmds(FrameData & frame_data)
+{
+    MRQ2_ASSERT(m_batch_open == false);
+
+    static const wchar_t * const s_render_pass_names[] = {
+        L"SolidGeometry",
+        L"TranslucentSurfaces",
+        L"TranslucentEntities",
+    };
+    static_assert(ArrayLength(s_render_pass_names) == kRenderPassCount);
+
+    auto & context  = frame_data.context;
+    auto & cbuffers = frame_data.cbuffers;
+
+    const auto draw_buf = m_vertex_buffers.EndFrame();
+    const VertexBuffer & vertex_buffer = *draw_buf.buffer_ptr;
+
+    for (int pass = 0; pass < kRenderPassCount; ++pass)
+    {
+        if (m_draw_cmds[pass].empty())
+        {
+            continue;
+        }
+
+        context.PushMarker(s_render_pass_names[pass]);
+
+        context.SetPipelineState(PipelineStateForPass(pass));
+        context.SetVertexBuffer(vertex_buffer);
+
+        uint32_t cbuffer_slot = 0;
+        for (; cbuffer_slot < cbuffers.size(); ++cbuffer_slot)
+        {
+            context.SetConstantBuffer(*cbuffers[cbuffer_slot], cbuffer_slot);
+        }
+
+        for (const DrawCmd & cmd : m_draw_cmds[pass])
+        {
+            // Depth hack to prevent weapons from poking into geometry.
+            if (cmd.depth_hack)
+            {
+                constexpr float depth_min = 0.0f;
+                constexpr float depth_max = 1.0f;
+                context.SetDepthRange(depth_min, depth_min + 0.3f * (depth_max - depth_min));
+            }
+
+            context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, cmd.consts);
+
+            context.SetPrimitiveTopology(cmd.topology);
+            context.SetTexture(cmd.texture->BackendTexture(), 0);
+
+            context.Draw(cmd.first_vert, cmd.vertex_count);
+
+            // Restore to default if we did a depth-hacked draw.
+            context.RestoreDepthRange();
+        }
+
+        context.PopMarker();
+        m_draw_cmds[pass].clear();
+    }
+
+    m_current_pass = kPass_Invalid;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewDrawState::DoRenderView(FrameData & frame_data)
+{
+    BatchImmediateModeDrawCmds();
+
     //
     // Opaque/solid geometry pass
     //
-    {
-        MRQ2_SCOPED_GPU_MARKER(context, "RenderOpaqueGeometry");
-        BeginRenderPass();
-        RenderWorldModel(frame_data);
-
-        // TODO: tidy
-        if (m_use_vertex_index_buffers.IsSet() && kUseVertexAndIndexBuffers)
-        {
-            context.SetPipelineState(m_pipeline_solid_geometry);
-
-            context.SetVertexBuffer(frame_data.world_model.vb);
-            context.SetIndexBuffer(frame_data.world_model.ib);
-
-            uint32_t cbuffer_slot = 0;
-            for (; cbuffer_slot < cbuffers.size(); ++cbuffer_slot)
-            {
-                context.SetConstantBuffer(*cbuffers[cbuffer_slot], cbuffer_slot);
-            }
-
-            context.SetPrimitiveTopology(PrimitiveTopology::kTriangleList);
-            context.SetTexture(frame_data.tex_store.tex_debug->BackendTexture(), 0);
-
-            for (auto & r : s_poly_ib)
-            {
-                PerDrawShaderConstants consts;
-                consts.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
-                context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, consts);
-
-                context.DrawIndexed(r.first_index, r.index_count, r.base_vertex);
-            }
-
-            s_poly_ib.clear();
-        }
-
-        RenderSkyBox(frame_data);
-        RenderSolidEntities(frame_data);
-        EndRenderPass(frame_data, context, cbuffers, m_pipeline_solid_geometry);
-    }
+    m_current_pass = kPass_SolidGeometry;
+    RenderWorldModel(frame_data);
+    RenderSkyBox(frame_data);
+    RenderSolidEntities(frame_data);
 
     //
     // Transparencies/alpha passes
     //
+    m_current_pass = kPass_TranslucentSurfaces; // Color Blend ON for static world geometry
+    RenderTranslucentSurfaces(frame_data);
 
-    // Color Blend ON for static world geometry
-    {
-        MRQ2_SCOPED_GPU_MARKER(context, "RenderTranslucentSurfaces");
-        BeginRenderPass();
-        RenderTranslucentSurfaces(frame_data);
-        EndRenderPass(frame_data, context, cbuffers, m_pipeline_translucent_world_geometry);
-    }
+    m_current_pass = kPass_TranslucentEntities; // Disable Z writes in case entities stack up
+    RenderTranslucentEntities(frame_data);
 
-    // Disable z writes in case entities stack up
-    {
-        MRQ2_SCOPED_GPU_MARKER(context, "RenderTranslucentEntities");
-        BeginRenderPass();
-        RenderTranslucentEntities(frame_data);
-        EndRenderPass(frame_data, context, cbuffers, m_pipeline_translucent_entities);
-    }
+    FlushImmediateModeDrawCmds(frame_data);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -659,7 +667,7 @@ void ViewDrawState::RecursiveWorldNode(const FrameData & frame_data,
         }
         else // Opaque texture chain
         {
-            const TextureImage * image = TextureAnimation(surf->texinfo);
+            const TextureImage * image = TextureAnimation(surf->texinfo, static_cast<int>(frame_data.view_def.time * 2.0f));
             MRQ2_ASSERT(image != nullptr);
 
             surf->texture_chain = image->DrawChainPtr();
@@ -753,18 +761,39 @@ void ViewDrawState::MarkLeaves(ModelInstance & world_mdl)
 
 void ViewDrawState::DrawTextureChains(FrameData & frame_data)
 {
-    TextureStore & tex_store = frame_data.tex_store;
-
     const bool do_draw   = !m_skip_draw_texture_chains.IsSet();
     const bool use_vb_ib = m_use_vertex_index_buffers.IsSet();
 
-    BeginBatchArgs args;
-    args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
-    args.topology     = PrimitiveTopology::kTriangleList;
-    args.depth_hack   = false;
+    auto & context  = frame_data.context;
+    auto & cbuffers = frame_data.cbuffers;
+
+    BeginBatchArgs batchArgs;
+    batchArgs.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
+    batchArgs.topology     = PrimitiveTopology::kTriangleList;
+    batchArgs.depth_hack   = false;
+
+    if (use_vb_ib && kUseVertexAndIndexBuffers)
+    {
+        context.PushMarker(L"DrawTextureChains");
+
+        context.SetPipelineState(m_pipeline_solid_geometry);
+        context.SetVertexBuffer(frame_data.world_model.vb);
+        context.SetIndexBuffer(frame_data.world_model.ib);
+        context.SetPrimitiveTopology(batchArgs.topology);
+
+        uint32_t cbuffer_slot = 0;
+        for (; cbuffer_slot < cbuffers.size(); ++cbuffer_slot)
+        {
+            context.SetConstantBuffer(*cbuffers[cbuffer_slot], cbuffer_slot);
+        }
+
+        PerDrawShaderConstants consts;
+        consts.model_matrix = batchArgs.model_matrix;
+        context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, consts);
+    }
 
     // Draw with sorting by texture:
-    for (TextureImage * tex : tex_store)
+    for (const TextureImage * tex : frame_data.tex_store)
     {
         MRQ2_ASSERT(tex->Width() > 0 && tex->Height() > 0);
         MRQ2_ASSERT(tex->Type() != TextureType::kCount);
@@ -776,37 +805,38 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
 
         if (do_draw)
         {
-            if (use_vb_ib && kUseVertexAndIndexBuffers)
+            if (use_vb_ib && kUseVertexAndIndexBuffers) // Use the prebaked vertex and index buffers
             {
                 for (const ModelSurface * surf = tex->DrawChainPtr(); surf; surf = surf->texture_chain)
                 {
-                    // Need at least one triangle.
-                    if (surf->polys == nullptr || surf->polys->num_verts < 3)
+                    if (const ModelPoly * poly = surf->polys)
                     {
-                        continue;
-                    }
+                        if (poly->num_verts >= 3) // Need at least one triangle.
+                        {
+                            const auto range = poly->index_buffer;
+                            MRQ2_ASSERT(range.first_index >= 0 && range.index_count > 0 && range.base_vertex >= 0);
 
-                    for (const ModelPoly * poly = surf->polys; poly; poly = poly->next)
-                    {
-                        MRQ2_ASSERT(poly->index_buffer.first_index >= 0);
-                        MRQ2_ASSERT(poly->index_buffer.index_count >  0);
-                        s_poly_ib.push_back(poly->index_buffer);
+                            context.SetTexture(tex->BackendTexture(), 0);
+                            context.DrawIndexed(range.first_index, range.index_count, range.base_vertex);
+                        }
                     }
                 }
             }
-            else
+            else // Immediate mode emulation
             {
-                args.optional_tex = tex;
-                MiniImBatch batch = BeginBatch(args);
+                batchArgs.optional_tex = tex;
+
+                MiniImBatch batch = BeginBatch(batchArgs);
                 {
                     for (const ModelSurface * surf = tex->DrawChainPtr(); surf; surf = surf->texture_chain)
                     {
-                        // Need at least one triangle.
-                        if (surf->polys == nullptr || surf->polys->num_verts < 3)
+                        if (const ModelPoly * poly = surf->polys)
                         {
-                            continue;
+                            if (poly->num_verts >= 3) // Need at least one triangle.
+                            {
+                                batch.PushModelSurface(*surf);
+                            }
                         }
-                        batch.PushModelSurface(*surf);
                     }
                 }
                 EndBatch(batch);
@@ -815,6 +845,11 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
 
         // All world geometry using this texture has been drawn, clear for the next frame.
         tex->SetDrawChainPtr(nullptr);
+    }
+
+    if (use_vb_ib && kUseVertexAndIndexBuffers)
+    {
+        context.PopMarker();
     }
 }
 
@@ -1116,8 +1151,15 @@ void ViewDrawState::RenderSolidEntities(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// Draw an inline brush model either using immediate mode emulation or vertex/index buffers.
+// This renders things like doors, windows and moving platforms.
 void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t & entity)
 {
+    if (m_skip_brush_mods.IsSet())
+    {
+        return;
+    }
+
     const auto * model = reinterpret_cast<const ModelInstance *>(entity.model);
     MRQ2_ASSERT(model != nullptr);
 
@@ -1190,6 +1232,41 @@ void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t 
     }
     */
 
+    const bool use_vb_ib = m_use_vertex_index_buffers.IsSet();
+    auto & context  = frame_data.context;
+    auto & cbuffers = frame_data.cbuffers;
+
+    // IndexBuffer rendering
+    if (use_vb_ib && kUseVertexAndIndexBuffers)
+    {
+        context.PushMarker(L"DrawBrushModel");
+
+        const PipelineState * pipeline;
+        if (entity.flags & RF_TRANSLUCENT)
+        {
+            pipeline = &m_pipeline_translucent_entities;
+        }
+        else
+        {
+            pipeline = &m_pipeline_solid_geometry;
+        }
+
+        context.SetPipelineState(*pipeline);
+        context.SetVertexBuffer(frame_data.world_model.vb);
+        context.SetIndexBuffer(frame_data.world_model.ib);
+        context.SetPrimitiveTopology(PrimitiveTopology::kTriangleList);
+
+        uint32_t cbuffer_slot = 0;
+        for (; cbuffer_slot < cbuffers.size(); ++cbuffer_slot)
+        {
+            context.SetConstantBuffer(*cbuffers[cbuffer_slot], cbuffer_slot);
+        }
+
+        PerDrawShaderConstants consts;
+        consts.model_matrix = mdl_mtx;
+        context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, consts);
+    }
+
     ModelSurface * surf = &model->data.surfaces[model->data.first_model_surface];
     const int num_surfaces = model->data.num_model_surfaces;
 
@@ -1211,6 +1288,7 @@ void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t 
             }
             else 
             {
+                // TODO handle water polys (SURF_DRAWTURB) as done in R_RenderBrushPoly
                 /*
                 else if (qglMTexCoord2fSGIS && !(psurf->flags & SURF_DRAWTURB))
                 {
@@ -1224,24 +1302,40 @@ void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t 
                 }
                 */
 
-                // TODO handle water polys (SURF_DRAWTURB) as done in R_RenderBrushPoly
-
-                // TODO probably becomes an assert once water polygons are handled???
-                if (surf->polys == nullptr) continue;
-
-                BeginBatchArgs args;
-                args.model_matrix = mdl_mtx;
-                args.optional_tex = TextureAnimation(surf->texinfo);
-                args.topology     = PrimitiveTopology::kTriangleList;
-                args.depth_hack   = false;
-
-                MiniImBatch batch = BeginBatch(args);
+                if (const ModelPoly * poly = surf->polys)
                 {
-                    batch.PushModelSurface(*surf);
+                    // IndexBuffer rendering
+                    if (use_vb_ib && kUseVertexAndIndexBuffers && (poly->index_buffer.index_count > 0))
+                    {
+                        const auto range = poly->index_buffer;
+                        MRQ2_ASSERT(range.first_index >= 0 && range.base_vertex >= 0);
+
+                        auto * tex = TextureAnimation(surf->texinfo, entity.frame);
+                        context.SetTexture(tex->BackendTexture(), 0);
+                        context.DrawIndexed(range.first_index, range.index_count, range.base_vertex);
+                    }
+                    else // Immediate mode emulation
+                    {
+                        BeginBatchArgs args;
+                        args.model_matrix = mdl_mtx;
+                        args.optional_tex = TextureAnimation(surf->texinfo, entity.frame);
+                        args.topology     = PrimitiveTopology::kTriangleList;
+                        args.depth_hack   = false;
+
+                        MiniImBatch batch = BeginBatch(args);
+                        {
+                            batch.PushModelSurface(*surf);
+                        }
+                        EndBatch(batch);
+                    }
                 }
-                EndBatch(batch);
             }
         }
+    }
+
+    if (use_vb_ib && kUseVertexAndIndexBuffers)
+    {
+        context.PopMarker();
     }
 
     /* TODO

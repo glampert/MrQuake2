@@ -247,6 +247,15 @@ VID_CmdRestart
 static void VID_CmdRestart(void)
 {
     // "vid_ref D3D11; vid_restart"
+    // OR
+    // "vid_restart D3D11"
+
+    int argc = Cmd_Argc();
+    if (argc >= 2)
+    {
+        const char * ref_name = Cmd_Argv(1);
+        Cvar_Set("vid_ref", ref_name);
+    }
 
     winquake.vid_is_restarting = true;
     VID_Shutdown();

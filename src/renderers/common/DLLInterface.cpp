@@ -248,7 +248,11 @@ void DLLInterface::RenderView(refdef_t * const view_def)
         GameInterface::Errorf("RenderView: Null world model!");
     }
 
-    ViewDrawState::FrameData frame_data{ sm_texture_store, *sm_model_store.WorldModel(), *view_def };
+    FixedSizeArray<const ConstantBuffer *, 2> cbuffers;
+    cbuffers.push_back(&sm_per_frame_shader_consts.CurrentBuffer()); // slot(0)
+    cbuffers.push_back(&sm_per_view_shader_consts.CurrentBuffer());  // slot(1)
+
+    ViewDrawState::FrameData frame_data{ sm_texture_store, *sm_model_store.WorldModel(), *view_def, context, cbuffers };
 
     // Set up camera/view (fills frame_data)
     sm_view_state.RenderViewSetup(frame_data);
@@ -257,11 +261,8 @@ void DLLInterface::RenderView(refdef_t * const view_def)
     sm_per_view_shader_consts.data.view_proj_matrix = frame_data.view_proj_matrix;
     sm_per_view_shader_consts.Upload();
 
-    FixedSizeArray<const ConstantBuffer *, 2> cbuffers;
-    cbuffers.push_back(&sm_per_frame_shader_consts.CurrentBuffer()); // slot(0)
-    cbuffers.push_back(&sm_per_view_shader_consts.CurrentBuffer());  // slot(1)
-
-    sm_view_state.DoRenderView(frame_data, context, cbuffers);
+    // Add draw commands to the GraphicsContext
+    sm_view_state.DoRenderView(frame_data);
 }
 
 void DLLInterface::DrawPic(const int x, const int y, const char * const name)

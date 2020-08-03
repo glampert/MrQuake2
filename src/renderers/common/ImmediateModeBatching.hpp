@@ -157,7 +157,7 @@ public:
         return m_mapped_ptrs[m_buffer_index] + m_used_verts;
     }
 
-    void Begin()
+    void BeginFrame()
     {
         MRQ2_ASSERT(m_used_verts == 0); // Missing End()?
 
@@ -172,7 +172,7 @@ public:
         m_mapped_ptrs[m_buffer_index] = static_cast<VertexType *>(memory);
     }
 
-    DrawBuffer End()
+    DrawBuffer EndFrame()
     {
         MRQ2_ASSERT(m_mapped_ptrs[m_buffer_index] != nullptr); // Missing Begin()?
 

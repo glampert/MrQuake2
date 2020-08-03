@@ -144,7 +144,7 @@ struct ModelPoly
     ModelTriangle * triangles; // (num_verts - 2) triangles with indexes into vertexes[]
     ModelPoly * next;
 
-    // Range in the ModelInstance index buffer for this polygon (see kUseVertexAndIndexBuffers).
+    // Range in the ModelInstance index buffer for this polygon (used if kUseVertexAndIndexBuffers=true).
     struct IbRange {
         int first_index;
         int index_count;

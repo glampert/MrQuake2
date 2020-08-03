@@ -17,6 +17,8 @@
 namespace MrQ2
 {
 
+using ViewConstBuffers = ArrayBase<const ConstantBuffer *>;
+
 /*
 ===============================================================================
 
@@ -33,11 +35,16 @@ public:
 
     struct FrameData
     {
-        FrameData(TextureStore & texstore, ModelInstance & world, const refdef_t & view)
-            : tex_store{ texstore }
+        FrameData(TextureStore & texstore, ModelInstance & world, const refdef_t & view, GraphicsContext & cx, const ViewConstBuffers & cbs)
+            : context{ cx }
+            , cbuffers{ cbs }
+            , tex_store{ texstore }
             , world_model{ world }
             , view_def{ view }
         { }
+
+        GraphicsContext & context;
+        const ViewConstBuffers & cbuffers;
 
         // Frame matrices for the back-end
         RenderMatrix view_matrix{};
@@ -72,21 +79,13 @@ public:
     void Init(const RenderDevice & device, const TextureStore & tex_store);
     void Shutdown();
 
-    void BeginRenderPass();
-    void EndRenderPass(const FrameData & frame_data, GraphicsContext & context, const ArrayBase<const ConstantBuffer *> & cbuffers, const PipelineState & pipeline_state);
-
     // Level-load registration:
     void BeginRegistration();
     void EndRegistration();
 
     // Frame/view rendering:
-    void DoRenderView(FrameData & frame_data, GraphicsContext & context, const ArrayBase<const ConstantBuffer *> & cbuffers);
     void RenderViewSetup(FrameData & frame_data);
-    void RenderWorldModel(FrameData & frame_data);
-    void RenderSkyBox(FrameData & frame_data);
-    void RenderSolidEntities(FrameData & frame_data);
-    void RenderTranslucentSurfaces(FrameData & frame_data);
-    void RenderTranslucentEntities(FrameData & frame_data);
+    void DoRenderView(FrameData & frame_data);
 
     // Assignable ref
     SkyBox & Sky() { return m_skybox; }
@@ -104,9 +103,28 @@ private:
     MiniImBatch BeginBatch(const BeginBatchArgs & args);
     void EndBatch(MiniImBatch & batch);
 
-    // Frame setup:
+    enum RenderPass : int
+    {
+        kPass_SolidGeometry = 0,
+        kPass_TranslucentSurfaces,
+        kPass_TranslucentEntities,
+
+        kRenderPassCount,
+        kPass_Invalid = kRenderPassCount
+    };
+
+    const PipelineState & PipelineStateForPass(const int pass_index) const;
+    void BatchImmediateModeDrawCmds();
+    void FlushImmediateModeDrawCmds(FrameData & frame_data);
+
+    // Frame setup & rendering:
     void SetUpViewClusters(const FrameData & frame_data);
     void SetUpFrustum(FrameData & frame_data) const;
+    void RenderWorldModel(FrameData & frame_data);
+    void RenderSkyBox(FrameData & frame_data);
+    void RenderSolidEntities(FrameData & frame_data);
+    void RenderTranslucentSurfaces(FrameData & frame_data);
+    void RenderTranslucentEntities(FrameData & frame_data);
 
     // World rendering:
     void RecursiveWorldNode(const FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node);
@@ -154,6 +172,7 @@ private:
     CvarWrapper m_skip_draw_world;
     CvarWrapper m_skip_draw_sky;
     CvarWrapper m_skip_draw_entities;
+    CvarWrapper m_skip_brush_mods;
     CvarWrapper m_intensity;
 
     // Chain of world surfaces that draw with transparency (water/glass).
@@ -192,8 +211,9 @@ private:
     const TextureImage * m_tex_white2x2{ nullptr };
     bool                 m_batch_open{ false };
     VBuffers             m_vertex_buffers{};
+    RenderPass           m_current_pass{ kPass_Invalid };
     DrawCmd              m_current_draw_cmd{};
-    DrawCmdList          m_draw_cmds{};
+    DrawCmdList          m_draw_cmds[kRenderPassCount]{};
 };
 
 } // MrQ2
