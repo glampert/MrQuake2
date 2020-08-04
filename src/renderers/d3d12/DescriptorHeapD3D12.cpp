@@ -60,6 +60,7 @@ DescriptorD3D12 DescriptorHeapD3D12::AllocateDescriptor(const DescriptorD3D12::T
     if (!heap.free_list->empty())
     {
         const DescriptorD3D12 recycled_descriptor = heap.free_list->back();
+        MRQ2_ASSERT(recycled_descriptor.type == type);
         heap.free_list->pop_back();
         return recycled_descriptor;
     }
@@ -69,17 +70,13 @@ DescriptorD3D12 DescriptorHeapD3D12::AllocateDescriptor(const DescriptorD3D12::T
         GameInterface::Errorf("Heap out of descriptors! Max = %u", heap.descriptor_count);
     }
 
-    DescriptorD3D12 d{};
+    const DescriptorD3D12 descriptor = { heap.cpu_heap_start, heap.gpu_heap_start, type };
 
-    d.cpu_handle = heap.cpu_heap_start;
     heap.cpu_heap_start.ptr += heap.descriptor_size;
-
-    d.gpu_handle = heap.gpu_heap_start;
     heap.gpu_heap_start.ptr += heap.descriptor_size;
-
     heap.descriptors_used++;
 
-    return d;
+    return descriptor;
 }
 
 void DescriptorHeapD3D12::FreeDescriptor(const DescriptorD3D12 & descriptor)
