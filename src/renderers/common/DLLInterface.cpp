@@ -23,6 +23,7 @@ ConstBuffers<DLLInterface::PerFrameShaderConstants> DLLInterface::sm_per_frame_s
 ConstBuffers<DLLInterface::PerViewShaderConstants>  DLLInterface::sm_per_view_shader_consts;
 
 // Cached Cvars:
+CvarWrapper DLLInterface::sm_surf_use_debug_color;
 CvarWrapper DLLInterface::sm_force_mip_level;
 CvarWrapper DLLInterface::sm_disable_texturing;
 CvarWrapper DLLInterface::sm_blend_debug_color;
@@ -39,11 +40,12 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
     auto r_renderdoc = GameInterface::Cvar::Get("r_renderdoc", "0",    CvarWrapper::kFlagArchive);
     auto r_debug     = GameInterface::Cvar::Get("r_debug",     "0",    CvarWrapper::kFlagArchive);
 
-    sm_force_mip_level   = GameInterface::Cvar::Get("r_force_mip_level",   "-1", 0);
-    sm_disable_texturing = GameInterface::Cvar::Get("r_disable_texturing", "0",  0);
-    sm_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0",  0);
-    sm_draw_fps_counter  = GameInterface::Cvar::Get("r_draw_fps_counter",  "0",  CvarWrapper::kFlagArchive);
-    sm_no_draw           = GameInterface::Cvar::Get("r_no_draw",           "0",  0);
+    sm_surf_use_debug_color = GameInterface::Cvar::Get("r_surf_use_debug_color", "0",  0);
+    sm_force_mip_level      = GameInterface::Cvar::Get("r_force_mip_level",      "-1", 0);
+    sm_disable_texturing    = GameInterface::Cvar::Get("r_disable_texturing",    "0",  0);
+    sm_blend_debug_color    = GameInterface::Cvar::Get("r_blend_debug_color",    "0",  0);
+    sm_draw_fps_counter     = GameInterface::Cvar::Get("r_draw_fps_counter",     "0",  CvarWrapper::kFlagArchive);
+    sm_no_draw              = GameInterface::Cvar::Get("r_no_draw",              "0",  0);
 
     int w, h;
     if (!GameInterface::Video::GetModeInfo(w, h, vid_mode.AsInt()))
@@ -182,22 +184,39 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
 
     sm_per_frame_shader_consts.data.screen_dimensions[0] = static_cast<float>(sm_renderer.RenderWidth());
     sm_per_frame_shader_consts.data.screen_dimensions[1] = static_cast<float>(sm_renderer.RenderHeight());
-    sm_per_frame_shader_consts.data.forced_mip_level = sm_force_mip_level.AsFloat();
 
-    if (sm_disable_texturing.IsSet()) // Use only debug vertex color
+    // Debug flags
     {
-        VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 0.0f);
-        VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling,  1.0f);
-    }
-    else if (sm_blend_debug_color.IsSet()) // Blend debug vertex color with texture
-    {
-        VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 1.0f);
-        VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling,  1.0f);
-    }
-    else // Normal rendering
-    {
-        VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 1.0f);
-        VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling,  0.0f);
+        sm_per_frame_shader_consts.data.debug_mode = false;
+        sm_per_frame_shader_consts.data.forced_mip_level = sm_force_mip_level.AsFloat();
+
+        if (sm_per_frame_shader_consts.data.forced_mip_level >= 0.0f)
+        {
+            sm_per_frame_shader_consts.data.debug_mode = true;
+        }
+
+        if (sm_surf_use_debug_color.IsSet())
+        {
+            sm_per_frame_shader_consts.data.debug_mode = true;
+        }
+
+        if (sm_disable_texturing.IsSet()) // Use only debug vertex color
+        {
+            VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 0.0f);
+            VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling, 1.0f);
+            sm_per_frame_shader_consts.data.debug_mode = true;
+        }
+        else if (sm_blend_debug_color.IsSet()) // Blend debug vertex color with texture
+        {
+            VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 1.0f);
+            VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling, 1.0f);
+            sm_per_frame_shader_consts.data.debug_mode = true;
+        }
+        else // Normal rendering
+        {
+            VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 1.0f);
+            VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling, 0.0f);
+        }
     }
 
     auto & context = sm_renderer.Device().GraphicsContext();
@@ -263,6 +282,26 @@ void DLLInterface::RenderView(refdef_t * const view_def)
 
     // Add draw commands to the GraphicsContext
     sm_view_state.DoRenderView(frame_data);
+
+    // Draw a fullscreen overlay with the blend color for screen flash effects.
+    R_Flash(frame_data.view_def.blend);
+}
+
+void DLLInterface::R_Flash(const float blend[4])
+{
+    if (blend[3] <= 0.0f)
+    {
+        return;
+    }
+
+    auto r = std::uint8_t(blend[0] * 255.0f);
+    auto g = std::uint8_t(blend[1] * 255.0f);
+    auto b = std::uint8_t(blend[2] * 255.0f);
+    auto a = std::uint8_t(blend[3] * 255.0f);
+
+    sm_sprite_batches.Get(SpriteBatch::kDrawPics).PushQuadTextured(
+        0.0f, 0.0f, sm_renderer.RenderWidth(), sm_renderer.RenderHeight(),
+        sm_texture_store.tex_white2x2, BytesToColor(r, g, b, a));
 }
 
 void DLLInterface::DrawPic(const int x, const int y, const char * const name)

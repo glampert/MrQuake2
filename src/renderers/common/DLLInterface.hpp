@@ -61,6 +61,7 @@ public:
 
 private:
 
+    static void R_Flash(const float blend[4]);
     static void ChangeTextureFilterCmd();
     static void DumpAllTexturesCmd();
 
@@ -73,7 +74,8 @@ private:
     // Constant buffers:
     struct PerFrameShaderConstants
     {
-        vec3_t screen_dimensions;     // Only XY used.
+        vec2_t screen_dimensions;     // Only XY used.
+        Bool32 debug_mode;            // [debug] if nonzero uses the debug shader path
         float  forced_mip_level;      // [debug] if >= 0, force that mipmap level
         vec4_t texture_color_scaling; // [debug] multiplied with texture color
         vec4_t vertex_color_scaling;  // [debug] multiplied with vertex color
@@ -87,6 +89,7 @@ private:
     static ConstBuffers<PerViewShaderConstants> sm_per_view_shader_consts;
 
     // Cached Cvars:
+    static CvarWrapper sm_surf_use_debug_color;
     static CvarWrapper sm_force_mip_level;
     static CvarWrapper sm_disable_texturing;
     static CvarWrapper sm_blend_debug_color;

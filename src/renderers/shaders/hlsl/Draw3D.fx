@@ -19,7 +19,10 @@ struct VertexShaderOutput
 
 cbuffer PerFrameShaderConstants : register(b0)
 {
-    float3 screen_dimensions;
+    float2 screen_dimensions;
+
+    // Debugging flags
+    bool   debug_mode;
     float  forced_mip_level;
     float4 texture_color_scaling;
     float4 vertex_color_scaling;
@@ -55,28 +58,38 @@ VertexShaderOutput VS_main(DrawVertex3D input)
 // Pixel Shader
 ///////////////////////////////////////////////////////////////////////////////
 
+// Handles both opaque and translucent geometry
 float4 PS_main(VertexShaderOutput input) : SV_TARGET
 {
-    // Handles both opaque and translucent geometry
+    float4 pixel_color;
 
-    float4 tex_color;
-    if (forced_mip_level >= 0.0f)
+    if (!debug_mode)
     {
-        // Sample specific mipmap level for debugging
-        tex_color = diffuse_texture.SampleLevel(diffuse_sampler, input.uv, forced_mip_level);
+        float4 tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
+        pixel_color = tex_color * input.rgba;
     }
-    else
+    else // Debug shader
     {
-        tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
+        float4 tex_color;
+        if (forced_mip_level >= 0.0f)
+        {
+            // Sample specific mipmap level for debugging (r_force_mip_level)
+            tex_color = diffuse_texture.SampleLevel(diffuse_sampler, input.uv, forced_mip_level);
+        }
+        else
+        {
+            tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
+        }
+
+        // Surface debugging (r_disable_texturing/r_blend_debug_color)
+        tex_color *= texture_color_scaling;
+
+        float4 vert_color = input.rgba;
+        vert_color *= vertex_color_scaling;
+
+        pixel_color = saturate(tex_color + vert_color);
+        pixel_color.a = input.rgba.a * tex_color.a; // Preserve the incoming alpha values for transparencies
     }
-
-    tex_color *= texture_color_scaling;
-
-    float4 vert_color = input.rgba;
-    vert_color *= vertex_color_scaling;
-
-    float4 pixel_color = saturate(tex_color + vert_color);
-    pixel_color.a = input.rgba.a * tex_color.a; // Preserve the incoming alpha values for transparencies
 
     return pixel_color;
 }

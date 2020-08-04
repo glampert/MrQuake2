@@ -125,6 +125,7 @@ private:
     void RenderSolidEntities(FrameData & frame_data);
     void RenderTranslucentSurfaces(FrameData & frame_data);
     void RenderTranslucentEntities(FrameData & frame_data);
+    void RenderParticles(const FrameData & frame_data);
 
     // World rendering:
     void RecursiveWorldNode(const FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node);

@@ -78,6 +78,7 @@ std::uint32_t FnvHash32(const std::uint8_t * bytes, std::size_t len);
 
 using Color8      = std::uint8_t;
 using ColorRGBA32 = std::uint32_t;
+using Bool32      = std::uint32_t;
 
 struct Vec2u16
 {

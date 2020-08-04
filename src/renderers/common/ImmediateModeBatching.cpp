@@ -300,7 +300,7 @@ void MiniImBatch::PushModelSurface(const ModelSurface & surf, const vec4_t * con
             }
             else
             {
-                ColorFloats(surf.debug_color,
+                ColorFloats(surf.color,
                             verts_iter->rgba[0],
                             verts_iter->rgba[1],
                             verts_iter->rgba[2],

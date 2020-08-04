@@ -1,7 +1,4 @@
 
-- Move static world geometry rendering to use vertex buffers instead of submitting every frame.
-  MD2s can stay as they are for now and get regenerated and sumitted per-frame with the MiniImBatch.
-
 - Implement lighting with point lights, ambient and maybe spot lights.
 
 - Implement shadow maps for shadows.

@@ -841,16 +841,18 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
     mdl.data.surfaces     = out;
     mdl.data.num_surfaces = count;
 
+    static auto r_surf_use_debug_color = GameInterface::Cvar::Get("r_surf_use_debug_color", "0", 0);
+
     // TODO needed?
     //GL_BeginBuildingLightmaps(mdl);
 
     for (int surf_num = 0; surf_num < count; ++surf_num, ++in, ++out)
     {
-        out->first_edge  = in->firstedge;
-        out->num_edges   = in->numedges;
-        out->debug_color = RandomDebugColor();
-        out->flags       = 0;
-        out->polys       = nullptr;
+        out->first_edge = in->firstedge;
+        out->num_edges  = in->numedges;
+        out->color      = r_surf_use_debug_color.IsSet() ? RandomDebugColor() : ColorRGBA32{ 0xFFFFFFFF };
+        out->flags      = 0;
+        out->polys      = nullptr;
 
         const int plane_num = in->planenum;
         const int side = in->side;
@@ -1280,7 +1282,7 @@ void ModelStore::LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, c
                     vertex_iter->uv[0] = poly_vert.texture_s;
                     vertex_iter->uv[1] = poly_vert.texture_t;
 
-                    ColorFloats(surf.debug_color, vertex_iter->rgba[0], vertex_iter->rgba[1], vertex_iter->rgba[2], vertex_iter->rgba[3]);
+                    ColorFloats(surf.color, vertex_iter->rgba[0], vertex_iter->rgba[1], vertex_iter->rgba[2], vertex_iter->rgba[3]);
                     ++vertex_iter;
                 }
 

@@ -274,6 +274,7 @@ void TextureStore::Shutdown()
     tex_white2x2 = nullptr;
     tex_debug    = nullptr;
     tex_cinframe = nullptr;
+    tex_particle = nullptr;
 
     DestroyAllLoadedTextures();
     m_teximages_cache.shrink_to_fit();
@@ -281,7 +282,6 @@ void TextureStore::Shutdown()
     m_scrap.Shutdown();
 
     m_registration_num = 0;
-    m_scrap_inited     = false;
     m_scrap_dirty      = false;
     m_device           = nullptr;
 }
@@ -537,10 +537,10 @@ static ColorRGBA32 * MakeCheckerPattern()
 void TextureStore::TouchResidentTextures()
 {
     // Create the scrap texture if needed
-    if (!m_scrap_inited)
+    if (!m_scrap.IsInitialised())
     {
+        m_scrap.Init();
         m_teximages_cache.push_back(CreateScrapTexture(m_scrap.Size(), m_scrap.pixels.get()));
-        m_scrap_inited = true;
     }
 
     // This texture is generated at runtime
@@ -574,6 +574,36 @@ void TextureStore::TouchResidentTextures()
         tex_cinframe = tex;
     }
 
+    // Little dot for particles (8x8 white/alpha texture)
+    if (tex_particle == nullptr)
+    {
+        constexpr uint32_t Dims = 8;
+        const uint8_t dot_texture[Dims][Dims] = {
+            { 0, 0, 0, 0, 0, 0, 0, 0 },
+            { 0, 0, 1, 1, 0, 0, 0, 0 },
+            { 0, 1, 1, 1, 1, 0, 0, 0 },
+            { 0, 1, 1, 1, 1, 0, 0, 0 },
+            { 0, 0, 1, 1, 0, 0, 0, 0 },
+            { 0, 0, 0, 0, 0, 0, 0, 0 },
+            { 0, 0, 0, 0, 0, 0, 0, 0 },
+            { 0, 0, 0, 0, 0, 0, 0, 0 },
+        };
+
+        auto * pixels = new(MemTag::kTextures) ColorRGBA32[Dims * Dims];
+        for (int x = 0; x < Dims; ++x)
+        {
+            for (int y = 0; y < Dims; ++y)
+            {
+                pixels[x + (y * Dims)] = BytesToColor(255, 255, 255, dot_texture[x][y] * 255);
+            }
+        }
+
+        TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic, false,
+                                           Dims, Dims, {}, {}, "pics/particle.pcx");
+        m_teximages_cache.push_back(tex);
+        tex_particle = tex;
+    }
+
     // Update the registration count for these:
     tex_scrap    = FindOrLoad("scrap",    TextureType::kPic);
     tex_conchars = FindOrLoad("conchars", TextureType::kPic);
@@ -582,6 +612,7 @@ void TextureStore::TouchResidentTextures()
     tex_white2x2 = FindOrLoad("white2x2", TextureType::kPic);
     tex_debug    = FindOrLoad("debug",    TextureType::kPic);
     tex_cinframe = FindOrLoad("cinframe", TextureType::kPic);
+    tex_particle = FindOrLoad("particle", TextureType::kPic);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -807,7 +838,7 @@ TextureImage * TextureStore::LoadWALImpl(const char * const name)
 TextureImage * TextureStore::ScrapTryAlloc8Bit(const Color8 * const pic8, const int width, const int height, const char * const name, const TextureType tt)
 {
     MRQ2_ASSERT(width > 0 && height > 0);
-    MRQ2_ASSERT(m_scrap_inited);
+    MRQ2_ASSERT(m_scrap.IsInitialised());
 
     // Adding a 2 pixels padding border around each side to avoid sampling artifacts.
     const int padded_width  = width  + 2;

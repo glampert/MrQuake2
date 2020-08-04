@@ -225,6 +225,7 @@ public:
     const TextureImage * tex_white2x2 = nullptr;
     const TextureImage * tex_debug    = nullptr;
     const TextureImage * tex_cinframe = nullptr;
+    const TextureImage * tex_particle = nullptr;
 
     // Global palette access.
     static ColorRGBA32 * CinematicPalette()          { return sm_cinematic_palette; }
@@ -283,10 +284,12 @@ private:
         std::unique_ptr<int[]>         allocated; // Allocated space map
         std::unique_ptr<ColorRGBA32[]> pixels;    // RGBA pixels
 
-        ScrapAtlas() // Allocate zero-initialized arrays
-            : allocated{ new(MemTag::kTextures) int[kScrapSize]{} }
-            , pixels{ new(MemTag::kTextures) ColorRGBA32[kScrapSize * kScrapSize]{} }
-        { }
+        void Init()
+        {
+            // Allocate zero-initialized arrays
+            allocated.reset(new(MemTag::kTextures) int[kScrapSize]{});
+            pixels.reset(new(MemTag::kTextures) ColorRGBA32[kScrapSize * kScrapSize]{});
+        }
 
         void Shutdown()
         {
@@ -294,20 +297,20 @@ private:
             pixels    = nullptr;
         }
 
+        bool IsInitialised() const  { return allocated != nullptr; }
         constexpr static int Size() { return kScrapSize; }
     };
 
     // Scrap texture atlas to group small textures
     ScrapAtlas m_scrap;
-    bool m_scrap_inited = false;
-    bool m_scrap_dirty  = false;
+    bool m_scrap_dirty{ false };
 
     // Loaded textures cache
-    std::uint32_t m_registration_num = 0;
+    std::uint32_t m_registration_num{ 0 };
     std::vector<TextureImage *> m_teximages_cache;
     Pool<TextureImage, kTexturePoolSize> m_teximages_pool{ MemTag::kTextures };
 
-    const RenderDevice * m_device = nullptr;
+    const RenderDevice * m_device{ nullptr };
 };
 
 // ============================================================================

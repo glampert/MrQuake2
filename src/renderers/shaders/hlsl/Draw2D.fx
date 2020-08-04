@@ -18,7 +18,10 @@ struct VertexShaderOutput
 
 cbuffer PerFrameShaderConstants : register(b0)
 {
-    float3 screen_dimensions;
+    float2 screen_dimensions;
+
+    // Debugging flags (unused in this shader)
+    bool   debug_mode;
     float  forced_mip_level;
     float4 texture_color_scaling;
     float4 vertex_color_scaling;

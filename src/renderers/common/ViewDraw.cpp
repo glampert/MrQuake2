@@ -182,7 +182,7 @@ void ViewDrawState::Init(const RenderDevice & device, const TextureStore & tex_s
     m_skip_draw_sky            = GameInterface::Cvar::Get("r_skip_draw_sky", "0", 0);
     m_skip_draw_entities       = GameInterface::Cvar::Get("r_skip_draw_entities", "0", 0);
     m_skip_brush_mods          = GameInterface::Cvar::Get("r_skip_brush_mods", "0", 0);
-    m_intensity                = GameInterface::Cvar::Get("r_intensity", "2", 0);
+    m_intensity                = GameInterface::Cvar::Get("r_intensity", "2", CvarWrapper::kFlagArchive);
 
     constexpr uint32_t kViewDrawBatchSize = 25000; // max vertices * num buffers
     m_vertex_buffers.Init(device, kViewDrawBatchSize);
@@ -425,12 +425,16 @@ void ViewDrawState::FlushImmediateModeDrawCmds(FrameData & frame_data)
 {
     MRQ2_ASSERT(m_batch_open == false);
 
-    static const wchar_t * const s_render_pass_names[] = {
-        L"SolidGeometry",
-        L"TranslucentSurfaces",
-        L"TranslucentEntities",
+    auto PushRenderPassMarker = [](GraphicsContext & context, const int pass)
+    {
+        switch (pass)
+        {
+        case kPass_SolidGeometry       : MRQ2_PUSH_GPU_MARKER(context, "SolidGeometry");       break;
+        case kPass_TranslucentSurfaces : MRQ2_PUSH_GPU_MARKER(context, "TranslucentSurfaces"); break;
+        case kPass_TranslucentEntities : MRQ2_PUSH_GPU_MARKER(context, "TranslucentEntities"); break;
+        default : GameInterface::Errorf("Invalid pass index!");
+        } // switch
     };
-    static_assert(ArrayLength(s_render_pass_names) == kRenderPassCount);
 
     auto & context  = frame_data.context;
     auto & cbuffers = frame_data.cbuffers;
@@ -445,7 +449,7 @@ void ViewDrawState::FlushImmediateModeDrawCmds(FrameData & frame_data)
             continue;
         }
 
-        context.PushMarker(s_render_pass_names[pass]);
+        PushRenderPassMarker(context, pass);
 
         context.SetPipelineState(PipelineStateForPass(pass));
         context.SetVertexBuffer(vertex_buffer);
@@ -477,7 +481,7 @@ void ViewDrawState::FlushImmediateModeDrawCmds(FrameData & frame_data)
             context.RestoreDepthRange();
         }
 
-        context.PopMarker();
+        MRQ2_POP_GPU_MARKER(context);
         m_draw_cmds[pass].clear();
     }
 
@@ -506,6 +510,9 @@ void ViewDrawState::DoRenderView(FrameData & frame_data)
 
     m_current_pass = kPass_TranslucentEntities; // Disable Z writes in case entities stack up
     RenderTranslucentEntities(frame_data);
+
+    m_current_pass = kPass_TranslucentEntities; // Also with Z writes disabled
+    RenderParticles(frame_data);
 
     FlushImmediateModeDrawCmds(frame_data);
 }
@@ -767,19 +774,19 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
     auto & context  = frame_data.context;
     auto & cbuffers = frame_data.cbuffers;
 
-    BeginBatchArgs batchArgs;
-    batchArgs.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
-    batchArgs.topology     = PrimitiveTopology::kTriangleList;
-    batchArgs.depth_hack   = false;
+    BeginBatchArgs batch_args;
+    batch_args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
+    batch_args.topology     = PrimitiveTopology::kTriangleList;
+    batch_args.depth_hack   = false;
 
     if (use_vb_ib && kUseVertexAndIndexBuffers)
     {
-        context.PushMarker(L"DrawTextureChains");
+        MRQ2_PUSH_GPU_MARKER(context, "DrawTextureChains");
 
         context.SetPipelineState(m_pipeline_solid_geometry);
         context.SetVertexBuffer(frame_data.world_model.vb);
         context.SetIndexBuffer(frame_data.world_model.ib);
-        context.SetPrimitiveTopology(batchArgs.topology);
+        context.SetPrimitiveTopology(batch_args.topology);
 
         uint32_t cbuffer_slot = 0;
         for (; cbuffer_slot < cbuffers.size(); ++cbuffer_slot)
@@ -788,7 +795,7 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
         }
 
         PerDrawShaderConstants consts;
-        consts.model_matrix = batchArgs.model_matrix;
+        consts.model_matrix = batch_args.model_matrix;
         context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, consts);
     }
 
@@ -824,9 +831,9 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
             }
             else // Immediate mode emulation
             {
-                batchArgs.optional_tex = tex;
+                batch_args.optional_tex = tex;
 
-                MiniImBatch batch = BeginBatch(batchArgs);
+                MiniImBatch batch = BeginBatch(batch_args);
                 {
                     for (const ModelSurface * surf = tex->DrawChainPtr(); surf; surf = surf->texture_chain)
                     {
@@ -849,7 +856,7 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
 
     if (use_vb_ib && kUseVertexAndIndexBuffers)
     {
-        context.PopMarker();
+        MRQ2_POP_GPU_MARKER(context);
     }
 }
 
@@ -964,6 +971,86 @@ void ViewDrawState::RenderTranslucentEntities(FrameData & frame_data)
         default : GameInterface::Errorf("RenderTranslucentEntities: Bad model type for '%s'!", model->name.CStr());
         } // switch
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Classic blocky Quake2 particles using a single triangle and
+// a special 8x8 texture with a dot-like pattern in its top-left corner.
+void ViewDrawState::RenderParticles(const FrameData & frame_data)
+{
+    const int num_particles = frame_data.view_def.num_particles;
+    if (num_particles <= 0)
+    {
+        return;
+    }
+
+    vec3_t up, right;
+    Vec3Scale(frame_data.up_vec,    1.5f, up);
+    Vec3Scale(frame_data.right_vec, 1.5f, right);
+
+    BeginBatchArgs args;
+    args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
+    args.optional_tex = frame_data.tex_store.tex_particle;
+    args.topology     = PrimitiveTopology::kTriangleList;
+    args.depth_hack   = false;
+
+    MiniImBatch batch = BeginBatch(args);
+
+    const particle_t * const particles = frame_data.view_def.particles;
+    for (int i = 0; i < num_particles; ++i)
+    {
+        const particle_t * p = &particles[i];
+
+        // hack a scale up to keep particles from disappearing
+        float scale = (p->origin[0] - frame_data.camera_origin[0]) * frame_data.forward_vec[0] +
+                      (p->origin[1] - frame_data.camera_origin[1]) * frame_data.forward_vec[1] +
+                      (p->origin[2] - frame_data.camera_origin[2]) * frame_data.forward_vec[2];
+
+        if (scale < 20.0f)
+            scale = 1.0f;
+        else
+            scale = 1.0f + scale * 0.004f;
+
+        const ColorRGBA32 color = TextureStore::ColorForIndex(p->color & 0xFF);
+        const std::uint8_t bR = (color & 0xFF);
+        const std::uint8_t bG = (color >> 8) & 0xFF;
+        const std::uint8_t bB = (color >> 16) & 0xFF;
+
+        const float fR = bR * (1.0f / 255.0f);
+        const float fG = bG * (1.0f / 255.0f);
+        const float fB = bB * (1.0f / 255.0f);
+        const float fA = p->alpha;
+
+        DrawVertex3D v;
+        v.rgba[0] = fR;
+        v.rgba[1] = fG;
+        v.rgba[2] = fB;
+        v.rgba[3] = fA;
+
+        v.position[0] = p->origin[0];
+        v.position[1] = p->origin[1];
+        v.position[2] = p->origin[2];
+        v.uv[0] = 0.0625f;
+        v.uv[1] = 0.0625f;
+        batch.PushVertex(v);
+
+        v.position[0] = p->origin[0] + up[0] * scale;
+        v.position[1] = p->origin[1] + up[1] * scale;
+        v.position[2] = p->origin[2] + up[2] * scale;
+        v.uv[0] = 1.0625f;
+        v.uv[1] = 0.0625f;
+        batch.PushVertex(v);
+
+        v.position[0] = p->origin[0] + right[0] * scale;
+        v.position[1] = p->origin[1] + right[1] * scale;
+        v.position[2] = p->origin[2] + right[2] * scale;
+        v.uv[0] = 0.0625f;
+        v.uv[1] = 1.0625f;
+        batch.PushVertex(v);
+    }
+
+    EndBatch(batch);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1129,6 +1216,7 @@ void ViewDrawState::RenderSolidEntities(FrameData & frame_data)
             continue; // Drawn on the next pass
         }
 
+        // Draws with the translucent entities.
         MRQ2_ASSERT(!(entity.flags & RF_BEAM));
 
         // entity_t::model is an opaque pointer outside the Refresh module, so we need the cast.
@@ -1239,7 +1327,7 @@ void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t 
     // IndexBuffer rendering
     if (use_vb_ib && kUseVertexAndIndexBuffers)
     {
-        context.PushMarker(L"DrawBrushModel");
+        MRQ2_PUSH_GPU_MARKER(context, "DrawBrushModel");
 
         const PipelineState * pipeline;
         if (entity.flags & RF_TRANSLUCENT)
@@ -1335,7 +1423,7 @@ void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t 
 
     if (use_vb_ib && kUseVertexAndIndexBuffers)
     {
-        context.PopMarker();
+        MRQ2_POP_GPU_MARKER(context);
     }
 
     /* TODO
@@ -1465,6 +1553,7 @@ void ViewDrawState::DrawAliasMD2Model(const FrameData & frame_data, const entity
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// Draw a translucent cylinder. Z writes should be OFF.
 void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t & entity)
 {
     constexpr unsigned kNumBeamSegs = 6;
@@ -1521,11 +1610,7 @@ void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t &
     args.topology     = PrimitiveTopology::kTriangleStrip;
     args.depth_hack   = false;
 
-    // TODO - missing states!
-    //qglDisable(GL_TEXTURE_2D);
-    //qglEnable(GL_BLEND);
-    //qglDepthMask(GL_FALSE);
-
+    // Draw together with the translucent entities so we can assume Z writes are off and blending is enabled.
     MiniImBatch batch = BeginBatch(args);
     {
         for (unsigned i = 0; i < kNumBeamSegs; ++i)
@@ -1564,7 +1649,7 @@ void ViewDrawState::DrawNullModel(const FrameData & frame_data, const entity_t &
 
     BeginBatchArgs args;
     args.model_matrix = MakeEntityModelMatrix(entity);
-    args.optional_tex = frame_data.tex_store.tex_debug;
+    args.optional_tex = frame_data.tex_store.tex_debug; // Use the debug checker pattern texture.
     args.topology     = PrimitiveTopology::kTriangleFan;
     args.depth_hack   = false;
 

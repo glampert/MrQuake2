@@ -161,7 +161,7 @@ struct ModelSurface
 
     cplane_s * plane;
     int flags;
-    ColorRGBA32 debug_color;
+    ColorRGBA32 color;
 
     int first_edge; // look up in model->surf_edges[], negative numbers are backwards edges
     int num_edges;
