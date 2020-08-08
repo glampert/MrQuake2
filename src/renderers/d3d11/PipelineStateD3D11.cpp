@@ -131,7 +131,7 @@ void PipelineStateD3D11::Finalize() const
         if (m_flags & kDepthTestEnabled)
         {
             ds_desc.DepthEnable = true;
-            ds_desc.DepthFunc   = D3D11_COMPARISON_LESS;
+            ds_desc.DepthFunc   = D3D11_COMPARISON_LESS_EQUAL; // Matching ref_gl
         }
         else
         {

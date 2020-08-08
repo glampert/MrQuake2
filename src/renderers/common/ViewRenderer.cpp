@@ -514,6 +514,10 @@ void ViewRenderer::DoRenderView(FrameData & frame_data)
     m_current_pass = kPass_TranslucentEntities; // Also with Z writes disabled
     RenderParticles(frame_data);
 
+    // TODO needs a different blend func qglBlendFunc (GL_ONE, GL_ONE);
+    //m_current_pass = kPass_SolidGeometry
+    //RenderDLights();
+
     FlushImmediateModeDrawCmds(frame_data);
 }
 
@@ -539,8 +543,8 @@ void ViewRenderer::RenderViewSetup(FrameData & frame_data)
     // Other camera/lens parameters
     const float aspect_ratio = float(frame_data.view_def.width) / float(frame_data.view_def.height);
     const float fov_y  = frame_data.view_def.fov_y;
-    const float near_z = 4.0f;    // From ref_gl
-    const float far_z  = 4096.0f; // From ref_gl
+    const float near_z = 0.5f;    // was 4.0 in ref_gl, which causes some clipping in the gun model
+    const float far_z  = 4096.0f; // original value from ref_gl
 
     // Set projection and view matrices for the frame
     const vec3_t up_direction = { -frame_data.up_vec[0], -frame_data.up_vec[1], -frame_data.up_vec[2] };
@@ -1092,6 +1096,12 @@ void ViewRenderer::DrawAnimatedWaterPolys(const ModelSurface & surf, const float
     args.topology     = PrimitiveTopology::kTriangleFan;
     args.depth_hack   = false;
 
+    // HACK: There's some noticeable z-fighting happening with lava and water touching walls when you go underwater.
+    // Adding a small offset to the positions resolves it. No idea why this didn't happen with the original
+    // OpenGL renderer, maybe the lower precision floating-point math was actually hiding the flickering?
+    static auto r_water_hack = GameInterface::Cvar::Get("r_water_hack", "0.5", CvarWrapper::kFlagArchive);
+    const float water_position_offset_hack = r_water_hack.AsFloat();
+
     for (const ModelPoly * poly = surf.polys; poly; poly = poly->next)
     {
         MiniImBatch batch = BeginBatch(args);
@@ -1122,6 +1132,13 @@ void ViewRenderer::DrawAnimatedWaterPolys(const ModelSurface & surf, const float
                 vert.rgba[1] = color[1];
                 vert.rgba[2] = color[2];
                 vert.rgba[3] = color[3];
+
+                // X
+                if (vert.position[0] > 0.0f) vert.position[0] += water_position_offset_hack;
+                if (vert.position[0] < 0.0f) vert.position[0] -= water_position_offset_hack;
+                // Y
+                if (vert.position[1] > 0.0f) vert.position[1] += water_position_offset_hack;
+                if (vert.position[1] < 0.0f) vert.position[1] -= water_position_offset_hack;
 
                 if (v == 0)
                 {

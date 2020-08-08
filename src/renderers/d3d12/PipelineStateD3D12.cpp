@@ -62,7 +62,7 @@ void PipelineStateD3D12::Init(const DeviceD3D12 & device)
         D3D12_DEPTH_STENCIL_DESC & desc = m_pso_desc.DepthStencilState;
         desc.DepthEnable                = true;
         desc.DepthWriteMask             = D3D12_DEPTH_WRITE_MASK_ALL;
-        desc.DepthFunc                  = D3D12_COMPARISON_FUNC_LESS;
+        desc.DepthFunc                  = D3D12_COMPARISON_FUNC_LESS_EQUAL; // Matching ref_gl
         desc.StencilEnable              = false;
         desc.FrontFace.StencilFailOp    = desc.FrontFace.StencilDepthFailOp = desc.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
         desc.FrontFace.StencilFunc      = D3D12_COMPARISON_FUNC_ALWAYS;
@@ -108,7 +108,7 @@ void PipelineStateD3D12::SetDepthTestEnabled(const bool enabled)
     if (enabled)
     {
         m_pso_desc.DepthStencilState.DepthEnable = true;
-        m_pso_desc.DepthStencilState.DepthFunc   = D3D12_COMPARISON_FUNC_LESS;
+        m_pso_desc.DepthStencilState.DepthFunc   = D3D12_COMPARISON_FUNC_LESS_EQUAL; // Matching ref_gl
     }
     else
     {
