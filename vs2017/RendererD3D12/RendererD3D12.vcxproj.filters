@@ -58,9 +58,6 @@
     <ClCompile Include="..\..\src\renderers\common\TextureStore.cpp">
       <Filter>Common</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\renderers\common\ViewDraw.cpp">
-      <Filter>Common</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\renderers\common\Win32Window.cpp">
       <Filter>Common</Filter>
     </ClCompile>
@@ -87,6 +84,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\renderers\d3d12\RootSignatureD3D12.cpp">
       <Filter>Backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\ViewRenderer.cpp">
+      <Filter>Common</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -147,9 +147,6 @@
     <ClInclude Include="..\..\src\renderers\common\TextureStore.hpp">
       <Filter>Common</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\renderers\common\ViewDraw.hpp">
-      <Filter>Common</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\renderers\common\Win32Window.hpp">
       <Filter>Common</Filter>
     </ClInclude>
@@ -167,6 +164,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\renderers\d3d12\RootSignatureD3D12.hpp">
       <Filter>Backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\ViewRenderer.hpp">
+      <Filter>Common</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

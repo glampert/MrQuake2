@@ -3,7 +3,7 @@
 //  Helper functions for rendering "Alias" MD2 models.
 //
 
-#include "ViewDraw.hpp"
+#include "ViewRenderer.hpp"
 
 namespace MrQ2
 {
@@ -101,9 +101,9 @@ static inline const float * GetShadeDotsForEnt(const entity_t & entity)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t * const alias_header, const float backlerp,
-                                          const vec3_t shade_light, const RenderMatrix & model_matrix,
-                                          const TextureImage * const model_skin)
+void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t * const alias_header, const float backlerp,
+                                         const vec3_t shade_light, const RenderMatrix & model_matrix,
+                                         const TextureImage * const model_skin)
 {
     MRQ2_ASSERT(alias_header != nullptr);
     MRQ2_ASSERT(alias_header->num_xyz <= MAX_VERTS);

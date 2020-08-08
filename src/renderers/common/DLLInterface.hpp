@@ -6,7 +6,7 @@
 #include "RenderInterface.hpp"
 #include "TextureStore.hpp"
 #include "ModelStore.hpp"
-#include "ViewDraw.hpp"
+#include "ViewRenderer.hpp"
 
 // Quake includes
 #include "client/ref.h"
@@ -69,7 +69,7 @@ private:
     static SpriteBatches   sm_sprite_batches;
     static TextureStore    sm_texture_store;
     static ModelStore      sm_model_store;
-    static ViewDrawState   sm_view_state;
+    static ViewRenderer    sm_view_renderer;
 
     // Constant buffers:
     struct PerFrameShaderConstants

@@ -16,7 +16,7 @@ RenderInterface DLLInterface::sm_renderer;
 SpriteBatches   DLLInterface::sm_sprite_batches;
 TextureStore    DLLInterface::sm_texture_store;
 ModelStore      DLLInterface::sm_model_store;
-ViewDrawState   DLLInterface::sm_view_state;
+ViewRenderer    DLLInterface::sm_view_renderer;
 
 // Constant buffers:
 ConstBuffers<DLLInterface::PerFrameShaderConstants> DLLInterface::sm_per_frame_shader_consts;
@@ -70,7 +70,7 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
     // Stores/view:
     sm_texture_store.Init(sm_renderer.Device());
     sm_model_store.Init(sm_texture_store);
-    sm_view_state.Init(sm_renderer.Device(), sm_texture_store);
+    sm_view_renderer.Init(sm_renderer.Device(), sm_texture_store);
 
     // Constant buffers:
     sm_per_frame_shader_consts.Init(sm_renderer.Device());
@@ -90,7 +90,7 @@ void DLLInterface::Shutdown()
     sm_renderer.WaitForGpu();
     sm_per_view_shader_consts.Shutdown();
     sm_per_frame_shader_consts.Shutdown();
-    sm_view_state.Shutdown();
+    sm_view_renderer.Shutdown();
     sm_model_store.Shutdown();
     sm_texture_store.Shutdown();
     sm_sprite_batches.Shutdown();
@@ -104,7 +104,7 @@ void DLLInterface::BeginRegistration(const char * const map_name)
 {
     GameInterface::Printf("**** DLLInterface::BeginRegistration ****");
 
-    sm_view_state.BeginRegistration();
+    sm_view_renderer.BeginRegistration();
     sm_texture_store.BeginRegistration();
     sm_model_store.BeginRegistration(map_name);
 
@@ -118,7 +118,7 @@ void DLLInterface::EndRegistration()
     sm_model_store.EndRegistration();
     sm_texture_store.EndRegistration();
     sm_texture_store.UploadScrapIfNeeded();
-    sm_view_state.EndRegistration();
+    sm_view_renderer.EndRegistration();
 
     MemTagsPrintAll();
 }
@@ -148,7 +148,7 @@ image_s * DLLInterface::RegisterPic(const char * const name)
 
 void DLLInterface::SetSky(const char * const name, const float rotate, vec3_t axis)
 {
-    sm_view_state.Sky() = SkyBox{ sm_texture_store, name, rotate, axis };
+    sm_view_renderer.Sky() = SkyBox{ sm_texture_store, name, rotate, axis };
 }
 
 void DLLInterface::GetPicSize(int * out_w, int * out_h, const char * const name)
@@ -271,17 +271,17 @@ void DLLInterface::RenderView(refdef_t * const view_def)
     cbuffers.push_back(&sm_per_frame_shader_consts.CurrentBuffer()); // slot(0)
     cbuffers.push_back(&sm_per_view_shader_consts.CurrentBuffer());  // slot(1)
 
-    ViewDrawState::FrameData frame_data{ sm_texture_store, *sm_model_store.WorldModel(), *view_def, context, cbuffers };
+    ViewRenderer::FrameData frame_data{ sm_texture_store, *sm_model_store.WorldModel(), *view_def, context, cbuffers };
 
     // Set up camera/view (fills frame_data)
-    sm_view_state.RenderViewSetup(frame_data);
+    sm_view_renderer.RenderViewSetup(frame_data);
 
     // Update the constant buffers for this view
     sm_per_view_shader_consts.data.view_proj_matrix = frame_data.view_proj_matrix;
     sm_per_view_shader_consts.Upload();
 
     // Add draw commands to the GraphicsContext
-    sm_view_state.DoRenderView(frame_data);
+    sm_view_renderer.DoRenderView(frame_data);
 
     // Draw a fullscreen overlay with the blend color for screen flash effects.
     R_Flash(frame_data.view_def.blend);

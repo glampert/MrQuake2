@@ -1,15 +1,15 @@
 //
-// ViewDraw.cpp
+// ViewRenderer.cpp
 //  Common view/3D frame rendering helpers.
 //
 
-#include "ViewDraw.hpp"
+#include "ViewRenderer.hpp"
 
 namespace MrQ2
 {
 
 ///////////////////////////////////////////////////////////////////////////////
-// Local ViewDrawState helpers:
+// Local ViewRenderer helpers:
 ///////////////////////////////////////////////////////////////////////////////
 
 // Returns the proper texture for a given time and base texture.
@@ -166,10 +166,10 @@ static RenderMatrix MakeEntityModelMatrix(const entity_t & entity, const bool fl
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// ViewDrawState
+// ViewRenderer
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::Init(const RenderDevice & device, const TextureStore & tex_store)
+void ViewRenderer::Init(const RenderDevice & device, const TextureStore & tex_store)
 {
     m_tex_white2x2 = tex_store.tex_white2x2;
 
@@ -236,7 +236,7 @@ void ViewDrawState::Init(const RenderDevice & device, const TextureStore & tex_s
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::Shutdown()
+void ViewRenderer::Shutdown()
 {
     m_skybox = {};
     m_alpha_world_surfaces = nullptr;
@@ -257,7 +257,7 @@ void ViewDrawState::Shutdown()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-MiniImBatch ViewDrawState::BeginBatch(const BeginBatchArgs & args)
+MiniImBatch ViewRenderer::BeginBatch(const BeginBatchArgs & args)
 {
     MRQ2_ASSERT(m_batch_open == false);
     MRQ2_ASSERT_ALIGN16(args.model_matrix.floats);
@@ -276,7 +276,7 @@ MiniImBatch ViewDrawState::BeginBatch(const BeginBatchArgs & args)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::EndBatch(MiniImBatch & batch)
+void ViewRenderer::EndBatch(MiniImBatch & batch)
 {
     MRQ2_ASSERT(batch.IsValid());
     MRQ2_ASSERT(m_batch_open == true);
@@ -297,7 +297,7 @@ void ViewDrawState::EndBatch(MiniImBatch & batch)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::BeginRegistration()
+void ViewRenderer::BeginRegistration()
 {
     // New map loaded, clear the view clusters.
     m_view_cluster      = -1;
@@ -308,14 +308,14 @@ void ViewDrawState::BeginRegistration()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::EndRegistration()
+void ViewRenderer::EndRegistration()
 {
     // Currently not required.
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::SetUpViewClusters(const FrameData & frame_data)
+void ViewRenderer::SetUpViewClusters(const FrameData & frame_data)
 {
     if ((frame_data.view_def.rdflags & RDF_NOWORLDMODEL) || m_skip_draw_world.IsSet())
     {
@@ -353,7 +353,7 @@ void ViewDrawState::SetUpViewClusters(const FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::SetUpFrustum(FrameData & frame_data) const
+void ViewRenderer::SetUpFrustum(FrameData & frame_data) const
 {
     // Rotate VPN right by FOV_X/2 degrees
     MrQ2::RotatePointAroundVector(frame_data.frustum[0].normal,
@@ -389,7 +389,7 @@ void ViewDrawState::SetUpFrustum(FrameData & frame_data) const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const PipelineState & ViewDrawState::PipelineStateForPass(const int pass) const
+const PipelineState & ViewRenderer::PipelineStateForPass(const int pass) const
 {
     switch (pass)
     {
@@ -406,7 +406,7 @@ const PipelineState & ViewDrawState::PipelineStateForPass(const int pass) const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::BatchImmediateModeDrawCmds()
+void ViewRenderer::BatchImmediateModeDrawCmds()
 {
     MRQ2_ASSERT(m_batch_open == false);
     MRQ2_ASSERT(m_current_pass == kPass_Invalid);
@@ -421,7 +421,7 @@ void ViewDrawState::BatchImmediateModeDrawCmds()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::FlushImmediateModeDrawCmds(FrameData & frame_data)
+void ViewRenderer::FlushImmediateModeDrawCmds(FrameData & frame_data)
 {
     MRQ2_ASSERT(m_batch_open == false);
 
@@ -490,7 +490,7 @@ void ViewDrawState::FlushImmediateModeDrawCmds(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DoRenderView(FrameData & frame_data)
+void ViewRenderer::DoRenderView(FrameData & frame_data)
 {
     BatchImmediateModeDrawCmds();
 
@@ -519,7 +519,7 @@ void ViewDrawState::DoRenderView(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::RenderViewSetup(FrameData & frame_data)
+void ViewRenderer::RenderViewSetup(FrameData & frame_data)
 {
     ++m_frame_count;
 
@@ -558,7 +558,7 @@ void ViewDrawState::RenderViewSetup(FrameData & frame_data)
 // be drawn and add them to the appropriate draw chain, so the
 // next call to DrawTextureChains() will actually render what
 // was marked for draw in here.
-void ViewDrawState::RecursiveWorldNode(const FrameData & frame_data,
+void ViewRenderer::RecursiveWorldNode(const FrameData & frame_data,
                                        const ModelInstance & world_mdl,
                                        const ModelNode * const node)
 {
@@ -689,7 +689,7 @@ void ViewDrawState::RecursiveWorldNode(const FrameData & frame_data,
 ///////////////////////////////////////////////////////////////////////////////
 
 // Mark the leaves and nodes that are in the PVS for the current cluster.
-void ViewDrawState::MarkLeaves(ModelInstance & world_mdl)
+void ViewRenderer::MarkLeaves(ModelInstance & world_mdl)
 {
     if (m_old_view_cluster  == m_view_cluster  &&
         m_old_view_cluster2 == m_view_cluster2 &&
@@ -766,7 +766,7 @@ void ViewDrawState::MarkLeaves(ModelInstance & world_mdl)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DrawTextureChains(FrameData & frame_data)
+void ViewRenderer::DrawTextureChains(FrameData & frame_data)
 {
     const bool do_draw   = !m_skip_draw_texture_chains.IsSet();
     const bool use_vb_ib = m_use_vertex_index_buffers.IsSet();
@@ -862,7 +862,7 @@ void ViewDrawState::DrawTextureChains(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::RenderTranslucentSurfaces(FrameData & frame_data)
+void ViewRenderer::RenderTranslucentSurfaces(FrameData & frame_data)
 {
     if (m_skip_draw_alpha_surfs.IsSet())
     {
@@ -933,7 +933,7 @@ void ViewDrawState::RenderTranslucentSurfaces(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::RenderTranslucentEntities(FrameData & frame_data)
+void ViewRenderer::RenderTranslucentEntities(FrameData & frame_data)
 {
     if (m_skip_draw_entities.IsSet())
     {
@@ -977,7 +977,7 @@ void ViewDrawState::RenderTranslucentEntities(FrameData & frame_data)
 
 // Classic blocky Quake2 particles using a single triangle and
 // a special 8x8 texture with a dot-like pattern in its top-left corner.
-void ViewDrawState::RenderParticles(const FrameData & frame_data)
+void ViewRenderer::RenderParticles(const FrameData & frame_data)
 {
     const int num_particles = frame_data.view_def.num_particles;
     if (num_particles <= 0)
@@ -1074,7 +1074,7 @@ static const float s_turb_sin[] = {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DrawAnimatedWaterPolys(const ModelSurface & surf, const float frame_time, const vec4_t color)
+void ViewRenderer::DrawAnimatedWaterPolys(const ModelSurface & surf, const float frame_time, const vec4_t color)
 {
     float scroll;
     if (surf.texinfo->flags & SURF_FLOWING)
@@ -1139,7 +1139,7 @@ void ViewDrawState::DrawAnimatedWaterPolys(const ModelSurface & surf, const floa
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::RenderWorldModel(FrameData & frame_data)
+void ViewRenderer::RenderWorldModel(FrameData & frame_data)
 {
     m_alpha_world_surfaces = nullptr;
     m_skybox.Clear(); // RecursiveWorldNode adds to the sky bounds
@@ -1156,7 +1156,7 @@ void ViewDrawState::RenderWorldModel(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::RenderSkyBox(FrameData & frame_data)
+void ViewRenderer::RenderSkyBox(FrameData & frame_data)
 {
     // Skybox bounds rendering if visible:
     if (m_skybox.IsAnyPlaneVisible() && !m_skip_draw_sky.IsSet())
@@ -1195,7 +1195,7 @@ void ViewDrawState::RenderSkyBox(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::RenderSolidEntities(FrameData & frame_data)
+void ViewRenderer::RenderSolidEntities(FrameData & frame_data)
 {
     if (m_skip_draw_entities.IsSet())
     {
@@ -1241,7 +1241,7 @@ void ViewDrawState::RenderSolidEntities(FrameData & frame_data)
 
 // Draw an inline brush model either using immediate mode emulation or vertex/index buffers.
 // This renders things like doors, windows and moving platforms.
-void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t & entity)
+void ViewRenderer::DrawBrushModel(const FrameData & frame_data, const entity_t & entity)
 {
     if (m_skip_brush_mods.IsSet())
     {
@@ -1443,7 +1443,7 @@ void ViewDrawState::DrawBrushModel(const FrameData & frame_data, const entity_t 
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DrawSpriteModel(const FrameData & frame_data, const entity_t & entity)
+void ViewRenderer::DrawSpriteModel(const FrameData & frame_data, const entity_t & entity)
 {
     const auto * model = reinterpret_cast<const ModelInstance *>(entity.model);
     const auto * p_sprite = model->hunk.ViewBaseAs<dsprite_t>();
@@ -1512,7 +1512,7 @@ void ViewDrawState::DrawSpriteModel(const FrameData & frame_data, const entity_t
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DrawAliasMD2Model(const FrameData & frame_data, const entity_t & entity)
+void ViewRenderer::DrawAliasMD2Model(const FrameData & frame_data, const entity_t & entity)
 {
     const vec3_t shade_light = { 1.0f, 1.0f, 1.0f }; // TODO - temp, must be calculated
 
@@ -1554,7 +1554,7 @@ void ViewDrawState::DrawAliasMD2Model(const FrameData & frame_data, const entity
 ///////////////////////////////////////////////////////////////////////////////
 
 // Draw a translucent cylinder. Z writes should be OFF.
-void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t & entity)
+void ViewRenderer::DrawBeamModel(const FrameData & frame_data, const entity_t & entity)
 {
     constexpr unsigned kNumBeamSegs = 6;
 
@@ -1626,7 +1626,7 @@ void ViewDrawState::DrawBeamModel(const FrameData & frame_data, const entity_t &
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::DrawNullModel(const FrameData & frame_data, const entity_t & entity)
+void ViewRenderer::DrawNullModel(const FrameData & frame_data, const entity_t & entity)
 {
     vec4_t color;
     if (entity.flags & RF_FULLBRIGHT)
@@ -1681,7 +1681,7 @@ void ViewDrawState::DrawNullModel(const FrameData & frame_data, const entity_t &
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewDrawState::CalcPointLightColor(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const
+void ViewRenderer::CalcPointLightColor(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const
 {
     // TODO - compute lighting
     out_shade_light_color[0] = out_shade_light_color[1] =

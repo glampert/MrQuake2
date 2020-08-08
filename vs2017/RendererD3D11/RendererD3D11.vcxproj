@@ -30,7 +30,7 @@
     <ClCompile Include="..\..\src\renderers\common\RenderDocUtils.cpp" />
     <ClCompile Include="..\..\src\renderers\common\SkyBox.cpp" />
     <ClCompile Include="..\..\src\renderers\common\TextureStore.cpp" />
-    <ClCompile Include="..\..\src\renderers\common\ViewDraw.cpp" />
+    <ClCompile Include="..\..\src\renderers\common\ViewRenderer.cpp" />
     <ClCompile Include="..\..\src\renderers\common\Win32Window.cpp" />
     <ClCompile Include="..\..\src\renderers\d3d11\BufferD3D11.cpp" />
     <ClCompile Include="..\..\src\renderers\d3d11\DeviceD3D11.cpp" />
@@ -56,7 +56,7 @@
     <ClInclude Include="..\..\src\renderers\common\RenderInterface.hpp" />
     <ClInclude Include="..\..\src\renderers\common\SkyBox.hpp" />
     <ClInclude Include="..\..\src\renderers\common\TextureStore.hpp" />
-    <ClInclude Include="..\..\src\renderers\common\ViewDraw.hpp" />
+    <ClInclude Include="..\..\src\renderers\common\ViewRenderer.hpp" />
     <ClInclude Include="..\..\src\renderers\common\Win32Window.hpp" />
     <ClInclude Include="..\..\src\renderers\d3d11\BufferD3D11.hpp" />
     <ClInclude Include="..\..\src\renderers\d3d11\DeviceD3D11.hpp" />

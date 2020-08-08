@@ -1,5 +1,5 @@
 //
-// ViewDraw.hpp
+// ViewRenderer.hpp
 //  Common view/3D frame rendering helpers.
 //
 #pragma once
@@ -22,11 +22,11 @@ using ViewConstBuffers = ArrayBase<const ConstantBuffer *>;
 /*
 ===============================================================================
 
-    ViewDrawState
+    ViewRenderer
 
 ===============================================================================
 */
-class ViewDrawState final
+class ViewRenderer final
 {
 public:
 
@@ -70,11 +70,11 @@ public:
         FixedSizeArray<const entity_t *, kMaxTranslucentEntities> translucent_entities;
     };
 
-    ViewDrawState() = default;
+    ViewRenderer() = default;
 
     // Not copyable.
-    ViewDrawState(const ViewDrawState &) = delete;
-    ViewDrawState & operator=(const ViewDrawState &) = delete;
+    ViewRenderer(const ViewRenderer &) = delete;
+    ViewRenderer & operator=(const ViewRenderer &) = delete;
 
     void Init(const RenderDevice & device, const TextureStore & tex_store);
     void Shutdown();
@@ -183,7 +183,7 @@ private:
     SkyBox m_skybox;
 
     //
-    // Low-level render back-end state:
+    // Low-level render back-end state / immediate mode rendering emulation.
     //
 
     struct PerDrawShaderConstants
