@@ -32,6 +32,7 @@ public:
     void SetDepthTestEnabled(const bool enabled);
     void SetDepthWritesEnabled(const bool enabled);
     void SetAlphaBlendingEnabled(const bool enabled);
+    void SetAdditiveBlending(const bool enabled);
     void SetCullEnabled(const bool enabled);
 
     void Finalize() const;
@@ -46,7 +47,8 @@ private:
         kDepthTestEnabled  = (1 << 2),
         kDepthWriteEnabled = (1 << 3),
         kAlphaBlendEnabled = (1 << 4),
-        kCullEnabled       = (1 << 5),
+        kAdditiveBlending  = (1 << 5),
+        kCullEnabled       = (1 << 6),
     };
 
     const DeviceD3D11 *                        m_device{ nullptr };

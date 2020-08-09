@@ -108,6 +108,7 @@ private:
         kPass_SolidGeometry = 0,
         kPass_TranslucentSurfaces,
         kPass_TranslucentEntities,
+        kPass_DLights,
 
         kRenderPassCount,
         kPass_Invalid = kRenderPassCount
@@ -126,6 +127,7 @@ private:
     void RenderTranslucentSurfaces(FrameData & frame_data);
     void RenderTranslucentEntities(FrameData & frame_data);
     void RenderParticles(const FrameData & frame_data);
+    void RenderDLights(const FrameData & frame_data);
 
     // World rendering:
     void RecursiveWorldNode(const FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node);
@@ -207,6 +209,7 @@ private:
     PipelineState        m_pipeline_solid_geometry;
     PipelineState        m_pipeline_translucent_world_geometry;
     PipelineState        m_pipeline_translucent_entities;
+    PipelineState        m_pipeline_dlights;
     ShaderProgram        m_render3d_shader;
     ConstantBuffer       m_per_draw_shader_consts;
     const TextureImage * m_tex_white2x2{ nullptr };

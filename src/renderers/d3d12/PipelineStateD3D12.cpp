@@ -157,6 +157,20 @@ void PipelineStateD3D12::SetAlphaBlendingEnabled(const bool enabled)
     }
 }
 
+void PipelineStateD3D12::SetAdditiveBlending(const bool enabled)
+{
+    if (enabled)
+    {
+        m_pso_desc.BlendState.RenderTarget[0].SrcBlend  = D3D12_BLEND_ONE;
+        m_pso_desc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+    }
+    else
+    {
+        m_pso_desc.BlendState.RenderTarget[0].SrcBlend  = D3D12_BLEND_ONE;
+        m_pso_desc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
+    }
+}
+
 void PipelineStateD3D12::SetCullEnabled(const bool enabled)
 {
     if (enabled)

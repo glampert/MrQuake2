@@ -232,6 +232,17 @@ void ViewRenderer::Init(const RenderDevice & device, const TextureStore & tex_st
     m_pipeline_translucent_entities.SetDepthWritesEnabled(false);
     m_pipeline_translucent_entities.SetCullEnabled(true);
     m_pipeline_translucent_entities.Finalize();
+
+    // Dynamic lights: Use additive blending
+    m_pipeline_dlights.Init(device);
+    m_pipeline_dlights.SetPrimitiveTopology(PrimitiveTopology::kTriangleList);
+    m_pipeline_dlights.SetShaderProgram(m_render3d_shader);
+    m_pipeline_dlights.SetAlphaBlendingEnabled(true);
+    m_pipeline_dlights.SetAdditiveBlending(true);
+    m_pipeline_dlights.SetDepthTestEnabled(true);
+    m_pipeline_dlights.SetDepthWritesEnabled(false);
+    m_pipeline_dlights.SetCullEnabled(true);
+    m_pipeline_dlights.Finalize();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -250,6 +261,7 @@ void ViewRenderer::Shutdown()
     m_pipeline_solid_geometry.Shutdown();
     m_pipeline_translucent_world_geometry.Shutdown();
     m_pipeline_translucent_entities.Shutdown();
+    m_pipeline_dlights.Shutdown();
     m_render3d_shader.Shutdown();
     m_per_draw_shader_consts.Shutdown();
     m_vertex_buffers.Shutdown();
@@ -399,6 +411,8 @@ const PipelineState & ViewRenderer::PipelineStateForPass(const int pass) const
         return m_pipeline_translucent_world_geometry;
     case kPass_TranslucentEntities:
         return m_pipeline_translucent_entities;
+    case kPass_DLights:
+        return m_pipeline_dlights;
     default:
         GameInterface::Errorf("Invalid pass index!");
     } // switch
@@ -432,6 +446,7 @@ void ViewRenderer::FlushImmediateModeDrawCmds(FrameData & frame_data)
         case kPass_SolidGeometry       : MRQ2_PUSH_GPU_MARKER(context, "SolidGeometry");       break;
         case kPass_TranslucentSurfaces : MRQ2_PUSH_GPU_MARKER(context, "TranslucentSurfaces"); break;
         case kPass_TranslucentEntities : MRQ2_PUSH_GPU_MARKER(context, "TranslucentEntities"); break;
+        case kPass_DLights             : MRQ2_PUSH_GPU_MARKER(context, "DLights");             break;
         default : GameInterface::Errorf("Invalid pass index!");
         } // switch
     };
@@ -514,9 +529,8 @@ void ViewRenderer::DoRenderView(FrameData & frame_data)
     m_current_pass = kPass_TranslucentEntities; // Also with Z writes disabled
     RenderParticles(frame_data);
 
-    // TODO needs a different blend func qglBlendFunc (GL_ONE, GL_ONE);
-    //m_current_pass = kPass_SolidGeometry
-    //RenderDLights();
+    m_current_pass = kPass_DLights; // Simulated light sources use additive blending
+    RenderDLights(frame_data);
 
     FlushImmediateModeDrawCmds(frame_data);
 }
@@ -1055,6 +1069,66 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
     }
 
     EndBatch(batch);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// A Quake2 Dynamic Light (DLight) is a point light simulated with a circular billboarded sprite that follows the light source.
+// This is used to simulate gunshot flares for example. The sprite is rendered with additive blending (qglBlendFunc(GL_ONE, GL_ONE)).
+void ViewRenderer::RenderDLights(const FrameData & frame_data)
+{
+    const int num_dlights = frame_data.view_def.num_dlights;
+    if (num_dlights <= 0)
+    {
+        return;
+    }
+
+    BeginBatchArgs args;
+    args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
+    args.optional_tex = nullptr;
+    args.topology     = PrimitiveTopology::kTriangleFan;
+    args.depth_hack   = false;
+
+    const dlight_t * const dlights = frame_data.view_def.dlights;
+    for (int l = 0; l < num_dlights; ++l)
+    {
+        const dlight_t * const light = &dlights[l];
+
+        MiniImBatch batch = BeginBatch(args);
+        {
+            DrawVertex3D vert = {};
+
+            vert.rgba[0] = light->color[0] * 0.2f;
+            vert.rgba[1] = light->color[1] * 0.2f;
+            vert.rgba[2] = light->color[2] * 0.2f;
+            vert.rgba[3] = 1.0f;
+
+            const float radius = light->intensity * 0.35f;
+            for (int v = 0; v < 3; ++v)
+            {
+                vert.position[v] = light->origin[v] - frame_data.forward_vec[v] * radius;
+            }
+
+            batch.SetTriangleFanFirstVertex(vert);
+
+            vert.rgba[0] = 0.0f;
+            vert.rgba[1] = 0.0f;
+            vert.rgba[2] = 0.0f;
+            vert.rgba[3] = 1.0f;
+
+            for (int i = 16; i >= 0; --i)
+            {
+                const float a = i / 16.0f * M_PI * 2.0f;
+                for (int j = 0; j < 3; ++j)
+                {
+                    vert.position[j] = light->origin[j] + frame_data.right_vec[j] * std::cosf(a) * radius + frame_data.up_vec[j] * std::sinf(a) * radius;
+                }
+
+                batch.PushVertex(vert);
+            }
+        }
+        EndBatch(batch);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

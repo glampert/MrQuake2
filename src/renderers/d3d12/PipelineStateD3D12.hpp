@@ -32,6 +32,7 @@ public:
     void SetDepthTestEnabled(const bool enabled);
     void SetDepthWritesEnabled(const bool enabled);
     void SetAlphaBlendingEnabled(const bool enabled);
+    void SetAdditiveBlending(const bool enabled);
     void SetCullEnabled(const bool enabled);
 
     void Finalize() const;

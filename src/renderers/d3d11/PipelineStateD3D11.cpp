@@ -83,6 +83,18 @@ void PipelineStateD3D11::SetAlphaBlendingEnabled(const bool enabled)
     }
 }
 
+void PipelineStateD3D11::SetAdditiveBlending(const bool enabled)
+{
+    if (enabled)
+    {
+        m_flags |= kAdditiveBlending;
+    }
+    else
+    {
+        m_flags &= ~kAdditiveBlending;
+    }
+}
+
 void PipelineStateD3D11::SetCullEnabled(const bool enabled)
 {
     if (enabled)
@@ -178,8 +190,8 @@ void PipelineStateD3D11::Finalize() const
         {
             bs_desc.RenderTarget[0].BlendEnable           = true;
             bs_desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-            bs_desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
-            bs_desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+            bs_desc.RenderTarget[0].SrcBlend              = (m_flags & kAdditiveBlending) ? D3D11_BLEND_ONE : D3D11_BLEND_SRC_ALPHA;
+            bs_desc.RenderTarget[0].DestBlend             = (m_flags & kAdditiveBlending) ? D3D11_BLEND_ONE : D3D11_BLEND_INV_SRC_ALPHA;
             bs_desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
             bs_desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
             bs_desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
