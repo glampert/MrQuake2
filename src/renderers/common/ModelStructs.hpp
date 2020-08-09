@@ -343,6 +343,12 @@ public:
         std::memset(&data, 0, sizeof(data));
     }
 
+    ~ModelInstance()
+    {
+        vb.Shutdown();
+        ib.Shutdown();
+    }
+
     // Disallow copy.
     ModelInstance(const ModelInstance &) = delete;
     ModelInstance & operator=(const ModelInstance &) = delete;

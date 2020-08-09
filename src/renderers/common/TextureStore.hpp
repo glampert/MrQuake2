@@ -65,6 +65,8 @@ public:
 
     ~TextureImage()
     {
+        m_texture.Shutdown();
+
         // Memory is owned by the TextureImage unless it is using the scrap atlas.
         if (!m_is_scrap_image)
         {

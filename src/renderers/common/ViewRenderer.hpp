@@ -143,8 +143,8 @@ private:
     void DrawNullModel(const FrameData & frame_data, const entity_t & entity);
 
     // Lighting/shading:
-    void CalcPointLightColor(const FrameData & frame_data, const entity_t & entity,
-                             vec4_t out_shade_light_color) const;
+    void ShadeAliasMD2Model(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const;
+    void CalcPointLightColor(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const;
 
     // Defined in DrawAliasMD2.cpp
     void DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t * const alias_header, const float backlerp,

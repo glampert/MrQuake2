@@ -396,7 +396,6 @@ TextureImage * TextureStore::CreateTexture(const ColorRGBA32 * pixels, uint32_t 
 
 void TextureStore::DestroyTexture(TextureImage * tex)
 {
-    tex->m_texture.Shutdown();
     Destroy(tex);
     m_teximages_pool.Deallocate(tex);
 }

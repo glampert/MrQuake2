@@ -1605,7 +1605,8 @@ void ViewRenderer::DrawSpriteModel(const FrameData & frame_data, const entity_t 
 
 void ViewRenderer::DrawAliasMD2Model(const FrameData & frame_data, const entity_t & entity)
 {
-    const vec3_t shade_light = { 1.0f, 1.0f, 1.0f }; // TODO - temp, must be calculated
+    vec4_t shade_light = { 1.0f, 1.0f, 1.0f, 1.0f };
+    ShadeAliasMD2Model(frame_data, entity, shade_light);
 
     const float  backlerp = (m_lerp_entity_models.IsSet() ? entity.backlerp : 0.0f);
     const auto   mdl_mtx  = MakeEntityModelMatrix(entity, /* flipUpV = */false);
@@ -1615,7 +1616,7 @@ void ViewRenderer::DrawAliasMD2Model(const FrameData & frame_data, const entity_
     const TextureImage * skin = nullptr;
     if (entity.skin != nullptr)
     {
-        // Custom player skin (opaque outside the renderer)
+        // Custom player skin (opaque pointer outside the renderer)
         skin = reinterpret_cast<const TextureImage *>(entity.skin);
     }
     else
@@ -1772,9 +1773,122 @@ void ViewRenderer::DrawNullModel(const FrameData & frame_data, const entity_t & 
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void ViewRenderer::ShadeAliasMD2Model(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const
+{
+    //
+    // Hacks for the original Quake2 ref_gl follow
+    //
+
+    // PMM - rewrote, reordered to handle new shells & mixing
+    if (entity.flags & (RF_SHELL_HALF_DAM | RF_SHELL_GREEN | RF_SHELL_RED | RF_SHELL_BLUE | RF_SHELL_DOUBLE))
+    {
+        // PMM - special case for godmode
+        if ((entity.flags & RF_SHELL_RED) && (entity.flags & RF_SHELL_BLUE) && (entity.flags & RF_SHELL_GREEN))
+        {
+            for (int i = 0; i < 3; ++i)
+                out_shade_light_color[i] = 1.0f;
+        }
+        else if (entity.flags & (RF_SHELL_RED | RF_SHELL_BLUE | RF_SHELL_DOUBLE))
+        {
+            Vec3Zero(out_shade_light_color);
+
+            if (entity.flags & RF_SHELL_RED)
+            {
+                out_shade_light_color[0] = 1.0f;
+                if (entity.flags & (RF_SHELL_BLUE | RF_SHELL_DOUBLE))
+                {
+                    out_shade_light_color[2] = 1.0f;
+                }
+            }
+            else if (entity.flags & RF_SHELL_BLUE)
+            {
+                if (entity.flags & RF_SHELL_DOUBLE)
+                {
+                    out_shade_light_color[1] = 1.0f;
+                    out_shade_light_color[2] = 1.0f;
+                }
+                else
+                {
+                    out_shade_light_color[2] = 1.0f;
+                }
+            }
+            else if (entity.flags & RF_SHELL_DOUBLE)
+            {
+                out_shade_light_color[0] = 0.9f;
+                out_shade_light_color[1] = 0.7f;
+            }
+        }
+        else if (entity.flags & (RF_SHELL_HALF_DAM | RF_SHELL_GREEN))
+        {
+            Vec3Zero(out_shade_light_color);
+
+            // PMM - new colors
+            if (entity.flags & RF_SHELL_HALF_DAM)
+            {
+                out_shade_light_color[0] = 0.56f;
+                out_shade_light_color[1] = 0.59f;
+                out_shade_light_color[2] = 0.45f;
+            }
+            if (entity.flags & RF_SHELL_GREEN)
+            {
+                out_shade_light_color[1] = 1.0f;
+            }
+        }
+    }
+    else if (entity.flags & RF_FULLBRIGHT)
+    {
+        for (int i = 0; i < 3; ++i)
+            out_shade_light_color[i] = 1.0f;
+    }
+    else
+    {
+        CalcPointLightColor(frame_data, entity, out_shade_light_color);
+    }
+
+    if (entity.flags & RF_MINLIGHT)
+    {
+        int i;
+        for (i = 0; i < 3; ++i)
+        {
+            if (out_shade_light_color[i] > 0.1f)
+                break;
+        }
+        if (i == 3)
+        {
+            out_shade_light_color[0] = 0.1f;
+            out_shade_light_color[1] = 0.1f;
+            out_shade_light_color[2] = 0.1f;
+        }
+    }
+
+    if (entity.flags & RF_GLOW)
+    {
+        // bonus items will pulse with time
+        float min;
+        const float scale = 0.1f * std::sinf(frame_data.view_def.time * 7.0f);
+        for (int i = 0; i < 3; ++i)
+        {
+            min = out_shade_light_color[i] * 0.8f;
+            out_shade_light_color[i] += scale;
+            if (out_shade_light_color[i] < min)
+                out_shade_light_color[i] = min;
+        }
+    }
+
+    // PGM - IR goggles color override
+    if ((frame_data.view_def.rdflags & RDF_IRGOGGLES) && (entity.flags & RF_IR_VISIBLE))
+    {
+        out_shade_light_color[0] = 1.0f;
+        out_shade_light_color[1] = 0.0f;
+        out_shade_light_color[2] = 0.0f;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void ViewRenderer::CalcPointLightColor(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const
 {
-    // TODO - compute lighting
+    // TODO - compute lighting (R_LightPoint - sample lightmap color at point)
     out_shade_light_color[0] = out_shade_light_color[1] =
     out_shade_light_color[2] = out_shade_light_color[3] = 1.0f;
 }
