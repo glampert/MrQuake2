@@ -64,7 +64,7 @@ private:
 
     // These match the D3D12 global RootSignature
     static constexpr uint32_t kCBufferSlotCount = 3;
-    static constexpr uint32_t kTextureSlotCount = 1;
+    static constexpr uint32_t kTextureSlotCount = 2; // BaseTexture and Lightmap
 
     const DeviceD3D11 *                  m_device{ nullptr };
     const SwapChainD3D11 *               m_swap_chain{ nullptr };

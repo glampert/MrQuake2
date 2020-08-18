@@ -95,7 +95,8 @@ private:
     struct BeginBatchArgs
     {
         RenderMatrix         model_matrix;
-        const TextureImage * optional_tex;
+        const TextureImage * diffuse_tex;  // optional
+        const TextureImage * lightmap_tex; // optional
         PrimitiveTopology    topology;
         bool                 depth_hack;
     };
@@ -196,7 +197,8 @@ private:
     struct DrawCmd
     {
         PerDrawShaderConstants consts;
-        const TextureImage *   texture;
+        const TextureImage *   diffuse_tex;
+        const TextureImage *   lightmap_tex;
         uint32_t               first_vert;
         uint32_t               vertex_count;
         PrimitiveTopology      topology;

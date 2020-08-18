@@ -5,6 +5,7 @@
 
 #include "ModelStore.hpp"
 #include "TextureStore.hpp"
+#include "Lightmaps.hpp"
 #include "ImmediateModeBatching.hpp"
 
 // Quake includes
@@ -843,8 +844,8 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
 
     static auto r_surf_use_debug_color = GameInterface::Cvar::Get("r_surf_use_debug_color", "0", 0);
 
-    // TODO needed?
-    //GL_BeginBuildingLightmaps(mdl);
+    LightmapManager & lightmap_mgr = LightmapManager::Instance();
+    lightmap_mgr.BeginBuildLightmaps();
 
     for (int surf_num = 0; surf_num < count; ++surf_num, ++in, ++out)
     {
@@ -853,6 +854,9 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
         out->color      = r_surf_use_debug_color.IsSet() ? RandomDebugColor() : ColorRGBA32{ 0xFFFFFFFF };
         out->flags      = 0;
         out->polys      = nullptr;
+
+        // Default it to not ligthmapped.
+        out->lightmap_texture_num = -1;
 
         const int plane_num = in->planenum;
         const int side = in->side;
@@ -878,7 +882,7 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
         // Lighting info:
         //
         int i;
-        for (i = 0; i < MAXLIGHTMAPS; ++i)
+        for (i = 0; i < kMaxLightmaps; ++i)
         {
             out->styles[i] = in->styles[i];
         }
@@ -914,8 +918,7 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
         //
         if (!(out->texinfo->flags & (SURF_SKY | SURF_TRANS33 | SURF_TRANS66 | SURF_WARP)))
         {
-            // TODO
-            //GL_CreateSurfaceLightmap(out);
+            lightmap_mgr.CreateSurfaceLightmap(out);
         }
 
         //
@@ -927,8 +930,7 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
         }
     }
 
-    // TODO needed?
-    //GL_EndBuildingLightmaps();
+    lightmap_mgr.FinishBuildLightmaps();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1217,6 +1219,9 @@ void ModelStore::LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, c
     // Vertex/Index buffer setup:
     if (kUseVertexAndIndexBuffers)
     {
+        static auto r_world_ambient = GameInterface::Cvar::Get("r_world_ambient", "1.2", CvarWrapper::kFlagArchive);
+        const float world_ambient_term = r_world_ambient.AsFloat(); // Modulate with the vertex color
+
         const int num_surfaces = mdl.data.num_surfaces;
         const ModelSurface * const surfaces = mdl.data.surfaces;
 
@@ -1279,10 +1284,20 @@ void ModelStore::LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, c
                     vertex_iter->position[1] = poly_vert.position[1];
                     vertex_iter->position[2] = poly_vert.position[2];
 
-                    vertex_iter->uv[0] = poly_vert.texture_s;
-                    vertex_iter->uv[1] = poly_vert.texture_t;
+                    vertex_iter->texture_uv[0] = poly_vert.texture_s;
+                    vertex_iter->texture_uv[1] = poly_vert.texture_t;
+
+                    vertex_iter->lightmap_uv[0] = poly_vert.lightmap_s;
+                    vertex_iter->lightmap_uv[1] = poly_vert.lightmap_t;
 
                     ColorFloats(surf.color, vertex_iter->rgba[0], vertex_iter->rgba[1], vertex_iter->rgba[2], vertex_iter->rgba[3]);
+
+                    // Scale by world "ambient light" term
+                    for (int n = 0; n < 4; ++n)
+                    {
+                        vertex_iter->rgba[n] *= world_ambient_term;
+                    }
+
                     ++vertex_iter;
                 }
 

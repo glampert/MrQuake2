@@ -269,6 +269,9 @@ void MiniImBatch::PushModelSurface(const ModelSurface & surf, const vec4_t * con
 {
     MRQ2_ASSERT(IsValid()); // Clear()ed?
 
+    static auto r_world_ambient = GameInterface::Cvar::Get("r_world_ambient", "1.2", CvarWrapper::kFlagArchive);
+    const float world_ambient_term = r_world_ambient.AsFloat(); // Modulate with the vertex color
+
     const ModelPoly & poly   = *surf.polys;
     const int num_triangles  = (poly.num_verts - 2);
     const uint32_t num_verts = (num_triangles * 3);
@@ -291,8 +294,11 @@ void MiniImBatch::PushModelSurface(const ModelSurface & surf, const vec4_t * con
             verts_iter->position[1] = poly_vert.position[1];
             verts_iter->position[2] = poly_vert.position[2];
 
-            verts_iter->uv[0] = poly_vert.texture_s;
-            verts_iter->uv[1] = poly_vert.texture_t;
+            verts_iter->texture_uv[0] = poly_vert.texture_s;
+            verts_iter->texture_uv[1] = poly_vert.texture_t;
+
+            verts_iter->lightmap_uv[0] = poly_vert.lightmap_s;
+            verts_iter->lightmap_uv[1] = poly_vert.lightmap_t;
 
             if (opt_color_override != nullptr)
             {
@@ -300,11 +306,13 @@ void MiniImBatch::PushModelSurface(const ModelSurface & surf, const vec4_t * con
             }
             else
             {
-                ColorFloats(surf.color,
-                            verts_iter->rgba[0],
-                            verts_iter->rgba[1],
-                            verts_iter->rgba[2],
-                            verts_iter->rgba[3]);
+                ColorFloats(surf.color, verts_iter->rgba[0], verts_iter->rgba[1], verts_iter->rgba[2], verts_iter->rgba[3]);
+            }
+
+            // Scale by world "ambient light" term
+            for (int n = 0; n < 4; ++n)
+            {
+                verts_iter->rgba[n] *= world_ambient_term;
             }
 
             ++verts_iter;

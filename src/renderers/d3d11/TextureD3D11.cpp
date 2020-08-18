@@ -112,6 +112,10 @@ D3D11_FILTER TextureD3D11::FilterForTextureType(const TextureType type)
 
         return d3d_tex_filtering_options[opt];
     }
+    else if (type == TextureType::kLightmap)
+    {
+        return D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+    }
     else // no mipmaps (UI/Cinematic frames), use point/nearest sampling
     {
         return D3D11_FILTER_MIN_MAG_MIP_POINT;

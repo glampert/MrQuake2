@@ -56,10 +56,6 @@ enum class ModelType : std::uint8_t
 constexpr float kBackFaceEpsilon = 0.01f;
 constexpr int kSubdivideSize = 64;
 
-// Size in pixels of the lightmap atlases.
-constexpr int kLightmapBlockWidth  = 128;
-constexpr int kLightmapBlockHeight = 128;
-
 // Max height in pixels of MD2 model skins.
 constexpr int kMaxMD2SkinHeight = 480;
 
@@ -182,7 +178,7 @@ struct ModelSurface
     int dlight_frame;
     int dlight_bits;
 
-    int lightmap_texture_num;
+    int lightmap_texture_num;          // -1 if not lightmapped
     std::uint8_t styles[kMaxLightmaps];
     float cached_light[kMaxLightmaps]; // values currently used in lightmap
     std::uint8_t * samples;            // [numstyles * surfsize]

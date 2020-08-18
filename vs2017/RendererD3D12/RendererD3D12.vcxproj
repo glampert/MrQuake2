@@ -22,6 +22,7 @@
     <ClCompile Include="..\..\src\renderers\common\Common.cpp" />
     <ClCompile Include="..\..\src\renderers\common\DLLInterface.cpp" />
     <ClCompile Include="..\..\src\renderers\common\DrawAliasMD2.cpp" />
+    <ClCompile Include="..\..\src\renderers\common\Lightmaps.cpp" />
     <ClCompile Include="..\..\src\renderers\common\Memory.cpp" />
     <ClCompile Include="..\..\src\renderers\common\ImmediateModeBatching.cpp" />
     <ClCompile Include="..\..\src\renderers\common\ModelLoad.cpp" />
@@ -49,6 +50,7 @@
     <ClInclude Include="..\..\src\renderers\common\Common.hpp" />
     <ClInclude Include="..\..\src\renderers\common\DLLInterface.hpp" />
     <ClInclude Include="..\..\src\renderers\common\Array.hpp" />
+    <ClInclude Include="..\..\src\renderers\common\Lightmaps.hpp" />
     <ClInclude Include="..\..\src\renderers\common\Memory.hpp" />
     <ClInclude Include="..\..\src\renderers\common\ImmediateModeBatching.hpp" />
     <ClInclude Include="..\..\src\renderers\common\ModelStore.hpp" />

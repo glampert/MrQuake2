@@ -38,52 +38,60 @@ void RootSignatureD3D12::CreateGlobalRootSignature(const DeviceD3D12 & device)
     FixedSizeArray<D3D12_ROOT_PARAMETER1, kRootParameterCount> params{};
 
     // Constant buffers b0,bN-1
-    int cbuffer_slot = 0;
-    for (; cbuffer_slot < kCBufferCount - 1; ++cbuffer_slot)
     {
-        D3D12_ROOT_PARAMETER1 param = {};
-        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-        param.Descriptor.ShaderRegister = cbuffer_slot;
-        param.Descriptor.RegisterSpace  = 0;
-        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        params.push_back(param);
+        int cbuffer_slot = 0;
+        for (; cbuffer_slot < kCBufferCount - 1; ++cbuffer_slot)
+        {
+            D3D12_ROOT_PARAMETER1 param = {};
+            param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+            param.Descriptor.ShaderRegister = cbuffer_slot;
+            param.Descriptor.RegisterSpace = 0;
+            param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+            params.push_back(param);
+        }
+
+        // Last constant buffer is actually a set of Root constants so we can efficiently updated them per draw
+        {
+            D3D12_ROOT_PARAMETER1 param = {};
+            param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+            param.Constants.ShaderRegister = cbuffer_slot;
+            param.Constants.RegisterSpace  = 0;
+            param.Constants.Num32BitValues = kMaxInlineRootConstants;
+            param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+            params.push_back(param);
+        }
     }
 
-    // Last constant buffer is actually a set of Root constants so we can efficiently updated them per draw
+    // Texture t0,t1
+    D3D12_DESCRIPTOR_RANGE1 texture_descriptor_ranges[kTextureCount] = {};
+    for (int tex_slot = 0; tex_slot < kTextureCount; ++tex_slot)
     {
-        D3D12_ROOT_PARAMETER1 param = {};
-        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        param.Constants.ShaderRegister = cbuffer_slot;
-        param.Constants.RegisterSpace  = 0;
-		param.Constants.Num32BitValues = kMaxInlineRootConstants;
-        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        params.push_back(param);
-    }
-
-    // Texture t0
-    {
-        D3D12_DESCRIPTOR_RANGE1 descriptor_ranges[1] = {};
-        descriptor_ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        descriptor_ranges[0].NumDescriptors = kTextureCount;
+        texture_descriptor_ranges[tex_slot].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        texture_descriptor_ranges[tex_slot].NumDescriptors = 1;
+        texture_descriptor_ranges[tex_slot].BaseShaderRegister = tex_slot;
+        texture_descriptor_ranges[tex_slot].RegisterSpace = 0;
 
         D3D12_ROOT_PARAMETER1 param = {};
         param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        param.DescriptorTable.NumDescriptorRanges = ArrayLength(descriptor_ranges);
-        param.DescriptorTable.pDescriptorRanges   = descriptor_ranges;
+        param.DescriptorTable.NumDescriptorRanges = 1;
+        param.DescriptorTable.pDescriptorRanges = &texture_descriptor_ranges[tex_slot];
         param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
         params.push_back(param);
     }
 
-    // Sampler s0
+    // Sampler s0,s1
+    D3D12_DESCRIPTOR_RANGE1 sampler_descriptor_ranges[kSamplerCount] = {};
+    for (int sampler_slot = 0; sampler_slot < kSamplerCount; ++sampler_slot)
     {
-        D3D12_DESCRIPTOR_RANGE1 descriptor_ranges[1] = {};
-        descriptor_ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-        descriptor_ranges[0].NumDescriptors = kSamplerCount;
+        sampler_descriptor_ranges[sampler_slot].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+        sampler_descriptor_ranges[sampler_slot].NumDescriptors = 1;
+        sampler_descriptor_ranges[sampler_slot].BaseShaderRegister = sampler_slot;
+        sampler_descriptor_ranges[sampler_slot].RegisterSpace = 0;
 
         D3D12_ROOT_PARAMETER1 param = {};
         param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        param.DescriptorTable.NumDescriptorRanges = ArrayLength(descriptor_ranges);
-        param.DescriptorTable.pDescriptorRanges   = descriptor_ranges;
+        param.DescriptorTable.NumDescriptorRanges = 1;
+        param.DescriptorTable.pDescriptorRanges = &sampler_descriptor_ranges[sampler_slot];
         param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
         params.push_back(param);
     }
@@ -91,13 +99,14 @@ void RootSignatureD3D12::CreateGlobalRootSignature(const DeviceD3D12 & device)
     D3D12_VERSIONED_ROOT_SIGNATURE_DESC root_sig_desc = {};
     root_sig_desc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
     root_sig_desc.Desc_1_1.NumParameters = params.size();
-    root_sig_desc.Desc_1_1.pParameters   = params.data();
+    root_sig_desc.Desc_1_1.pParameters = params.data();
     root_sig_desc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
                                    D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
                                    D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                                    D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 
     sm_global.Init(device, root_sig_desc);
+    D12SetDebugName(sm_global.root_sig, L"GlobalRootSignature");
 }
 
 } // MrQ2

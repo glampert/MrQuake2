@@ -444,4 +444,18 @@ namespace FS
 
 } // GameInterface
 
+/*
+===============================================================================
+
+    Global configuration parameters
+
+===============================================================================
+*/
+namespace Config
+{
+
+// TODO: Move all CVars into a single place inside this namespace and cache them all at GameInterface::Initialize.
+
+} // Config
+
 } // MrQ2

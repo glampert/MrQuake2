@@ -1,20 +1,28 @@
 
 ///////////////////////////////////////////////////////////////////////////////
-// Inputs
+// Inputs/Constants
 ///////////////////////////////////////////////////////////////////////////////
+
+static const uint kDebugMode_None             = 0;
+static const uint kDebugMode_ForcedMipLevel   = 1;
+static const uint kDebugMode_DisableTexturing = 2;
+static const uint kDebugMode_BlendDebugColor  = 3;
+static const uint kDebugMode_ViewLightmaps    = 4;
 
 struct DrawVertex3D
 {
-    float3 position : POSITION;
-    float2 uv       : TEXCOORD;
-    float4 rgba     : COLOR;
+    float3 position    : POSITION;
+    float2 texture_uv  : TEXCOORD0;
+    float2 lightmap_uv : TEXCOORD1;
+    float4 rgba        : COLOR;
 };
 
 struct VertexShaderOutput
 {
-    float4 vpos : SV_POSITION;
-    float2 uv   : TEXCOORD;
-    float4 rgba : COLOR;
+    float4 vpos        : SV_POSITION;
+    float2 texture_uv  : TEXCOORD0;
+    float2 lightmap_uv : TEXCOORD1;
+    float4 rgba        : COLOR;
 };
 
 cbuffer PerFrameShaderConstants : register(b0)
@@ -22,7 +30,7 @@ cbuffer PerFrameShaderConstants : register(b0)
     float2 screen_dimensions;
 
     // Debugging flags
-    bool   debug_mode;
+    uint   debug_mode; // Set to one of the kDebugMode_* values.
     float  forced_mip_level;
     float4 texture_color_scaling;
     float4 vertex_color_scaling;
@@ -38,8 +46,11 @@ cbuffer PerDrawShaderConstants : register(b2)
     matrix model_matrix;
 };
 
-Texture2D    diffuse_texture : register(t0);
-SamplerState diffuse_sampler : register(s0);
+Texture2D    diffuse_texture  : register(t0);
+SamplerState diffuse_sampler  : register(s0);
+
+Texture2D    lightmap_texture : register(t1);
+SamplerState lightmap_sampler : register(s1);
 
 ///////////////////////////////////////////////////////////////////////////////
 // Vertex Shader
@@ -48,9 +59,10 @@ SamplerState diffuse_sampler : register(s0);
 VertexShaderOutput VS_main(DrawVertex3D input)
 {
     VertexShaderOutput output;
-    output.vpos = mul(mul(view_proj_matrix, model_matrix), float4(input.position, 1.0f));
-    output.uv   = input.uv;
-    output.rgba = input.rgba;
+    output.vpos        = mul(mul(view_proj_matrix, model_matrix), float4(input.position, 1.0f));
+    output.texture_uv  = input.texture_uv;
+    output.lightmap_uv = input.lightmap_uv;
+    output.rgba        = input.rgba;
     return output;
 }
 
@@ -63,32 +75,50 @@ float4 PS_main(VertexShaderOutput input) : SV_TARGET
 {
     float4 pixel_color;
 
-    if (!debug_mode)
+    if (debug_mode == kDebugMode_None)
     {
-        float4 tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
-        pixel_color = tex_color * input.rgba;
+        float4 diffuse_tex_color  = diffuse_texture.Sample(diffuse_sampler, input.texture_uv);
+        float4 lightmap_tex_color = lightmap_texture.Sample(lightmap_sampler, input.lightmap_uv);
+        float4 vertex_color       = input.rgba;
+
+        pixel_color = diffuse_tex_color * lightmap_tex_color * vertex_color;
     }
     else // Debug shader
     {
-        float4 tex_color;
+        float4 diffuse_tex_color;
+
         if (forced_mip_level >= 0.0f)
         {
             // Sample specific mipmap level for debugging (r_force_mip_level)
-            tex_color = diffuse_texture.SampleLevel(diffuse_sampler, input.uv, forced_mip_level);
+            if (debug_mode == kDebugMode_ViewLightmaps)
+            {
+                diffuse_tex_color = lightmap_texture.SampleLevel(lightmap_sampler, input.lightmap_uv, forced_mip_level);
+            }
+            else
+            {
+                diffuse_tex_color = diffuse_texture.SampleLevel(diffuse_sampler, input.texture_uv, forced_mip_level);
+            }
         }
         else
         {
-            tex_color = diffuse_texture.Sample(diffuse_sampler, input.uv);
+            if (debug_mode == kDebugMode_ViewLightmaps) // Lightmap color only
+            {
+                diffuse_tex_color = lightmap_texture.Sample(lightmap_sampler, input.lightmap_uv);
+            }
+            else // Base texture
+            {
+                diffuse_tex_color = diffuse_texture.Sample(diffuse_sampler, input.texture_uv);
+            }
         }
 
         // Surface debugging (r_disable_texturing/r_blend_debug_color)
-        tex_color *= texture_color_scaling;
+        diffuse_tex_color *= texture_color_scaling;
 
-        float4 vert_color = input.rgba;
-        vert_color *= vertex_color_scaling;
+        float4 vertex_color = input.rgba;
+        vertex_color *= vertex_color_scaling;
 
-        pixel_color = saturate(tex_color + vert_color);
-        pixel_color.a = input.rgba.a * tex_color.a; // Preserve the incoming alpha values for transparencies
+        pixel_color = saturate(diffuse_tex_color + vertex_color);
+        pixel_color.a = input.rgba.a * diffuse_tex_color.a; // Preserve the incoming alpha values for transparencies
     }
 
     return pixel_color;

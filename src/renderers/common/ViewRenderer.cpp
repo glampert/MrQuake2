@@ -4,6 +4,7 @@
 //
 
 #include "ViewRenderer.hpp"
+#include "Lightmaps.hpp"
 
 namespace MrQ2
 {
@@ -166,6 +167,11 @@ static RenderMatrix MakeEntityModelMatrix(const entity_t & entity, const bool fl
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+constexpr int kDiffuseTextureSlot = 0;
+constexpr int kLightmapTextureSlot = 1;
+
+///////////////////////////////////////////////////////////////////////////////
 // ViewRenderer
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -193,9 +199,10 @@ void ViewRenderer::Init(const RenderDevice & device, const TextureStore & tex_st
     const VertexInputLayout vertex_input_layout = {
         // DrawVertex3D
         {
-            { VertexInputLayout::kVertexPosition,  VertexInputLayout::kFormatFloat3, offsetof(DrawVertex3D, position) },
-            { VertexInputLayout::kVertexTexCoords, VertexInputLayout::kFormatFloat2, offsetof(DrawVertex3D, uv)       },
-            { VertexInputLayout::kVertexColor,     VertexInputLayout::kFormatFloat4, offsetof(DrawVertex3D, rgba)     },
+            { VertexInputLayout::kVertexPosition,  VertexInputLayout::kFormatFloat3, offsetof(DrawVertex3D, position)    },
+            { VertexInputLayout::kVertexTexCoords, VertexInputLayout::kFormatFloat2, offsetof(DrawVertex3D, texture_uv)  },
+            { VertexInputLayout::kVertexLmCoords,  VertexInputLayout::kFormatFloat2, offsetof(DrawVertex3D, lightmap_uv) },
+            { VertexInputLayout::kVertexColor,     VertexInputLayout::kFormatFloat4, offsetof(DrawVertex3D, rgba)        },
         }
     };
     if (!m_render3d_shader.LoadFromFile(device, vertex_input_layout, "Draw3D"))
@@ -275,7 +282,8 @@ MiniImBatch ViewRenderer::BeginBatch(const BeginBatchArgs & args)
     MRQ2_ASSERT_ALIGN16(args.model_matrix.floats);
 
     m_current_draw_cmd.consts.model_matrix = args.model_matrix;
-    m_current_draw_cmd.texture      = (args.optional_tex != nullptr) ? args.optional_tex : m_tex_white2x2;
+    m_current_draw_cmd.diffuse_tex  = (args.diffuse_tex  != nullptr) ? args.diffuse_tex  : m_tex_white2x2;
+    m_current_draw_cmd.lightmap_tex = (args.lightmap_tex != nullptr) ? args.lightmap_tex : m_tex_white2x2;
     m_current_draw_cmd.topology     = args.topology;
     m_current_draw_cmd.depth_hack   = args.depth_hack;
     m_current_draw_cmd.first_vert   = 0;
@@ -294,16 +302,20 @@ void ViewRenderer::EndBatch(MiniImBatch & batch)
     MRQ2_ASSERT(m_batch_open == true);
     MRQ2_ASSERT(m_current_draw_cmd.topology == batch.Topology());
 
-    m_current_draw_cmd.first_vert   = m_vertex_buffers.CurrentPosition();
-    m_current_draw_cmd.vertex_count = batch.UsedVerts();
+    const auto batch_size = batch.UsedVerts();
+    if (batch_size > 0)
+    {
+        m_current_draw_cmd.first_vert = m_vertex_buffers.CurrentPosition();
+        m_current_draw_cmd.vertex_count = batch_size;
 
-    m_vertex_buffers.Increment(batch.UsedVerts());
+        m_vertex_buffers.Increment(batch_size);
 
-    MRQ2_ASSERT(m_current_pass < kRenderPassCount);
-    m_draw_cmds[m_current_pass].push_back(m_current_draw_cmd);
-    m_current_draw_cmd = {};
+        MRQ2_ASSERT(m_current_pass < kRenderPassCount);
+        m_draw_cmds[m_current_pass].push_back(m_current_draw_cmd);
+    }
 
     batch.Clear();
+    m_current_draw_cmd = {};
     m_batch_open = false;
 }
 
@@ -488,7 +500,8 @@ void ViewRenderer::FlushImmediateModeDrawCmds(FrameData & frame_data)
             context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, cmd.consts);
 
             context.SetPrimitiveTopology(cmd.topology);
-            context.SetTexture(cmd.texture->BackendTexture(), 0);
+            context.SetTexture(cmd.diffuse_tex->BackendTexture(),  kDiffuseTextureSlot);
+            context.SetTexture(cmd.lightmap_tex->BackendTexture(), kLightmapTextureSlot);
 
             context.Draw(cmd.first_vert, cmd.vertex_count);
 
@@ -817,6 +830,8 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
         context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, consts);
     }
 
+    LightmapManager & lightmap_mgr = LightmapManager::Instance();
+
     // Draw with sorting by texture:
     for (const TextureImage * tex : frame_data.tex_store)
     {
@@ -827,6 +842,8 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
         {
             continue;
         }
+
+        // TODO: Missing handling of (surf->texinfo->flags & SURF_FLOWING) here and for brush models
 
         if (do_draw)
         {
@@ -841,7 +858,15 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
                             const auto range = poly->index_buffer;
                             MRQ2_ASSERT(range.first_index >= 0 && range.index_count > 0 && range.base_vertex >= 0);
 
-                            context.SetTexture(tex->BackendTexture(), 0);
+                            context.SetTexture(tex->BackendTexture(), kDiffuseTextureSlot);
+
+                            auto * lightmap_tex = m_tex_white2x2;
+                            if (surf->lightmap_texture_num >= 0)
+                            {
+                                lightmap_tex = lightmap_mgr.LightmapAtIndex(surf->lightmap_texture_num);
+                            }
+                            context.SetTexture(lightmap_tex->BackendTexture(), kLightmapTextureSlot);
+
                             context.DrawIndexed(range.first_index, range.index_count, range.base_vertex);
                         }
                     }
@@ -849,21 +874,36 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
             }
             else // Immediate mode emulation
             {
-                batch_args.optional_tex = tex;
+                batch_args.diffuse_tex  = tex;
+                batch_args.lightmap_tex = nullptr;
 
                 MiniImBatch batch = BeginBatch(batch_args);
+
+                for (const ModelSurface * surf = tex->DrawChainPtr(); surf; surf = surf->texture_chain)
                 {
-                    for (const ModelSurface * surf = tex->DrawChainPtr(); surf; surf = surf->texture_chain)
+                    if (surf->lightmap_texture_num >= 0)
                     {
-                        if (const ModelPoly * poly = surf->polys)
+                        auto * lightmap_tex = lightmap_mgr.LightmapAtIndex(surf->lightmap_texture_num);
+
+                        if (lightmap_tex != batch_args.lightmap_tex)
                         {
-                            if (poly->num_verts >= 3) // Need at least one triangle.
-                            {
-                                batch.PushModelSurface(*surf);
-                            }
+                            batch_args.lightmap_tex = lightmap_tex;
+
+                            // Lightmap texture has changed, close the current batch and start a new one.
+                            EndBatch(batch);
+                            batch = BeginBatch(batch_args);
+                        }
+                    }
+
+                    if (const ModelPoly * poly = surf->polys)
+                    {
+                        if (poly->num_verts >= 3) // Need at least one triangle.
+                        {
+                            batch.PushModelSurface(*surf);
                         }
                     }
                 }
+
                 EndBatch(batch);
             }
         }
@@ -886,6 +926,8 @@ void ViewRenderer::RenderTranslucentSurfaces(FrameData & frame_data)
     {
         return;
     }
+
+    LightmapManager & lightmap_mgr = LightmapManager::Instance();
 
     // The textures are prescaled up for a better
     // lighting range, so scale it back down.
@@ -934,9 +976,15 @@ void ViewRenderer::RenderTranslucentSurfaces(FrameData & frame_data)
         {
             BeginBatchArgs args;
             args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
-            args.optional_tex = surf->texinfo->teximage;
+            args.diffuse_tex  = surf->texinfo->teximage;
+            args.lightmap_tex = nullptr;
             args.topology     = PrimitiveTopology::kTriangleList;
             args.depth_hack   = false;
+
+            if (surf->lightmap_texture_num >= 0)
+            {
+                args.lightmap_tex = lightmap_mgr.LightmapAtIndex(surf->lightmap_texture_num);
+            }
 
             MiniImBatch batch = BeginBatch(args);
             {
@@ -1009,7 +1057,8 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
 
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
-    args.optional_tex = frame_data.tex_store.tex_particle;
+    args.diffuse_tex  = frame_data.tex_store.tex_particle;
+    args.lightmap_tex = nullptr;
     args.topology     = PrimitiveTopology::kTriangleList;
     args.depth_hack   = false;
 
@@ -1040,7 +1089,7 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
         const float fB = bB * (1.0f / 255.0f);
         const float fA = p->alpha;
 
-        DrawVertex3D v;
+        DrawVertex3D v = {};
         v.rgba[0] = fR;
         v.rgba[1] = fG;
         v.rgba[2] = fB;
@@ -1049,22 +1098,22 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
         v.position[0] = p->origin[0];
         v.position[1] = p->origin[1];
         v.position[2] = p->origin[2];
-        v.uv[0] = 0.0625f;
-        v.uv[1] = 0.0625f;
+        v.texture_uv[0] = 0.0625f;
+        v.texture_uv[1] = 0.0625f;
         batch.PushVertex(v);
 
         v.position[0] = p->origin[0] + up[0] * scale;
         v.position[1] = p->origin[1] + up[1] * scale;
         v.position[2] = p->origin[2] + up[2] * scale;
-        v.uv[0] = 1.0625f;
-        v.uv[1] = 0.0625f;
+        v.texture_uv[0] = 1.0625f;
+        v.texture_uv[1] = 0.0625f;
         batch.PushVertex(v);
 
         v.position[0] = p->origin[0] + right[0] * scale;
         v.position[1] = p->origin[1] + right[1] * scale;
         v.position[2] = p->origin[2] + right[2] * scale;
-        v.uv[0] = 0.0625f;
-        v.uv[1] = 1.0625f;
+        v.texture_uv[0] = 0.0625f;
+        v.texture_uv[1] = 1.0625f;
         batch.PushVertex(v);
     }
 
@@ -1085,7 +1134,8 @@ void ViewRenderer::RenderDLights(const FrameData & frame_data)
 
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
-    args.optional_tex = nullptr;
+    args.diffuse_tex  = nullptr;
+    args.lightmap_tex = nullptr;
     args.topology     = PrimitiveTopology::kTriangleFan;
     args.depth_hack   = false;
 
@@ -1166,9 +1216,15 @@ void ViewRenderer::DrawAnimatedWaterPolys(const ModelSurface & surf, const float
 
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
-    args.optional_tex = surf.texinfo->teximage;
+    args.diffuse_tex  = surf.texinfo->teximage;
+    args.lightmap_tex = nullptr;
     args.topology     = PrimitiveTopology::kTriangleFan;
     args.depth_hack   = false;
+
+    if (surf.lightmap_texture_num >= 0)
+    {
+        args.lightmap_tex = LightmapManager::Instance().LightmapAtIndex(surf.lightmap_texture_num);
+    }
 
     // HACK: There's some noticeable z-fighting happening with lava and water touching walls when you go underwater.
     // Adding a small offset to the positions resolves it. No idea why this didn't happen with the original
@@ -1193,14 +1249,14 @@ void ViewRenderer::DrawAnimatedWaterPolys(const ModelSurface & surf, const float
                 float t = ot + s_turb_sin[int((os * 0.125f + frame_time) * kTurbScale) & 255];
                 t *= (1.0f / kSubdivideSize);
 
-                DrawVertex3D vert;
+                DrawVertex3D vert = {};
 
                 vert.position[0] = poly->vertexes[v].position[0];
                 vert.position[1] = poly->vertexes[v].position[1];
                 vert.position[2] = poly->vertexes[v].position[2];
 
-                vert.uv[0] = s;
-                vert.uv[1] = t;
+                vert.texture_uv[0] = s;
+                vert.texture_uv[1] = t;
 
                 vert.rgba[0] = color[0];
                 vert.rgba[1] = color[1];
@@ -1263,13 +1319,14 @@ void ViewRenderer::RenderSkyBox(FrameData & frame_data)
         for (int i = 0; i < SkyBox::kNumSides; ++i)
         {
             BeginBatchArgs args;
-            DrawVertex3D sky_verts[6];
+            DrawVertex3D sky_verts[6] = {};
             const TextureImage * sky_tex = nullptr;
 
             if (m_skybox.BuildSkyPlane(i, sky_verts, &sky_tex))
             {
                 args.model_matrix = sky_mtx;
-                args.optional_tex = sky_tex;
+                args.diffuse_tex  = sky_tex;
+                args.lightmap_tex = nullptr;
                 args.topology     = PrimitiveTopology::kTriangleList;
                 args.depth_hack   = false;
 
@@ -1446,6 +1503,8 @@ void ViewRenderer::DrawBrushModel(const FrameData & frame_data, const entity_t &
         context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, consts);
     }
 
+    LightmapManager & lightmap_mgr = LightmapManager::Instance();
+
     ModelSurface * surf = &model->data.surfaces[model->data.first_model_surface];
     const int num_surfaces = model->data.num_model_surfaces;
 
@@ -1490,16 +1549,30 @@ void ViewRenderer::DrawBrushModel(const FrameData & frame_data, const entity_t &
                         MRQ2_ASSERT(range.first_index >= 0 && range.base_vertex >= 0);
 
                         auto * tex = TextureAnimation(surf->texinfo, entity.frame);
-                        context.SetTexture(tex->BackendTexture(), 0);
+                        context.SetTexture(tex->BackendTexture(), kDiffuseTextureSlot);
+
+                        auto * lightmap_tex = m_tex_white2x2;
+                        if (surf->lightmap_texture_num >= 0)
+                        {
+                            lightmap_tex = lightmap_mgr.LightmapAtIndex(surf->lightmap_texture_num);
+                        }
+                        context.SetTexture(lightmap_tex->BackendTexture(), kLightmapTextureSlot);
+
                         context.DrawIndexed(range.first_index, range.index_count, range.base_vertex);
                     }
                     else // Immediate mode emulation
                     {
                         BeginBatchArgs args;
                         args.model_matrix = mdl_mtx;
-                        args.optional_tex = TextureAnimation(surf->texinfo, entity.frame);
+                        args.diffuse_tex  = TextureAnimation(surf->texinfo, entity.frame);
+                        args.lightmap_tex = nullptr;
                         args.topology     = PrimitiveTopology::kTriangleList;
                         args.depth_hack   = false;
+
+                        if (surf->lightmap_texture_num >= 0)
+                        {
+                            args.lightmap_tex = lightmap_mgr.LightmapAtIndex(surf->lightmap_texture_num);
+                        }
 
                         MiniImBatch batch = BeginBatch(args);
                         {
@@ -1553,32 +1626,32 @@ void ViewRenderer::DrawSpriteModel(const FrameData & frame_data, const entity_t 
     }
 
     // Camera facing billboarded quad:
-    DrawVertex3D quad[4];
+    DrawVertex3D quad[4] = {};
     const int indexes[6] = { 0,1,2, 2,3,0 };
 
-    quad[0].uv[0] = 0.0f;
-    quad[0].uv[1] = 1.0f;
+    quad[0].texture_uv[0] = 0.0f;
+    quad[0].texture_uv[1] = 1.0f;
     MrQ2::VecSplatN(quad[0].rgba, 1.0f);
     quad[0].rgba[3] = alpha;
     MrQ2::Vec3MAdd(entity.origin, -frame->origin_y, up, quad[0].position);
     MrQ2::Vec3MAdd(quad[0].position, -frame->origin_x, right, quad[0].position);
 
-    quad[1].uv[0] = 0.0f;
-    quad[1].uv[1] = 0.0f;
+    quad[1].texture_uv[0] = 0.0f;
+    quad[1].texture_uv[1] = 0.0f;
     MrQ2::VecSplatN(quad[1].rgba, 1.0f);
     quad[1].rgba[3] = alpha;
     MrQ2::Vec3MAdd(entity.origin, frame->height - frame->origin_y, up, quad[1].position);
     MrQ2::Vec3MAdd(quad[1].position, -frame->origin_x, right, quad[1].position);
 
-    quad[2].uv[0] = 1.0f;
-    quad[2].uv[1] = 0.0f;
+    quad[2].texture_uv[0] = 1.0f;
+    quad[2].texture_uv[1] = 0.0f;
     MrQ2::VecSplatN(quad[2].rgba, 1.0f);
     quad[2].rgba[3] = alpha;
     MrQ2::Vec3MAdd(entity.origin, frame->height - frame->origin_y, up, quad[2].position);
     MrQ2::Vec3MAdd(quad[2].position, frame->width - frame->origin_x, right, quad[2].position);
 
-    quad[3].uv[0] = 1.0f;
-    quad[3].uv[1] = 1.0f;
+    quad[3].texture_uv[0] = 1.0f;
+    quad[3].texture_uv[1] = 1.0f;
     MrQ2::VecSplatN(quad[3].rgba, 1.0f);
     quad[3].rgba[3] = alpha;
     MrQ2::Vec3MAdd(entity.origin, -frame->origin_y, up, quad[3].position);
@@ -1586,7 +1659,8 @@ void ViewRenderer::DrawSpriteModel(const FrameData & frame_data, const entity_t 
 
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
-    args.optional_tex = model->data.skins[frame_num];
+    args.diffuse_tex  = model->data.skins[frame_num];
+    args.lightmap_tex = nullptr;
     args.topology     = PrimitiveTopology::kTriangleList;
     args.depth_hack   = false;
 
@@ -1636,7 +1710,7 @@ void ViewRenderer::DrawAliasMD2Model(const FrameData & frame_data, const entity_
     }
     if (skin == nullptr)
     {
-        skin = frame_data.tex_store.tex_white2x2; // fallback...
+        skin = m_tex_white2x2; // fallback...
     }
 
     // Draw interpolated frame:
@@ -1698,7 +1772,8 @@ void ViewRenderer::DrawBeamModel(const FrameData & frame_data, const entity_t & 
 
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
-    args.optional_tex = nullptr; // No texture
+    args.diffuse_tex  = nullptr; // No texture
+    args.lightmap_tex = nullptr;
     args.topology     = PrimitiveTopology::kTriangleStrip;
     args.depth_hack   = false;
 
@@ -1741,7 +1816,8 @@ void ViewRenderer::DrawNullModel(const FrameData & frame_data, const entity_t & 
 
     BeginBatchArgs args;
     args.model_matrix = MakeEntityModelMatrix(entity);
-    args.optional_tex = frame_data.tex_store.tex_debug; // Use the debug checker pattern texture.
+    args.diffuse_tex  = frame_data.tex_store.tex_debug; // Use the debug checker pattern texture.
+    args.lightmap_tex = nullptr;
     args.topology     = PrimitiveTopology::kTriangleFan;
     args.depth_hack   = false;
 
@@ -1749,22 +1825,22 @@ void ViewRenderer::DrawNullModel(const FrameData & frame_data, const entity_t & 
     MiniImBatch batch = BeginBatch(args);
     {
         // Bottom halve
-        batch.SetTriangleFanFirstVertex({ {0.0f, 0.0f, -16.0f}, {0.0f, 0.0f},
+        batch.SetTriangleFanFirstVertex({ {0.0f, 0.0f, -16.0f}, {0.0f, 0.0f}, {0.0f, 0.0f},
                                           {color[0], color[1], color[2], color[3]} });
         for (int i = 0, j = 0; i <= 4; ++i)
         {
             batch.PushVertex({ {16.0f * std::cosf(i * M_PI / 2.0f), 16.0f * std::sinf(i * M_PI / 2.0f), 0.0f},
-                               {uvs[j][0], uvs[j][1]}, {color[0], color[1], color[2], color[3]} });
+                               {uvs[j][0], uvs[j][1]}, {0.0f, 0.0f}, {color[0], color[1], color[2], color[3]} });
             if (++j > 2) j = 1;
         }
 
         // Top halve
-        batch.SetTriangleFanFirstVertex({ {0.0f, 0.0f, 16.0f}, {0.0f, 0.0f},
+        batch.SetTriangleFanFirstVertex({ {0.0f, 0.0f, 16.0f}, {0.0f, 0.0f}, {0.0f, 0.0f},
                                           {color[0], color[1], color[2], color[3]} });
         for (int i = 4, j = 0; i >= 0; --i)
         {
             batch.PushVertex({ {16.0f * std::cosf(i * M_PI / 2.0f), 16.0f * std::sinf(i * M_PI / 2.0f), 0.0f},
-                               {uvs[j][0], uvs[j][1]}, {color[0], color[1], color[2], color[3]} });
+                               {uvs[j][0], uvs[j][1]}, {0.0f, 0.0f}, {color[0], color[1], color[2], color[3]} });
             if (++j > 2) j = 1;
         }
     }

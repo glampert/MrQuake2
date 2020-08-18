@@ -19,6 +19,7 @@ struct VertexInputLayoutD3D12 final
 
         kVertexPosition,
         kVertexTexCoords,
+        kVertexLmCoords,
         kVertexColor,
 
         kElementTypeCount

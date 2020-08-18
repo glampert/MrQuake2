@@ -159,7 +159,8 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
 
     BeginBatchArgs batch_args;
     batch_args.model_matrix = model_matrix;
-    batch_args.optional_tex = model_skin;
+    batch_args.diffuse_tex  = model_skin;
+    batch_args.lightmap_tex = nullptr;
     batch_args.depth_hack   = (entity.flags & RF_DEPTHHACK) != 0;
 
     // Build the final model vertices:
@@ -196,8 +197,10 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
                     order += 3;
 
                     DrawVertex3D dv;
-                    dv.uv[0]   = 0.0f;
-                    dv.uv[1]   = 0.0f;
+                    dv.texture_uv[0] = 0.0f;
+                    dv.texture_uv[1] = 0.0f;
+                    dv.lightmap_uv[0] = 0.0f;
+                    dv.lightmap_uv[1] = 0.0f;
                     dv.rgba[0] = shade_light[0];
                     dv.rgba[1] = shade_light[1];
                     dv.rgba[2] = shade_light[2];
@@ -232,8 +235,10 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
                     const float l = shade_dots[verts[index_xyz].lightnormalindex];
 
                     DrawVertex3D dv;
-                    dv.uv[0]   = u;
-                    dv.uv[1]   = v;
+                    dv.texture_uv[0] = u;
+                    dv.texture_uv[1] = v;
+                    dv.lightmap_uv[0] = 0.0f;
+                    dv.lightmap_uv[1] = 0.0f;
                     dv.rgba[0] = l * shade_light[0];
                     dv.rgba[1] = l * shade_light[1];
                     dv.rgba[2] = l * shade_light[2];

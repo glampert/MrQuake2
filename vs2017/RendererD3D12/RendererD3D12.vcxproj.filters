@@ -88,6 +88,9 @@
     <ClCompile Include="..\..\src\renderers\common\ViewRenderer.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\Lightmaps.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\renderers\d3d12\BufferD3D12.hpp">
@@ -166,6 +169,9 @@
       <Filter>Backend</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\renderers\common\ViewRenderer.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\Lightmaps.hpp">
       <Filter>Common</Filter>
     </ClInclude>
   </ItemGroup>

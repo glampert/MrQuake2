@@ -4,6 +4,7 @@
 //
 
 #include "TextureStore.hpp"
+#include "Lightmaps.hpp"
 #include <algorithm>
 #include <random>
 
@@ -86,6 +87,7 @@ static const char * const TextureType_Strings[] = {
     "kWall",
     "kSky",
     "kPic",
+    "kLightmap",
 };
 
 static_assert(ArrayLength(TextureType_Strings) == unsigned(TextureType::kCount), "Update this if the enum changes!");
@@ -261,12 +263,16 @@ void TextureStore::Init(const RenderDevice & device)
     TouchResidentTextures();
 
     GameInterface::Printf("TextureStore initialized.");
+
+    LightmapManager::Instance().Init(*this);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void TextureStore::Shutdown()
 {
+    LightmapManager::Instance().Shutdown();
+
     tex_scrap    = nullptr;
     tex_conchars = nullptr;
     tex_conback  = nullptr;
@@ -308,6 +314,33 @@ void TextureStore::UploadScrapIfNeeded()
 
         m_scrap_dirty = false;
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+const TextureImage * TextureStore::AllocLightmap(const ColorRGBA32* pixels)
+{
+    MRQ2_ASSERT(pixels   != nullptr);
+    MRQ2_ASSERT(m_device != nullptr);
+
+    char lmap_name[128] = {};
+    sprintf_s(lmap_name, "lightmap_%i", m_next_lmap_index++);
+
+    const uint32_t w = kLightmapBlockWidth;
+    const uint32_t h = kLightmapBlockHeight;
+
+    // Create a one mip level texture tagged as a scrap image.
+    TextureImage * new_lightmap = m_teximages_pool.Allocate();
+    ::new(new_lightmap) TextureImage{ pixels, m_registration_num, TextureType::kLightmap, /*scrap =*/true, w, h, {}, {}, lmap_name };
+
+    constexpr uint32_t  num_mip_levels = 1;
+    const ColorRGBA32 * mip_init_data[num_mip_levels]  = { new_lightmap->BasePixels() };
+    const Vec2u16       mip_dimensions[num_mip_levels] = { new_lightmap->MipMapDimensions(0) };
+
+    new_lightmap->m_texture.Init(*m_device, TextureType::kLightmap, /*is_scrap =*/true, mip_init_data, mip_dimensions, num_mip_levels, new_lightmap->Name().CStr());
+    m_teximages_cache.push_back(new_lightmap);
+
+    return new_lightmap;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -429,7 +462,7 @@ void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const ch
             sprintf_s(fullname, "%s/%s.tga", path, tex->Name().CStrNoExt(filename));
             GameInterface::FS::CreatePath(fullname);
 
-            if (stbi_write_tga(fullname, tex->Width(), tex->Height(), TextureImage::kBytesPerPixel, tex->BasePixels()) == 0)
+            if (!TGASaveToFile(fullname, tex->Width(), tex->Height(), tex->BasePixels()))
             {
                 GameInterface::Printf("Failed to write image '%s'", fullname);
             }
@@ -439,7 +472,7 @@ void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const ch
                 for (uint32_t mip = 1; mip < tex->NumMipMapLevels(); ++mip)
                 {
                     sprintf_s(fullname, "%s/%s_mip%u.tga", path, tex->Name().CStrNoExt(filename), mip);
-                    if (stbi_write_tga(fullname, tex->Width(mip), tex->Height(mip), TextureImage::kBytesPerPixel, tex->MipMapPixels(mip)) == 0)
+                    if (!TGASaveToFile(fullname, tex->Width(mip), tex->Height(mip), tex->MipMapPixels(mip)))
                     {
                         GameInterface::Printf("Failed to write image '%s'", fullname);
                     }
@@ -454,8 +487,7 @@ void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const ch
             sprintf_s(fullname, "%s/%s.png", path, tex->Name().CStrNoExt(filename));
             GameInterface::FS::CreatePath(fullname);
 
-            int stride = tex->Width() * TextureImage::kBytesPerPixel;
-            if (stbi_write_png(fullname, tex->Width(), tex->Height(), TextureImage::kBytesPerPixel, tex->BasePixels(), stride) == 0)
+            if (!PNGSaveToFile(fullname, tex->Width(), tex->Height(), tex->BasePixels()))
             {
                 GameInterface::Printf("Failed to write image '%s'", fullname);
             }
@@ -465,8 +497,7 @@ void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const ch
                 for (uint32_t mip = 1; mip < tex->NumMipMapLevels(); ++mip)
                 {
                     sprintf_s(fullname, "%s/%s_mip%u.png", path, tex->Name().CStrNoExt(filename), mip);
-                    stride = tex->Width(mip) * TextureImage::kBytesPerPixel;
-                    if (stbi_write_png(fullname, tex->Width(mip), tex->Height(mip), TextureImage::kBytesPerPixel, tex->MipMapPixels(mip), stride) == 0)
+                    if (!PNGSaveToFile(fullname, tex->Width(mip), tex->Height(mip), tex->MipMapPixels(mip)))
                     {
                         GameInterface::Printf("Failed to write image '%s'", fullname);
                     }
@@ -539,7 +570,7 @@ void TextureStore::TouchResidentTextures()
     if (!m_scrap.IsInitialised())
     {
         m_scrap.Init();
-        m_teximages_cache.push_back(CreateScrapTexture(m_scrap.Size(), m_scrap.pixels.get()));
+        m_teximages_cache.push_back(CreateScrapTexture(m_scrap.Size(), m_scrap.pixels));
     }
 
     // This texture is generated at runtime
@@ -620,9 +651,12 @@ void TextureStore::BeginRegistration()
 {
     GameInterface::Printf("==== TextureStore::BeginRegistration ====");
     ++m_registration_num;
+    m_next_lmap_index = 0;
 
     // Reference them on every BeginRegistration so they will always have the most current timestamp.
     TouchResidentTextures();
+
+    LightmapManager::Instance().BeginRegistration();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -631,13 +665,20 @@ void TextureStore::EndRegistration()
 {
     GameInterface::Printf("==== TextureStore::EndRegistration ====");
 
-    int num_removed = 0;
-    auto remove_pred = [this, &num_removed](TextureImage * tex)
+    LightmapManager::Instance().EndRegistration();
+
+    int num_textures_removed = 0;
+    int num_lmaps_removed = 0;
+
+    auto remove_pred = [this, &num_textures_removed, &num_lmaps_removed](TextureImage * tex)
     {
         if (tex->m_reg_num != m_registration_num)
         {
+            if (tex->Type() == TextureType::kLightmap)
+                ++num_lmaps_removed;
+
             DestroyTexture(tex);
-            ++num_removed;
+            ++num_textures_removed;
             return true;
         }
         return false;
@@ -648,7 +689,7 @@ void TextureStore::EndRegistration()
     auto last  = m_teximages_cache.end();
     m_teximages_cache.erase(std::remove_if(first, last, remove_pred), last);
 
-    GameInterface::Printf("Freed %i unused textures.", num_removed);
+    GameInterface::Printf("Freed %i unused textures (%i lightmaps).", num_textures_removed, num_lmaps_removed);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1393,6 +1434,29 @@ ColorRGBA32 RandomDebugColor()
     MRQ2_ASSERT(color_index < kNumDebugColors);
 
     return DebugColorsTable[color_index];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// STB Image writers
+///////////////////////////////////////////////////////////////////////////////
+
+bool TGASaveToFile(const char * filename, int width, int height, const ColorRGBA32 * pixels)
+{
+    if (stbi_write_tga(filename, width, height, TextureImage::kBytesPerPixel, pixels) == 0)
+    {
+        return false;
+    }
+    return true;
+}
+
+bool PNGSaveToFile(const char * filename, int width, int height, const ColorRGBA32 * pixels)
+{
+    const int stride = width * TextureImage::kBytesPerPixel;
+    if (stbi_write_png(filename, width, height, TextureImage::kBytesPerPixel, pixels, stride) == 0)
+    {
+        return false;
+    }
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -23,6 +23,7 @@ ConstBuffers<DLLInterface::PerFrameShaderConstants> DLLInterface::sm_per_frame_s
 ConstBuffers<DLLInterface::PerViewShaderConstants>  DLLInterface::sm_per_view_shader_consts;
 
 // Cached Cvars:
+CvarWrapper DLLInterface::sm_debug_lightmaps;
 CvarWrapper DLLInterface::sm_surf_use_debug_color;
 CvarWrapper DLLInterface::sm_force_mip_level;
 CvarWrapper DLLInterface::sm_disable_texturing;
@@ -40,6 +41,7 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
     auto r_renderdoc = GameInterface::Cvar::Get("r_renderdoc", "0",    CvarWrapper::kFlagArchive);
     auto r_debug     = GameInterface::Cvar::Get("r_debug",     "0",    CvarWrapper::kFlagArchive);
 
+    sm_debug_lightmaps      = GameInterface::Cvar::Get("r_debug_lightmaps",      "0",  0);
     sm_surf_use_debug_color = GameInterface::Cvar::Get("r_surf_use_debug_color", "0",  0);
     sm_force_mip_level      = GameInterface::Cvar::Get("r_force_mip_level",      "-1", 0);
     sm_disable_texturing    = GameInterface::Cvar::Get("r_disable_texturing",    "0",  0);
@@ -187,35 +189,40 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
 
     // Debug flags
     {
-        sm_per_frame_shader_consts.data.debug_mode = false;
+        sm_per_frame_shader_consts.data.debug_mode = DebugMode::kNone;
         sm_per_frame_shader_consts.data.forced_mip_level = sm_force_mip_level.AsFloat();
 
         if (sm_per_frame_shader_consts.data.forced_mip_level >= 0.0f)
         {
-            sm_per_frame_shader_consts.data.debug_mode = true;
+            sm_per_frame_shader_consts.data.debug_mode = DebugMode::kForcedMipLevel;
+        }
+
+        if (sm_debug_lightmaps.IsSet())
+        {
+            sm_per_frame_shader_consts.data.debug_mode = DebugMode::kViewLightmaps;
         }
 
         if (sm_surf_use_debug_color.IsSet())
         {
-            sm_per_frame_shader_consts.data.debug_mode = true;
+            sm_per_frame_shader_consts.data.debug_mode = DebugMode::kBlendDebugColor;
         }
 
         if (sm_disable_texturing.IsSet()) // Use only debug vertex color
         {
             VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 0.0f);
-            VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling, 1.0f);
-            sm_per_frame_shader_consts.data.debug_mode = true;
+            VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling,  1.0f);
+            sm_per_frame_shader_consts.data.debug_mode = DebugMode::kDisableTexturing;
         }
         else if (sm_blend_debug_color.IsSet()) // Blend debug vertex color with texture
         {
             VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 1.0f);
-            VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling, 1.0f);
-            sm_per_frame_shader_consts.data.debug_mode = true;
+            VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling,  1.0f);
+            sm_per_frame_shader_consts.data.debug_mode = DebugMode::kBlendDebugColor;
         }
         else // Normal rendering
         {
             VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 1.0f);
-            VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling, 0.0f);
+            VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling,  0.0f);
         }
     }
 

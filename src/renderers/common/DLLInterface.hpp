@@ -71,14 +71,24 @@ private:
     static ModelStore      sm_model_store;
     static ViewRenderer    sm_view_renderer;
 
+    // These must match the shader equivalents!
+    enum class DebugMode : std::uint32_t
+    {
+        kNone             = 0,
+        kForcedMipLevel   = 1,
+        kDisableTexturing = 2,
+        kBlendDebugColor  = 3,
+        kViewLightmaps    = 4,
+    };
+
     // Constant buffers:
     struct PerFrameShaderConstants
     {
-        vec2_t screen_dimensions;     // Only XY used.
-        Bool32 debug_mode;            // [debug] if nonzero uses the debug shader path
-        float  forced_mip_level;      // [debug] if >= 0, force that mipmap level
-        vec4_t texture_color_scaling; // [debug] multiplied with texture color
-        vec4_t vertex_color_scaling;  // [debug] multiplied with vertex color
+        vec2_t    screen_dimensions;     // Only XY used.
+        DebugMode debug_mode;            // [debug] if nonzero uses the debug shader path
+        float     forced_mip_level;      // [debug] if >= 0, force that mipmap level
+        vec4_t    texture_color_scaling; // [debug] multiplied with texture color
+        vec4_t    vertex_color_scaling;  // [debug] multiplied with vertex color
     };
     static ConstBuffers<PerFrameShaderConstants> sm_per_frame_shader_consts;
 
@@ -89,6 +99,7 @@ private:
     static ConstBuffers<PerViewShaderConstants> sm_per_view_shader_consts;
 
     // Cached Cvars:
+    static CvarWrapper sm_debug_lightmaps;
     static CvarWrapper sm_surf_use_debug_color;
     static CvarWrapper sm_force_mip_level;
     static CvarWrapper sm_disable_texturing;

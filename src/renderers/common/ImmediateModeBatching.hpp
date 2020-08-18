@@ -23,7 +23,8 @@ namespace MrQ2
 struct DrawVertex3D
 {
     vec3_t position;
-    vec2_t uv;
+    vec2_t texture_uv;
+    vec2_t lightmap_uv;
     vec4_t rgba;
 };
 

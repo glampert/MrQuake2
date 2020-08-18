@@ -21,12 +21,14 @@ struct RootSignatureD3D12 final
 
         // Textures/samplers
         kRootParamIndexTexture0,
+        kRootParamIndexTexture1,
         kRootParamIndexSampler0,
+        kRootParamIndexSampler1,
 
         // Internal counts
         kCBufferCount = 3,
-        kTextureCount = 1,
-        kSamplerCount = 1,
+        kTextureCount = 2,
+        kSamplerCount = 2,
         kRootParameterCount = kCBufferCount + kTextureCount + kSamplerCount,
 
         // In 32bit values

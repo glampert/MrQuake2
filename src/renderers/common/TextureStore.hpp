@@ -7,9 +7,7 @@
 #include "Common.hpp"
 #include "Pool.hpp"
 #include "RenderInterface.hpp"
-
 #include <vector>
-#include <memory>
 
 namespace MrQ2
 {
@@ -37,6 +35,7 @@ enum class TextureType : std::uint8_t
     kWall,   // WALL/miptex_t format (mipmaps=yes)
     kSky,    // PCX or TGA           (mipmaps=yes)
     kPic,    // Usually PCX          (mipmaps=no)
+    kLightmap,
 
     // Number of items in the enum - not a valid texture type.
     kCount
@@ -212,6 +211,9 @@ public:
     const TextureImage * Find(const char * name, TextureType tt);       // Must be in cache, null otherwise
     const TextureImage * FindOrLoad(const char * name, TextureType tt); // Load if necessary
 
+    // Lightmaps
+    const TextureImage * AllocLightmap(const ColorRGBA32* pixels);
+
     // Dumps all loaded textures to the correct paths, creating dirs as needed.
     void DumpAllLoadedTexturesToFile(const char * path, const char * file_type, bool dump_mipmaps) const;
 
@@ -283,20 +285,31 @@ private:
     // reducing the number of texture switches when rendering.
     struct ScrapAtlas
     {
-        std::unique_ptr<int[]>         allocated; // Allocated space map
-        std::unique_ptr<ColorRGBA32[]> pixels;    // RGBA pixels
+        int * allocated{ nullptr };      // Allocated space map
+        ColorRGBA32 * pixels{ nullptr }; // RGBA pixels
 
         void Init()
         {
             // Allocate zero-initialized arrays
-            allocated.reset(new(MemTag::kTextures) int[kScrapSize]{});
-            pixels.reset(new(MemTag::kTextures) ColorRGBA32[kScrapSize * kScrapSize]{});
+
+            size_t size = sizeof(int) * kScrapSize;
+            allocated = (int *)MemAllocTracked(size, MemTag::kTextures);
+            std::memset(allocated, 0, size);
+
+            size = sizeof(ColorRGBA32) * (kScrapSize * kScrapSize);
+            pixels = (ColorRGBA32 *)MemAllocTracked(size, MemTag::kTextures);
+            std::memset(pixels, 0, size);
         }
 
         void Shutdown()
         {
+            size_t size = sizeof(int) * kScrapSize;
+            MemFreeTracked(allocated, size, MemTag::kTextures);
             allocated = nullptr;
-            pixels    = nullptr;
+
+            size = sizeof(ColorRGBA32) * (kScrapSize * kScrapSize);
+            MemFreeTracked(pixels, size, MemTag::kTextures);
+            pixels = nullptr;
         }
 
         bool IsInitialised() const  { return allocated != nullptr; }
@@ -306,6 +319,7 @@ private:
     // Scrap texture atlas to group small textures
     ScrapAtlas m_scrap;
     bool m_scrap_dirty{ false };
+    int m_next_lmap_index{ 0 };
 
     // Loaded textures cache
     std::uint32_t m_registration_num{ 0 };
@@ -319,6 +333,9 @@ private:
 
 bool TGALoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height);
 bool PCXLoadFromFile(const char * filename, Color8 ** pic, int * width, int * height, ColorRGBA32 * palette);
+
+bool TGASaveToFile(const char * filename, int width, int height, const ColorRGBA32 * pixels);
+bool PNGSaveToFile(const char * filename, int width, int height, const ColorRGBA32 * pixels);
 
 constexpr int kNumTextureFilterOptions = 4;
 extern const char * const TextureFilterOptionNames[kNumTextureFilterOptions];

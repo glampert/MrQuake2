@@ -45,8 +45,11 @@ bool ShaderProgramD3D12::LoadFromFile(const DeviceD3D12 & device, const VertexIn
     }
 
     // Convert and cache the D3D12 input layout
-    const char * const d3d_input_layout_type_conv[] = { nullptr, "POSITION", "TEXCOORD", "COLOR" };
+    const char * const d3d_input_layout_type_conv[] = { nullptr, "POSITION", "TEXCOORD", "TEXCOORD", "COLOR" };
     static_assert(ArrayLength(d3d_input_layout_type_conv) == VertexInputLayoutD3D12::kElementTypeCount);
+
+    const int d3d_semantic_indices[] = { 0, 0, 0, 1, 0 };
+    static_assert(ArrayLength(d3d_semantic_indices) == VertexInputLayoutD3D12::kElementTypeCount);
 
     const DXGI_FORMAT d3d_input_layout_format_conv[] = { DXGI_FORMAT_UNKNOWN, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT, DXGI_FORMAT_R32G32B32A32_FLOAT };
     static_assert(ArrayLength(d3d_input_layout_format_conv) == VertexInputLayoutD3D12::kElementFormatCount);
@@ -61,7 +64,7 @@ bool ShaderProgramD3D12::LoadFromFile(const DeviceD3D12 & device, const VertexIn
         }
 
         m_input_layout_d3d[e].SemanticName         = d3d_input_layout_type_conv[element.type];
-        m_input_layout_d3d[e].SemanticIndex        = 0;
+        m_input_layout_d3d[e].SemanticIndex        = d3d_semantic_indices[element.type];
         m_input_layout_d3d[e].Format               = d3d_input_layout_format_conv[element.format];
         m_input_layout_d3d[e].InputSlot            = 0;
         m_input_layout_d3d[e].AlignedByteOffset    = element.offset;

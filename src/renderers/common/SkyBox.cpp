@@ -440,8 +440,11 @@ void SkyBox::MakeSkyVec(float s, float t, const int axis, DrawVertex3D & out_ver
     out_vert.position[1] = v[1];
     out_vert.position[2] = v[2];
 
-    out_vert.uv[0] = s;
-    out_vert.uv[1] = 1.0f - t;
+    out_vert.texture_uv[0] = s;
+    out_vert.texture_uv[1] = 1.0f - t;
+
+    out_vert.lightmap_uv[0] = 0.0f;
+    out_vert.lightmap_uv[1] = 0.0f;
 
     out_vert.rgba[0] = 1.0f;
     out_vert.rgba[1] = 1.0f;
