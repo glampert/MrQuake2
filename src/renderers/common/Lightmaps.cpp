@@ -92,8 +92,7 @@ static void AddDynamicLights(float dest_light_block[kLightBlockSize], const Mode
 
 static void StoreLightmap(std::uint8_t * dest, const int stride, const int smax, const int tmax, const float light_block[kLightBlockSize])
 {
-    static auto r_lightmap_format = GameInterface::Cvar::Get("r_lightmap_format", "D", CvarWrapper::kFlagArchive);
-    const auto lightmap_format = LightmapFormat(r_lightmap_format.AsStr()[0]);
+    const auto lightmap_format = LightmapFormat(Config::r_lightmap_format.AsStr()[0]);
 
     const float * light_block_ptr = light_block;
 
@@ -428,11 +427,9 @@ void LightmapManager::UploadBlock(const bool is_dynamic)
 
 void LightmapManager::DebugDumpToFile() const
 {
-    static auto r_lightmap_format = GameInterface::Cvar::Get("r_lightmap_format", "D", CvarWrapper::kFlagArchive);
-
     // Dump the current lightmap to a PNG
     char name[512] = {};
-    sprintf_s(name, "lightmaps/%c_lightmap_%d.png", r_lightmap_format.AsStr()[0], m_current_lightmap_texture);
+    sprintf_s(name, "lightmaps/%c_lightmap_%d.png", Config::r_lightmap_format.AsStr()[0], m_current_lightmap_texture);
     PNGSaveToFile(name, kLightmapBlockWidth, kLightmapBlockHeight, m_lightmap_buffer);
 }
 
@@ -465,8 +462,7 @@ void LightmapManager::CreateSurfaceLightmap(ModelSurface * surf)
     lm_block += (surf->light_t * kLightmapBlockWidth + surf->light_s) * kLightmapBytesPerPixel;
     const int lm_stride = kLightmapBlockWidth * kLightmapBytesPerPixel;
 
-    static auto r_lightmap_intensity = GameInterface::Cvar::Get("r_lightmap_intensity", "3", CvarWrapper::kFlagArchive);
-    const float lightmap_intensity = r_lightmap_intensity.AsFloat();
+    const float lightmap_intensity = Config::r_lightmap_intensity.AsFloat();
 
     // No dynamic lights at this point, just the base lightmaps
     const int frame_num = -1;

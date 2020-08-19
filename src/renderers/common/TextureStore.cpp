@@ -132,8 +132,8 @@ static void MipDebugBorder(const uint32_t mip, const uint32_t w, const uint32_t 
 
 void TextureImage::GenerateMipMaps()
 {
-    const bool no_mipmaps    = TextureStore::no_mipmaps.IsSet();
-    const bool debug_mipmaps = TextureStore::debug_mipmaps.IsSet();
+    const bool no_mipmaps    = Config::r_no_mipmaps.IsSet();
+    const bool debug_mipmaps = Config::r_debug_mipmaps.IsSet();
 
     if (no_mipmaps)
     {
@@ -243,8 +243,6 @@ void TextureImage::GenerateMipMaps()
 ///////////////////////////////////////////////////////////////////////////////
 
 ColorRGBA32 TextureStore::sm_cinematic_palette[256];
-CvarWrapper TextureStore::no_mipmaps;
-CvarWrapper TextureStore::debug_mipmaps;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -252,9 +250,6 @@ void TextureStore::Init(const RenderDevice & device)
 {
     MRQ2_ASSERT(m_device == nullptr);
     m_device = &device;
-
-    no_mipmaps    = GameInterface::Cvar::Get("r_no_mipmaps",    "0", CvarWrapper::kFlagArchive);
-    debug_mipmaps = GameInterface::Cvar::Get("r_debug_mipmaps", "0", 0);
 
     m_teximages_cache.reserve(kTexturePoolSize);
     MemTagsTrackAlloc(m_teximages_cache.capacity() * sizeof(TextureImage *), MemTag::kTextures);

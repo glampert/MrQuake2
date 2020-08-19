@@ -54,12 +54,12 @@ public:
     static void DrawFadeScreen();
     static void DrawStretchRaw(const int x, const int y, int w, int h, const int cols, const int rows, const qbyte * const data);
 
+private:
+
     // Not part of the Quake2 DLL renderer interface
     static void DrawAltString(int x, int y, const char * s);
     static void DrawNumberBig(int x, int y, int color, int width, int value);
     static void DrawFpsCounter();
-
-private:
 
     static void R_Flash(const float blend[4]);
     static void ChangeTextureFilterCmd();
@@ -97,15 +97,6 @@ private:
         RenderMatrix view_proj_matrix;
     };
     static ConstBuffers<PerViewShaderConstants> sm_per_view_shader_consts;
-
-    // Cached Cvars:
-    static CvarWrapper sm_debug_lightmaps;
-    static CvarWrapper sm_surf_use_debug_color;
-    static CvarWrapper sm_force_mip_level;
-    static CvarWrapper sm_disable_texturing;
-    static CvarWrapper sm_blend_debug_color;
-    static CvarWrapper sm_draw_fps_counter;
-    static CvarWrapper sm_no_draw;
 };
 
 } // MrQ2

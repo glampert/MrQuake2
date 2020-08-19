@@ -624,6 +624,7 @@ void Initialize(const refimport_s & ri, const char * ref_name)
     g_refimport = ri;
     g_refname = ref_name;
     InstallGameMemoryHooks();
+    Config::Initialize();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -919,5 +920,94 @@ const char * CvarWrapper::Name() const
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Global configuration parameters
+///////////////////////////////////////////////////////////////////////////////
+
+namespace Config
+{
+
+// Video
+CvarWrapper vid_xpos;
+CvarWrapper vid_ypos;
+CvarWrapper vid_mode;
+CvarWrapper vid_width;
+CvarWrapper vid_height;
+
+// Renderer misc
+CvarWrapper r_renderdoc;
+CvarWrapper r_debug;
+CvarWrapper r_debug_frame_events;
+CvarWrapper r_draw_fps_counter;
+CvarWrapper r_surf_use_debug_color;
+CvarWrapper r_blend_debug_color;
+CvarWrapper r_max_anisotropy;
+CvarWrapper r_no_mipmaps;
+CvarWrapper r_debug_mipmaps;
+CvarWrapper r_force_mip_level;
+CvarWrapper r_tex_filtering;
+CvarWrapper r_disable_texturing;
+CvarWrapper r_world_ambient;
+CvarWrapper r_sky_use_pal_textures;
+CvarWrapper r_sky_force_full_draw;
+CvarWrapper r_lightmap_format;
+CvarWrapper r_lightmap_intensity;
+CvarWrapper r_debug_lightmaps;
+CvarWrapper r_no_draw;
+
+// ViewRenderer configs
+CvarWrapper r_use_vertex_index_buffers;
+CvarWrapper r_force_null_entity_models;
+CvarWrapper r_lerp_entity_models;
+CvarWrapper r_skip_draw_alpha_surfs;
+CvarWrapper r_skip_draw_texture_chains;
+CvarWrapper r_skip_draw_world;
+CvarWrapper r_skip_draw_sky;
+CvarWrapper r_skip_draw_entities;
+CvarWrapper r_skip_brush_mods;
+CvarWrapper r_intensity;
+CvarWrapper r_water_hack;
+
+void Initialize()
+{
+    vid_xpos = GameInterface::Cvar::Get("vid_xpos", "0", CvarWrapper::kFlagArchive);
+    vid_ypos = GameInterface::Cvar::Get("vid_ypos", "0", CvarWrapper::kFlagArchive);
+    vid_mode = GameInterface::Cvar::Get("vid_mode", "6", CvarWrapper::kFlagArchive);
+    vid_width = GameInterface::Cvar::Get("vid_width", "1024", CvarWrapper::kFlagArchive);
+    vid_height = GameInterface::Cvar::Get("vid_height", "768", CvarWrapper::kFlagArchive);
+
+    r_renderdoc = GameInterface::Cvar::Get("r_renderdoc", "0", CvarWrapper::kFlagArchive);
+    r_debug = GameInterface::Cvar::Get("r_debug", "0", CvarWrapper::kFlagArchive);
+    r_debug_frame_events = GameInterface::Cvar::Get("r_debug_frame_events", "0", CvarWrapper::kFlagArchive);
+    r_draw_fps_counter = GameInterface::Cvar::Get("r_draw_fps_counter", "0", CvarWrapper::kFlagArchive);
+    r_surf_use_debug_color = GameInterface::Cvar::Get("r_surf_use_debug_color", "0", 0);
+    r_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
+    r_max_anisotropy = GameInterface::Cvar::Get("r_max_anisotropy", "1", CvarWrapper::kFlagArchive);
+    r_no_mipmaps = GameInterface::Cvar::Get("r_no_mipmaps", "0", CvarWrapper::kFlagArchive);
+    r_debug_mipmaps = GameInterface::Cvar::Get("r_debug_mipmaps", "0", 0);
+    r_tex_filtering = GameInterface::Cvar::Get("r_tex_filtering", "0", CvarWrapper::kFlagArchive);
+    r_disable_texturing = GameInterface::Cvar::Get("r_disable_texturing", "0", 0);
+    r_force_mip_level = GameInterface::Cvar::Get("r_force_mip_level", "-1", 0);
+    r_world_ambient = GameInterface::Cvar::Get("r_world_ambient", "1.2", CvarWrapper::kFlagArchive);
+    r_sky_use_pal_textures = GameInterface::Cvar::Get("r_sky_use_pal_textures", "0", CvarWrapper::kFlagArchive);
+    r_sky_force_full_draw = GameInterface::Cvar::Get("r_sky_force_full_draw", "0", 0);
+    r_lightmap_format = GameInterface::Cvar::Get("r_lightmap_format", "D", CvarWrapper::kFlagArchive);
+    r_lightmap_intensity = GameInterface::Cvar::Get("r_lightmap_intensity", "3", CvarWrapper::kFlagArchive);
+    r_debug_lightmaps = GameInterface::Cvar::Get("r_debug_lightmaps", "0", 0);
+    r_no_draw = GameInterface::Cvar::Get("r_no_draw", "0", 0);
+
+    r_use_vertex_index_buffers = GameInterface::Cvar::Get("r_use_vertex_index_buffers", "1", CvarWrapper::kFlagArchive);
+    r_force_null_entity_models = GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0);
+    r_lerp_entity_models = GameInterface::Cvar::Get("r_lerp_entity_models", "1", 0);
+    r_skip_draw_alpha_surfs = GameInterface::Cvar::Get("r_skip_draw_alpha_surfs", "0", 0);
+    r_skip_draw_texture_chains = GameInterface::Cvar::Get("r_skip_draw_texture_chains", "0", 0);
+    r_skip_draw_world = GameInterface::Cvar::Get("r_skip_draw_world", "0", 0);
+    r_skip_draw_sky = GameInterface::Cvar::Get("r_skip_draw_sky", "0", 0);
+    r_skip_draw_entities = GameInterface::Cvar::Get("r_skip_draw_entities", "0", 0);
+    r_skip_brush_mods = GameInterface::Cvar::Get("r_skip_brush_mods", "0", 0);
+    r_intensity = GameInterface::Cvar::Get("r_intensity", "2", CvarWrapper::kFlagArchive);
+    r_water_hack = GameInterface::Cvar::Get("r_water_hack", "0.5", CvarWrapper::kFlagArchive);
+}
+
+} // Config
 
 } // MrQ2

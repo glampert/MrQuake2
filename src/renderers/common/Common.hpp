@@ -453,8 +453,49 @@ namespace FS
 */
 namespace Config
 {
+    // Video
+    extern CvarWrapper vid_xpos;
+    extern CvarWrapper vid_ypos;
+    extern CvarWrapper vid_mode;
+    extern CvarWrapper vid_width;
+    extern CvarWrapper vid_height;
 
-// TODO: Move all CVars into a single place inside this namespace and cache them all at GameInterface::Initialize.
+    // Renderer misc
+    extern CvarWrapper r_renderdoc;
+    extern CvarWrapper r_debug;
+    extern CvarWrapper r_debug_frame_events;
+    extern CvarWrapper r_draw_fps_counter;
+    extern CvarWrapper r_surf_use_debug_color;
+    extern CvarWrapper r_blend_debug_color;
+    extern CvarWrapper r_max_anisotropy;
+    extern CvarWrapper r_no_mipmaps;
+    extern CvarWrapper r_debug_mipmaps;
+    extern CvarWrapper r_tex_filtering;
+    extern CvarWrapper r_disable_texturing;
+    extern CvarWrapper r_force_mip_level;
+    extern CvarWrapper r_world_ambient;
+    extern CvarWrapper r_sky_use_pal_textures;
+    extern CvarWrapper r_sky_force_full_draw;
+    extern CvarWrapper r_lightmap_format;
+    extern CvarWrapper r_lightmap_intensity;
+    extern CvarWrapper r_debug_lightmaps;
+    extern CvarWrapper r_no_draw;
+
+    // ViewRenderer configs
+    extern CvarWrapper r_use_vertex_index_buffers;
+    extern CvarWrapper r_force_null_entity_models;
+    extern CvarWrapper r_lerp_entity_models;
+    extern CvarWrapper r_skip_draw_alpha_surfs;
+    extern CvarWrapper r_skip_draw_texture_chains;
+    extern CvarWrapper r_skip_draw_world;
+    extern CvarWrapper r_skip_draw_sky;
+    extern CvarWrapper r_skip_draw_entities;
+    extern CvarWrapper r_skip_brush_mods;
+    extern CvarWrapper r_intensity;
+    extern CvarWrapper r_water_hack;
+
+    // Cache all the CVars above.
+    void Initialize();
 
 } // Config
 

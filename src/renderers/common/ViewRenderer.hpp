@@ -167,18 +167,6 @@ private:
     int m_old_view_cluster{ -1 };
     int m_old_view_cluster2{ -1 };
 
-    // Cached Cvars:
-    CvarWrapper m_use_vertex_index_buffers;
-    CvarWrapper m_force_null_entity_models;
-    CvarWrapper m_lerp_entity_models;
-    CvarWrapper m_skip_draw_alpha_surfs;
-    CvarWrapper m_skip_draw_texture_chains;
-    CvarWrapper m_skip_draw_world;
-    CvarWrapper m_skip_draw_sky;
-    CvarWrapper m_skip_draw_entities;
-    CvarWrapper m_skip_brush_mods;
-    CvarWrapper m_intensity;
-
     // Chain of world surfaces that draw with transparency (water/glass).
     const ModelSurface * m_alpha_world_surfaces{ nullptr };
 

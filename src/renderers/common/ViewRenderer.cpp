@@ -168,7 +168,7 @@ static RenderMatrix MakeEntityModelMatrix(const entity_t & entity, const bool fl
 
 ///////////////////////////////////////////////////////////////////////////////
 
-constexpr int kDiffuseTextureSlot = 0;
+constexpr int kDiffuseTextureSlot  = 0;
 constexpr int kLightmapTextureSlot = 1;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -178,17 +178,6 @@ constexpr int kLightmapTextureSlot = 1;
 void ViewRenderer::Init(const RenderDevice & device, const TextureStore & tex_store)
 {
     m_tex_white2x2 = tex_store.tex_white2x2;
-
-    m_use_vertex_index_buffers = GameInterface::Cvar::Get("r_use_vertex_index_buffers", "1", CvarWrapper::kFlagArchive);
-    m_force_null_entity_models = GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0);
-    m_lerp_entity_models       = GameInterface::Cvar::Get("r_lerp_entity_models", "1", 0);
-    m_skip_draw_alpha_surfs    = GameInterface::Cvar::Get("r_skip_draw_alpha_surfs", "0", 0);
-    m_skip_draw_texture_chains = GameInterface::Cvar::Get("r_skip_draw_texture_chains", "0", 0);
-    m_skip_draw_world          = GameInterface::Cvar::Get("r_skip_draw_world", "0", 0);
-    m_skip_draw_sky            = GameInterface::Cvar::Get("r_skip_draw_sky", "0", 0);
-    m_skip_draw_entities       = GameInterface::Cvar::Get("r_skip_draw_entities", "0", 0);
-    m_skip_brush_mods          = GameInterface::Cvar::Get("r_skip_brush_mods", "0", 0);
-    m_intensity                = GameInterface::Cvar::Get("r_intensity", "2", CvarWrapper::kFlagArchive);
 
     constexpr uint32_t kViewDrawBatchSize = 25000; // max vertices * num buffers
     m_vertex_buffers.Init(device, kViewDrawBatchSize);
@@ -341,7 +330,7 @@ void ViewRenderer::EndRegistration()
 
 void ViewRenderer::SetUpViewClusters(const FrameData & frame_data)
 {
-    if ((frame_data.view_def.rdflags & RDF_NOWORLDMODEL) || m_skip_draw_world.IsSet())
+    if ((frame_data.view_def.rdflags & RDF_NOWORLDMODEL) || Config::r_skip_draw_world.IsSet())
     {
         return;
     }
@@ -799,8 +788,8 @@ void ViewRenderer::MarkLeaves(ModelInstance & world_mdl)
 
 void ViewRenderer::DrawTextureChains(FrameData & frame_data)
 {
-    const bool do_draw   = !m_skip_draw_texture_chains.IsSet();
-    const bool use_vb_ib = m_use_vertex_index_buffers.IsSet();
+    const bool do_draw   = !Config::r_skip_draw_texture_chains.IsSet();
+    const bool use_vb_ib = Config::r_use_vertex_index_buffers.IsSet();
 
     auto & context  = frame_data.context;
     auto & cbuffers = frame_data.cbuffers;
@@ -922,7 +911,7 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
 
 void ViewRenderer::RenderTranslucentSurfaces(FrameData & frame_data)
 {
-    if (m_skip_draw_alpha_surfs.IsSet())
+    if (Config::r_skip_draw_alpha_surfs.IsSet())
     {
         return;
     }
@@ -931,7 +920,7 @@ void ViewRenderer::RenderTranslucentSurfaces(FrameData & frame_data)
 
     // The textures are prescaled up for a better
     // lighting range, so scale it back down.
-    const float inv_intensity = 1.0f / m_intensity.AsFloat();
+    const float inv_intensity = 1.0f / Config::r_intensity.AsFloat();
 
     // Draw water surfaces and windows.
     // The BSP tree is walked front to back, so unwinding the chain
@@ -1001,12 +990,12 @@ void ViewRenderer::RenderTranslucentSurfaces(FrameData & frame_data)
 
 void ViewRenderer::RenderTranslucentEntities(FrameData & frame_data)
 {
-    if (m_skip_draw_entities.IsSet())
+    if (Config::r_skip_draw_entities.IsSet())
     {
         return;
     }
 
-    const bool force_null_entity_models = m_force_null_entity_models.IsSet();
+    const bool force_null_entity_models = Config::r_force_null_entity_models.IsSet();
 
     for (const entity_t * entity : frame_data.translucent_entities)
     {
@@ -1229,8 +1218,7 @@ void ViewRenderer::DrawAnimatedWaterPolys(const ModelSurface & surf, const float
     // HACK: There's some noticeable z-fighting happening with lava and water touching walls when you go underwater.
     // Adding a small offset to the positions resolves it. No idea why this didn't happen with the original
     // OpenGL renderer, maybe the lower precision floating-point math was actually hiding the flickering?
-    static auto r_water_hack = GameInterface::Cvar::Get("r_water_hack", "0.5", CvarWrapper::kFlagArchive);
-    const float water_position_offset_hack = r_water_hack.AsFloat();
+    const float water_position_offset_hack = Config::r_water_hack.AsFloat();
 
     for (const ModelPoly * poly = surf.polys; poly; poly = poly->next)
     {
@@ -1291,7 +1279,7 @@ void ViewRenderer::RenderWorldModel(FrameData & frame_data)
     m_alpha_world_surfaces = nullptr;
     m_skybox.Clear(); // RecursiveWorldNode adds to the sky bounds
 
-    if ((frame_data.view_def.rdflags & RDF_NOWORLDMODEL) || m_skip_draw_world.IsSet())
+    if ((frame_data.view_def.rdflags & RDF_NOWORLDMODEL) || Config::r_skip_draw_world.IsSet())
     {
         return;
     }
@@ -1306,7 +1294,7 @@ void ViewRenderer::RenderWorldModel(FrameData & frame_data)
 void ViewRenderer::RenderSkyBox(FrameData & frame_data)
 {
     // Skybox bounds rendering if visible:
-    if (m_skybox.IsAnyPlaneVisible() && !m_skip_draw_sky.IsSet())
+    if (m_skybox.IsAnyPlaneVisible() && !Config::r_skip_draw_sky.IsSet())
     {
         const auto sky_t = RenderMatrix::Translation(frame_data.view_def.vieworg[0],
                                                      frame_data.view_def.vieworg[1],
@@ -1345,14 +1333,14 @@ void ViewRenderer::RenderSkyBox(FrameData & frame_data)
 
 void ViewRenderer::RenderSolidEntities(FrameData & frame_data)
 {
-    if (m_skip_draw_entities.IsSet())
+    if (Config::r_skip_draw_entities.IsSet())
     {
         return;
     }
 
     const int num_entities = frame_data.view_def.num_entities;
     const entity_t * const entities_list = frame_data.view_def.entities;
-    const bool force_null_entity_models = m_force_null_entity_models.IsSet();
+    const bool force_null_entity_models = Config::r_force_null_entity_models.IsSet();
 
     for (int e = 0; e < num_entities; ++e)
     {
@@ -1391,7 +1379,7 @@ void ViewRenderer::RenderSolidEntities(FrameData & frame_data)
 // This renders things like doors, windows and moving platforms.
 void ViewRenderer::DrawBrushModel(const FrameData & frame_data, const entity_t & entity)
 {
-    if (m_skip_brush_mods.IsSet())
+    if (Config::r_skip_brush_mods.IsSet())
     {
         return;
     }
@@ -1468,7 +1456,7 @@ void ViewRenderer::DrawBrushModel(const FrameData & frame_data, const entity_t &
     }
     */
 
-    const bool use_vb_ib = m_use_vertex_index_buffers.IsSet();
+    const bool use_vb_ib = Config::r_use_vertex_index_buffers.IsSet();
     auto & context  = frame_data.context;
     auto & cbuffers = frame_data.cbuffers;
 
@@ -1682,7 +1670,7 @@ void ViewRenderer::DrawAliasMD2Model(const FrameData & frame_data, const entity_
     vec4_t shade_light = { 1.0f, 1.0f, 1.0f, 1.0f };
     ShadeAliasMD2Model(frame_data, entity, shade_light);
 
-    const float  backlerp = (m_lerp_entity_models.IsSet() ? entity.backlerp : 0.0f);
+    const float  backlerp = (Config::r_lerp_entity_models.IsSet() ? entity.backlerp : 0.0f);
     const auto   mdl_mtx  = MakeEntityModelMatrix(entity, /* flipUpV = */false);
     const auto * model    = reinterpret_cast<const ModelInstance *>(entity.model);
 

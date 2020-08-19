@@ -74,10 +74,8 @@ void Win32Window::Init(const char * name, HINSTANCE hInst, WNDPROC wndProc, cons
 
     if (!m_fullscreen)
     {
-        auto vid_xpos = GameInterface::Cvar::Get("vid_xpos", "0", 0);
-        auto vid_ypos = GameInterface::Cvar::Get("vid_ypos", "0", 0);
-        x = vid_xpos.AsInt();
-        y = vid_ypos.AsInt();
+        x = Config::vid_xpos.AsInt();
+        y = Config::vid_ypos.AsInt();
     }
 
     m_hWnd = CreateWindowEx(exstyle, m_window_name.c_str(), m_window_name.c_str(),

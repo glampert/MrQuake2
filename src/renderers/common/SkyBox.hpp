@@ -57,8 +57,6 @@ private:
 
     float m_skybounds_mins[2][kNumSides];
     float m_skybounds_maxs[2][kNumSides];
-
-    CvarWrapper m_sky_force_full_draw;
 };
 
 } // MrQ2

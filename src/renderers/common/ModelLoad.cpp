@@ -842,8 +842,6 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
     mdl.data.surfaces     = out;
     mdl.data.num_surfaces = count;
 
-    static auto r_surf_use_debug_color = GameInterface::Cvar::Get("r_surf_use_debug_color", "0", 0);
-
     LightmapManager & lightmap_mgr = LightmapManager::Instance();
     lightmap_mgr.BeginBuildLightmaps();
 
@@ -851,7 +849,7 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
     {
         out->first_edge = in->firstedge;
         out->num_edges  = in->numedges;
-        out->color      = r_surf_use_debug_color.IsSet() ? RandomDebugColor() : ColorRGBA32{ 0xFFFFFFFF };
+        out->color      = Config::r_surf_use_debug_color.IsSet() ? RandomDebugColor() : ColorRGBA32{ 0xFFFFFFFF };
         out->flags      = 0;
         out->polys      = nullptr;
 
@@ -1219,8 +1217,7 @@ void ModelStore::LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, c
     // Vertex/Index buffer setup:
     if (kUseVertexAndIndexBuffers)
     {
-        static auto r_world_ambient = GameInterface::Cvar::Get("r_world_ambient", "1.2", CvarWrapper::kFlagArchive);
-        const float world_ambient_term = r_world_ambient.AsFloat(); // Modulate with the vertex color
+        const float world_ambient_term = Config::r_world_ambient.AsFloat(); // Modulate with the vertex color
 
         const int num_surfaces = mdl.data.num_surfaces;
         const ModelSurface * const surfaces = mdl.data.surfaces;

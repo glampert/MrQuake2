@@ -22,48 +22,25 @@ ViewRenderer    DLLInterface::sm_view_renderer;
 ConstBuffers<DLLInterface::PerFrameShaderConstants> DLLInterface::sm_per_frame_shader_consts;
 ConstBuffers<DLLInterface::PerViewShaderConstants>  DLLInterface::sm_per_view_shader_consts;
 
-// Cached Cvars:
-CvarWrapper DLLInterface::sm_debug_lightmaps;
-CvarWrapper DLLInterface::sm_surf_use_debug_color;
-CvarWrapper DLLInterface::sm_force_mip_level;
-CvarWrapper DLLInterface::sm_disable_texturing;
-CvarWrapper DLLInterface::sm_blend_debug_color;
-CvarWrapper DLLInterface::sm_draw_fps_counter;
-CvarWrapper DLLInterface::sm_no_draw;
-
 ///////////////////////////////////////////////////////////////////////////////
 
 int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
 {
-    auto vid_mode    = GameInterface::Cvar::Get("vid_mode",    "6",    CvarWrapper::kFlagArchive);
-    auto vid_width   = GameInterface::Cvar::Get("vid_width",   "1024", CvarWrapper::kFlagArchive);
-    auto vid_height  = GameInterface::Cvar::Get("vid_height",  "768",  CvarWrapper::kFlagArchive);
-    auto r_renderdoc = GameInterface::Cvar::Get("r_renderdoc", "0",    CvarWrapper::kFlagArchive);
-    auto r_debug     = GameInterface::Cvar::Get("r_debug",     "0",    CvarWrapper::kFlagArchive);
-
-    sm_debug_lightmaps      = GameInterface::Cvar::Get("r_debug_lightmaps",      "0",  0);
-    sm_surf_use_debug_color = GameInterface::Cvar::Get("r_surf_use_debug_color", "0",  0);
-    sm_force_mip_level      = GameInterface::Cvar::Get("r_force_mip_level",      "-1", 0);
-    sm_disable_texturing    = GameInterface::Cvar::Get("r_disable_texturing",    "0",  0);
-    sm_blend_debug_color    = GameInterface::Cvar::Get("r_blend_debug_color",    "0",  0);
-    sm_draw_fps_counter     = GameInterface::Cvar::Get("r_draw_fps_counter",     "0",  CvarWrapper::kFlagArchive);
-    sm_no_draw              = GameInterface::Cvar::Get("r_no_draw",              "0",  0);
-
     int w, h;
-    if (!GameInterface::Video::GetModeInfo(w, h, vid_mode.AsInt()))
+    if (!GameInterface::Video::GetModeInfo(w, h, Config::vid_mode.AsInt()))
     {
         // An invalid vid_mode (i.e.: -1) uses the explicit size
-        w = vid_width.AsInt();
-        h = vid_height.AsInt();
+        w = Config::vid_width.AsInt();
+        h = Config::vid_height.AsInt();
     }
 
-    if (r_renderdoc.IsSet())
+    if (Config::r_renderdoc.IsSet())
     {
         RenderDocUtils::Initialize();
     }
 
     // Low-level renderer back-end initialization
-    const bool debug = r_debug.IsSet();
+    const bool debug = Config::r_debug.IsSet();
     sm_renderer.Init(reinterpret_cast<HINSTANCE>(hInst), reinterpret_cast<WNDPROC>(wndProc), w, h, static_cast<bool>(fullscreen), debug);
 
     // 2D sprite/UI batch setup
@@ -175,7 +152,7 @@ void DLLInterface::CinematicSetPalette(const qbyte * const palette)
 
 void DLLInterface::BeginFrame(float /*camera_separation*/)
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     const float   clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // RGBA
@@ -190,30 +167,30 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
     // Debug flags
     {
         sm_per_frame_shader_consts.data.debug_mode = DebugMode::kNone;
-        sm_per_frame_shader_consts.data.forced_mip_level = sm_force_mip_level.AsFloat();
+        sm_per_frame_shader_consts.data.forced_mip_level = Config::r_force_mip_level.AsFloat();
 
         if (sm_per_frame_shader_consts.data.forced_mip_level >= 0.0f)
         {
             sm_per_frame_shader_consts.data.debug_mode = DebugMode::kForcedMipLevel;
         }
 
-        if (sm_debug_lightmaps.IsSet())
+        if (Config::r_debug_lightmaps.IsSet())
         {
             sm_per_frame_shader_consts.data.debug_mode = DebugMode::kViewLightmaps;
         }
 
-        if (sm_surf_use_debug_color.IsSet())
+        if (Config::r_surf_use_debug_color.IsSet())
         {
             sm_per_frame_shader_consts.data.debug_mode = DebugMode::kBlendDebugColor;
         }
 
-        if (sm_disable_texturing.IsSet()) // Use only debug vertex color
+        if (Config::r_disable_texturing.IsSet()) // Use only debug vertex color
         {
             VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 0.0f);
             VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling,  1.0f);
             sm_per_frame_shader_consts.data.debug_mode = DebugMode::kDisableTexturing;
         }
-        else if (sm_blend_debug_color.IsSet()) // Blend debug vertex color with texture
+        else if (Config::r_blend_debug_color.IsSet()) // Blend debug vertex color with texture
         {
             VecSplatN(sm_per_frame_shader_consts.data.texture_color_scaling, 1.0f);
             VecSplatN(sm_per_frame_shader_consts.data.vertex_color_scaling,  1.0f);
@@ -235,10 +212,10 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
 
 void DLLInterface::EndFrame()
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
-    if (sm_draw_fps_counter.IsSet())
+    if (Config::r_draw_fps_counter.IsSet())
     {
         DrawFpsCounter();
     }
@@ -259,7 +236,7 @@ void DLLInterface::EndFrame()
 
 void DLLInterface::RenderView(refdef_t * const view_def)
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     MRQ2_ASSERT(view_def != nullptr);
@@ -313,7 +290,7 @@ void DLLInterface::R_Flash(const float blend[4])
 
 void DLLInterface::DrawPic(const int x, const int y, const char * const name)
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
@@ -347,7 +324,7 @@ void DLLInterface::DrawPic(const int x, const int y, const char * const name)
 
 void DLLInterface::DrawStretchPic(const int x, const int y, const int w, const int h, const char * const name)
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
@@ -381,7 +358,7 @@ void DLLInterface::DrawStretchPic(const int x, const int y, const int w, const i
 
 void DLLInterface::DrawChar(const int x, const int y, int c)
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
@@ -415,7 +392,7 @@ void DLLInterface::DrawChar(const int x, const int y, int c)
 
 void DLLInterface::DrawString(int x, int y, const char * s)
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     while (*s)
@@ -428,7 +405,7 @@ void DLLInterface::DrawString(int x, int y, const char * s)
 
 void DLLInterface::DrawTileClear(int /*x*/, int /*y*/, int /*w*/, int /*h*/, const char * /*name*/)
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
@@ -440,7 +417,7 @@ void DLLInterface::DrawTileClear(int /*x*/, int /*y*/, int /*w*/, int /*h*/, con
 
 void DLLInterface::DrawFill(const int x, const int y, const int w, const int h, const int c)
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
@@ -453,7 +430,7 @@ void DLLInterface::DrawFill(const int x, const int y, const int w, const int h, 
 
 void DLLInterface::DrawFadeScreen()
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
@@ -470,7 +447,7 @@ void DLLInterface::DrawFadeScreen()
 
 void DLLInterface::DrawStretchRaw(const int x, const int y, int w, int h, const int cols, const int rows, const qbyte * const data)
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     MRQ2_ASSERT(sm_renderer.IsFrameStarted());
@@ -558,7 +535,7 @@ void DLLInterface::DrawStretchRaw(const int x, const int y, int w, int h, const 
 
 void DLLInterface::DrawAltString(int x, int y, const char * s)
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     while (*s)
@@ -571,7 +548,7 @@ void DLLInterface::DrawAltString(int x, int y, const char * s)
 
 void DLLInterface::DrawNumberBig(int x, int y, int color, int width, int value)
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     // Draw a big number using one of the 0-9 textures
@@ -619,7 +596,7 @@ void DLLInterface::DrawNumberBig(int x, int y, int color, int width, int value)
 
 void DLLInterface::DrawFpsCounter()
 {
-    if (sm_no_draw.IsSet())
+    if (Config::r_no_draw.IsSet())
         return;
 
     // Average multiple frames together to smooth changes out a bit.
@@ -680,9 +657,7 @@ void DLLInterface::ChangeTextureFilterCmd()
     const char * const filter_name = GameInterface::Cmd::Argv(1);
     if (std::strcmp(filter_name, "?") == 0)
     {
-        auto r_tex_filtering = GameInterface::Cvar::Get("r_tex_filtering", "0", CvarWrapper::kFlagArchive);
-        const int opt = r_tex_filtering.AsInt();
-
+        const int opt = Config::r_tex_filtering.AsInt();
         GameInterface::Printf("Current texture filtering is: '%s' (%i)", TextureFilterOptionNames[opt], opt);
         return;
     }

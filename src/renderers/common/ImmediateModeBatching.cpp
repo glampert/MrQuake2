@@ -269,8 +269,7 @@ void MiniImBatch::PushModelSurface(const ModelSurface & surf, const vec4_t * con
 {
     MRQ2_ASSERT(IsValid()); // Clear()ed?
 
-    static auto r_world_ambient = GameInterface::Cvar::Get("r_world_ambient", "1.2", CvarWrapper::kFlagArchive);
-    const float world_ambient_term = r_world_ambient.AsFloat(); // Modulate with the vertex color
+    const float world_ambient_term = Config::r_world_ambient.AsFloat(); // Modulate with the vertex color
 
     const ModelPoly & poly   = *surf.polys;
     const int num_triangles  = (poly.num_verts - 2);

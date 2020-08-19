@@ -19,8 +19,7 @@ void TextureD3D11::Init(const DeviceD3D11 & device, const TextureType type, cons
     MRQ2_ASSERT(m_device == nullptr); // Shutdown first
     (void)debug_name; // unused
 
-    static auto r_max_anisotropy = GameInterface::Cvar::Get("r_max_anisotropy", "1", CvarWrapper::kFlagArchive);
-    int max_anisotropy = r_max_anisotropy.AsInt();
+    int max_anisotropy = Config::r_max_anisotropy.AsInt();
 
     if (max_anisotropy > 16)
         max_anisotropy = 16;
@@ -102,9 +101,7 @@ D3D11_FILTER TextureD3D11::FilterForTextureType(const TextureType type)
 
     if (type < TextureType::kPic) // with mipmaps
     {
-        static auto r_tex_filtering = GameInterface::Cvar::Get("r_tex_filtering", "0", CvarWrapper::kFlagArchive);
-
-        uint32_t opt = r_tex_filtering.AsInt();
+        uint32_t opt = Config::r_tex_filtering.AsInt();
         if (opt >= ArrayLength(d3d_tex_filtering_options))
         {
             opt = ArrayLength(d3d_tex_filtering_options) - 1;

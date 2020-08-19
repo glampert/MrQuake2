@@ -239,10 +239,6 @@ public:
     // palette=nullptr sets back the global palette.
     static void SetCinematicPaletteFromRaw(const std::uint8_t * palette);
 
-    // Cached Cvars:
-    static CvarWrapper no_mipmaps;
-    static CvarWrapper debug_mipmaps;
-
 private:
 
     TextureImage * CreateCinematicTexture();

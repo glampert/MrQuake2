@@ -26,8 +26,7 @@ void GraphicsContextD3D11::Init(const DeviceD3D11 & device, const SwapChainD3D11
     m_current_viewport.MinDepth = 0.0f;
     m_current_viewport.MaxDepth = 1.0f;
 
-    auto r_debug_frame_events = GameInterface::Cvar::Get("r_debug_frame_events", "0", CvarWrapper::kFlagArchive);
-    m_gpu_markers_enabled = r_debug_frame_events.IsSet();
+    m_gpu_markers_enabled = Config::r_debug_frame_events.IsSet();
 
     if (m_gpu_markers_enabled)
     {

@@ -69,8 +69,7 @@ void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, cons
     srv_desc.Shader4ComponentMapping         = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     device.device->CreateShaderResourceView(m_resource.Get(), &srv_desc, m_srv_descriptor.cpu_handle);
 
-    static auto r_max_anisotropy = GameInterface::Cvar::Get("r_max_anisotropy", "1", CvarWrapper::kFlagArchive);
-    int max_anisotropy = r_max_anisotropy.AsInt();
+    int max_anisotropy = Config::r_max_anisotropy.AsInt();
 
     if (max_anisotropy > 16)
         max_anisotropy = 16;
@@ -142,9 +141,7 @@ D3D12_FILTER TextureD3D12::FilterForTextureType(const TextureType type)
 
     if (type < TextureType::kPic) // with mipmaps
     {
-        static auto r_tex_filtering = GameInterface::Cvar::Get("r_tex_filtering", "0", CvarWrapper::kFlagArchive);
-
-        uint32_t opt = r_tex_filtering.AsInt();
+        uint32_t opt = Config::r_tex_filtering.AsInt();
         if (opt >= ArrayLength(d3d_tex_filtering_options))
         {
             opt = ArrayLength(d3d_tex_filtering_options) - 1;

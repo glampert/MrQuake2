@@ -50,11 +50,7 @@ static const int s_skyvec_to_st[6][3] = {
 
 SkyBox::SkyBox(TextureStore & tex_store, const char * const name, const float rotate_degrees, const vec3_t axis)
     : m_sky_rotate{ rotate_degrees }
-    , m_sky_force_full_draw{ GameInterface::Cvar::Get("r_sky_force_full_draw", "0", 0) }
 {
-    // Select between TGA or PCX - defaults to TGA (higher quality).
-    static auto r_sky_use_pal_textures = GameInterface::Cvar::Get("r_sky_use_pal_textures", "0", CvarWrapper::kFlagArchive);
-
     strcpy_s(m_sky_name, name);
     Vec3Copy(axis, m_sky_axis);
 
@@ -74,7 +70,9 @@ SkyBox::SkyBox(TextureStore & tex_store, const char * const name, const float ro
     for (unsigned i = 0; i < m_sky_images.size(); ++i)
     {
         char pathname[1024];
-        if (r_sky_use_pal_textures.IsSet())
+
+        // Select between TGA or PCX - defaults to TGA (higher quality).
+        if (Config::r_sky_use_pal_textures.IsSet())
         {
             std::snprintf(pathname, sizeof(pathname), "env/%s%s.pcx", m_sky_name, suf_names[i]);
         }
@@ -330,7 +328,7 @@ void SkyBox::Clear()
 
 bool SkyBox::IsAnyPlaneVisible() const
 {
-    if (m_sky_rotate != 0.0f && !m_sky_force_full_draw.IsSet())
+    if (m_sky_rotate != 0.0f && !Config::r_sky_force_full_draw.IsSet())
     {
         // check for no sky at all
         int i;
@@ -360,7 +358,7 @@ bool SkyBox::BuildSkyPlane(const int plane_index, DrawVertex3D out_plane_verts[6
     const int sky_tri_indexes[6] = { 0,1,2, 2,3,0 }; // CW winding
     const int sky_tex_order[kNumSides] = { 0, 2, 1, 3, 4, 5 };
 
-    if (m_sky_rotate != 0.0f || m_sky_force_full_draw.IsSet())
+    if (m_sky_rotate != 0.0f || Config::r_sky_force_full_draw.IsSet())
     {
         // Force full sky to draw when rotating
         m_skybounds_mins[0][i] = -1.0f;
