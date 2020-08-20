@@ -4,6 +4,7 @@
 
 #include "DLLInterface.hpp"
 #include "RenderDocUtils.hpp"
+#include "DebugDraw.hpp"
 
 namespace MrQ2
 {
@@ -55,6 +56,11 @@ int DLLInterface::Init(void * hInst, void * wndProc, int fullscreen)
     sm_per_frame_shader_consts.Init(sm_renderer.Device());
     sm_per_view_shader_consts.Init(sm_renderer.Device());
 
+    if (debug)
+    {
+        DebugDraw::Init(sm_renderer.Device());
+    }
+
     GameInterface::Cmd::RegisterCommand("set_tex_filer", &ChangeTextureFilterCmd);
     GameInterface::Cmd::RegisterCommand("dump_textures", &DumpAllTexturesCmd);
 
@@ -67,6 +73,7 @@ void DLLInterface::Shutdown()
     GameInterface::Cmd::RemoveCommand("dump_textures");
 
     sm_renderer.WaitForGpu();
+    DebugDraw::Shutdown();
     sm_per_view_shader_consts.Shutdown();
     sm_per_frame_shader_consts.Shutdown();
     sm_view_renderer.Shutdown();
@@ -251,6 +258,8 @@ void DLLInterface::RenderView(refdef_t * const view_def)
         GameInterface::Errorf("RenderView: Null world model!");
     }
 
+    DebugDraw::BeginFrame();
+
     FixedSizeArray<const ConstantBuffer *, 2> cbuffers;
     cbuffers.push_back(&sm_per_frame_shader_consts.CurrentBuffer()); // slot(0)
     cbuffers.push_back(&sm_per_view_shader_consts.CurrentBuffer());  // slot(1)
@@ -269,6 +278,8 @@ void DLLInterface::RenderView(refdef_t * const view_def)
 
     // Draw a fullscreen overlay with the blend color for screen flash effects.
     R_Flash(frame_data.view_def.blend);
+
+    DebugDraw::EndFrame(context, sm_per_view_shader_consts.CurrentBuffer());
 }
 
 void DLLInterface::R_Flash(const float blend[4])

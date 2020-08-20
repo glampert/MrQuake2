@@ -269,11 +269,8 @@ static void SetCacheState(ModelSurface * surf, const lightstyle_t * lightstyles)
 // Write out each lightmap to a PNG on UploadBlock
 constexpr bool kDebugDumpLightmapsToFile = false;
 
-LightmapManager & LightmapManager::Instance()
-{
-    static LightmapManager s_instance;
-    return s_instance;
-}
+// Global instance
+LightmapManager LightmapManager::sm_instance;
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -23,6 +23,7 @@ enum class PrimitiveTopologyD3D11 : uint8_t
     kTriangleList,
     kTriangleStrip,
     kTriangleFan,
+    kLineList,
 
     kCount
 };

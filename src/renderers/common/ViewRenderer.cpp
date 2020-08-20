@@ -5,6 +5,7 @@
 
 #include "ViewRenderer.hpp"
 #include "Lightmaps.hpp"
+#include "DebugDraw.hpp"
 
 namespace MrQ2
 {
@@ -392,7 +393,7 @@ void ViewRenderer::SetUpFrustum(FrameData & frame_data) const
                                   frame_data.forward_vec,
                                   -(90.0f - frame_data.view_def.fov_y / 2.0f));
 
-    for (unsigned i = 0; i < ArrayLength(frame_data.frustum); ++i)
+    for (int i = 0; i < 4; ++i)
     {
         frame_data.frustum[i].type = PLANE_ANYZ;
         frame_data.frustum[i].dist = Vec3Dot(frame_data.view_def.vieworg, frame_data.frustum[i].normal);
@@ -547,10 +548,7 @@ void ViewRenderer::RenderViewSetup(FrameData & frame_data)
     SetUpViewClusters(frame_data);
 
     // Copy eye position
-    for (int i = 0; i < 3; ++i)
-    {
-        frame_data.camera_origin[i] = frame_data.view_def.vieworg[i];
-    }
+    Vec3Copy(frame_data.view_def.vieworg, frame_data.camera_origin);
 
     // Camera view vectors
     MrQ2::VectorsFromAngles(frame_data.view_def.viewangles, frame_data.forward_vec, frame_data.right_vec, frame_data.up_vec);
@@ -595,6 +593,11 @@ void ViewRenderer::RecursiveWorldNode(const FrameData & frame_data,
     if (ShouldCullBBox(frame_data.frustum, node->minmaxs, node->minmaxs + 3))
     {
         return;
+    }
+
+    if (node->num_surfaces > 0 && Config::r_draw_world_bounds.IsSet())
+    {
+        DebugDraw::AddAABB(node->minmaxs, node->minmaxs + 3, ColorRGBA32{ 0xFFFF00FF }); // pink
     }
 
     const refdef_t & view_def = frame_data.view_def;
@@ -1416,6 +1419,11 @@ void ViewRenderer::DrawBrushModel(const FrameData & frame_data, const entity_t &
         return;
     }
 
+    if (Config::r_draw_model_bounds.IsSet())
+    {
+        DebugDraw::AddAABB(mins, maxs, ColorRGBA32{ 0xFF00FF00 }); // greed
+    }
+
     vec3_t model_origin;
     Vec3Sub(frame_data.view_def.vieworg, entity.origin, model_origin);
 
@@ -1667,6 +1675,23 @@ void ViewRenderer::DrawSpriteModel(const FrameData & frame_data, const entity_t 
 
 void ViewRenderer::DrawAliasMD2Model(const FrameData & frame_data, const entity_t & entity)
 {
+    if (!(entity.flags & RF_WEAPONMODEL))
+    {
+        vec3_t bbox[8] = {};
+        const bool cull = ShouldCullAliasMD2Model(frame_data.frustum, entity, bbox);
+
+        if (Config::r_draw_model_bounds.IsSet())
+        {
+            DebugDraw::AddAABB(bbox, ColorRGBA32{ 0xFF0000FF }); // red
+        }
+
+        // TODO: Not working correctly
+        //if (cull)
+        //{
+        //    return;
+        //}
+    }
+
     vec4_t shade_light = { 1.0f, 1.0f, 1.0f, 1.0f };
     ShadeAliasMD2Model(frame_data, entity, shade_light);
 
@@ -1833,6 +1858,123 @@ void ViewRenderer::DrawNullModel(const FrameData & frame_data, const entity_t & 
         }
     }
     EndBatch(batch);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool ViewRenderer::ShouldCullAliasMD2Model(const cplane_t frustum[4], const entity_t & entity, vec3_t bbox[8]) const
+{
+    const auto   * model     = reinterpret_cast<const ModelInstance *>(entity.model);
+    const dmdl_t * paliashdr = model->hunk.ViewBaseAs<const dmdl_t>();
+
+    if ((entity.frame >= paliashdr->num_frames) || (entity.frame < 0))
+    {
+        GameInterface::Errorf("ShouldCullAliasMD2Model %s: no such frame", model->name.CStr(), entity.frame);
+    }
+    if ((entity.oldframe >= paliashdr->num_frames) || (entity.oldframe < 0))
+    {
+        GameInterface::Errorf("ShouldCullAliasMD2Model %s: no such oldframe", model->name.CStr(), entity.oldframe);
+    }
+
+    auto * pframe    = reinterpret_cast<const daliasframe_t *>((const uint8_t *)paliashdr + paliashdr->ofs_frames + entity.frame    * paliashdr->framesize);
+    auto * poldframe = reinterpret_cast<const daliasframe_t *>((const uint8_t *)paliashdr + paliashdr->ofs_frames + entity.oldframe * paliashdr->framesize);
+
+    // Compute axially aligned mins and maxs
+    vec3_t mins, maxs;
+    if (pframe == poldframe)
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            mins[i] = pframe->translate[i];
+            maxs[i] = mins[i] + pframe->scale[i] * 255.0f;
+        }
+    }
+    else
+    {
+        vec3_t thismins, oldmins, thismaxs, oldmaxs;
+        for (int i = 0; i < 3; ++i)
+        {
+            thismins[i] = pframe->translate[i];
+            thismaxs[i] = thismins[i] + pframe->scale[i] * 255.0f;
+
+            oldmins[i] = poldframe->translate[i];
+            oldmaxs[i] = oldmins[i] + poldframe->scale[i] * 255.0f;
+
+            if (thismins[i] < oldmins[i])
+                mins[i] = thismins[i];
+            else
+                mins[i] = oldmins[i];
+
+            if (thismaxs[i] > oldmaxs[i])
+                maxs[i] = thismaxs[i];
+            else
+                maxs[i] = oldmaxs[i];
+        }
+    }
+
+    // Compute a full bounding box
+    for (int i = 0; i < 8; ++i)
+    {
+        vec3_t tmp;
+
+        if (i & 1)
+            tmp[0] = mins[0];
+        else
+            tmp[0] = maxs[0];
+
+        if (i & 2)
+            tmp[1] = mins[1];
+        else
+            tmp[1] = maxs[1];
+
+        if (i & 4)
+            tmp[2] = mins[2];
+        else
+            tmp[2] = maxs[2];
+
+        Vec3Copy(tmp, bbox[i]);
+    }
+
+    // Rotate the bounding box
+    vec3_t angles;
+    vec3_t vectors[3];
+    Vec3Copy(entity.angles, angles);
+    angles[YAW] = -angles[YAW];
+    VectorsFromAngles(angles, vectors[0], vectors[1], vectors[2]);
+
+    for (int i = 0; i < 8; ++i)
+    {
+        vec3_t tmp;
+        Vec3Copy(bbox[i], tmp);
+
+        bbox[i][0] =  Vec3Dot(vectors[0], tmp);
+        bbox[i][1] = -Vec3Dot(vectors[1], tmp);
+        bbox[i][2] =  Vec3Dot(vectors[2], tmp);
+
+        Vec3Add(entity.origin, bbox[i], bbox[i]);
+    }
+
+    int aggregatemask = ~0;
+    for (int p = 0; p < 8; ++p)
+    {
+        int mask = 0;
+        for (int f = 0; f < 4; ++f)
+        {
+            const float dp = Vec3Dot(frustum[f].normal, bbox[p]);
+            if ((dp - frustum[f].dist) < 0.0f)
+            {
+                mask |= (1 << f);
+            }
+        }
+        aggregatemask &= mask;
+    }
+
+    if (aggregatemask)
+    {
+        return true;
+    }
+
+    return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

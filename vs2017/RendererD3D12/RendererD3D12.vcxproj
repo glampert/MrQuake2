@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\renderers\common\Common.cpp" />
+    <ClCompile Include="..\..\src\renderers\common\DebugDraw.cpp" />
     <ClCompile Include="..\..\src\renderers\common\DLLInterface.cpp" />
     <ClCompile Include="..\..\src\renderers\common\DrawAliasMD2.cpp" />
     <ClCompile Include="..\..\src\renderers\common\Lightmaps.cpp" />
@@ -48,6 +49,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\renderers\common\Common.hpp" />
+    <ClInclude Include="..\..\src\renderers\common\DebugDraw.hpp" />
     <ClInclude Include="..\..\src\renderers\common\DLLInterface.hpp" />
     <ClInclude Include="..\..\src\renderers\common\Array.hpp" />
     <ClInclude Include="..\..\src\renderers\common\Lightmaps.hpp" />
@@ -78,6 +80,7 @@
   <ItemGroup>
     <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw2D.fx" />
     <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw3D.fx" />
+    <FxCompile Include="..\..\src\renderers\shaders\hlsl\DrawDebug.fx" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

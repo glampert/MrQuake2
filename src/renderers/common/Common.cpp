@@ -966,6 +966,8 @@ CvarWrapper r_skip_draw_entities;
 CvarWrapper r_skip_brush_mods;
 CvarWrapper r_intensity;
 CvarWrapper r_water_hack;
+CvarWrapper r_draw_model_bounds; // MD2 and Brush models
+CvarWrapper r_draw_world_bounds; // World geometry
 
 void Initialize()
 {
@@ -1006,6 +1008,8 @@ void Initialize()
     r_skip_brush_mods = GameInterface::Cvar::Get("r_skip_brush_mods", "0", 0);
     r_intensity = GameInterface::Cvar::Get("r_intensity", "2", CvarWrapper::kFlagArchive);
     r_water_hack = GameInterface::Cvar::Get("r_water_hack", "0.5", CvarWrapper::kFlagArchive);
+    r_draw_model_bounds = GameInterface::Cvar::Get("r_draw_model_bounds", "0", 0);
+    r_draw_world_bounds = GameInterface::Cvar::Get("r_draw_world_bounds", "0", 0);
 }
 
 } // Config

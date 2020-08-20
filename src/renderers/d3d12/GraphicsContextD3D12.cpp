@@ -179,6 +179,7 @@ static inline D3D_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D(const PrimitiveTopol
     case PrimitiveTopologyD3D12::kTriangleList  : return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     case PrimitiveTopologyD3D12::kTriangleStrip : return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
     case PrimitiveTopologyD3D12::kTriangleFan   : return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST; // Converted by the front-end
+    case PrimitiveTopologyD3D12::kLineList      : return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
     default : GameInterface::Errorf("Bad PrimitiveTopology enum!");
     } // switch
 }

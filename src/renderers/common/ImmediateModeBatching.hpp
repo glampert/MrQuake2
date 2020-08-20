@@ -4,10 +4,10 @@
 //
 #pragma once
 
+#include "Array.hpp"
 #include "Common.hpp"
 #include "Memory.hpp"
 #include "RenderInterface.hpp"
-#include <vector>
 
 namespace MrQ2
 {
@@ -30,7 +30,8 @@ struct DrawVertex3D
 
 struct DrawVertex2D
 {
-    vec4_t xy_uv;
+    vec2_t position;
+    vec2_t texture_uv;
     vec4_t rgba;
 };
 
@@ -71,10 +72,12 @@ private:
 
 ===============================================================================
 */
-template<typename VertexType, uint32_t kNumBuffers>
+template<typename VertexType>
 class VertexBuffers final
 {
 public:
+
+    static constexpr uint32_t kNumBuffers = RenderInterface::kNumFrameBuffers;
 
     VertexBuffers() = default;
 
@@ -250,11 +253,11 @@ private:
         uint32_t quad_start_vtx;
     };
 
-    using QuadList = std::vector<DeferredTexQuad>;
-    using VBuffers = VertexBuffers<DrawVertex2D, RenderInterface::kNumFrameBuffers>;
+    using VBuffers = VertexBuffers<DrawVertex2D>;
+    using QuadList = FixedSizeArray<DeferredTexQuad, 1024>;
 
-    QuadList m_deferred_textured_quads;
     VBuffers m_buffers;
+    QuadList m_textured_quads;
 };
 
 /*

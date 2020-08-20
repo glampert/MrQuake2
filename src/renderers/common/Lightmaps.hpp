@@ -41,7 +41,7 @@ class LightmapManager final
 {
 public:
 
-    static LightmapManager & Instance();
+    static LightmapManager & Instance() { return sm_instance; }
 
     void Init(TextureStore & tex_store);
     void Shutdown();
@@ -72,6 +72,8 @@ private:
     const TextureImage * m_textures[kMaxLightmapTextures] = {};
     TextureStore *       m_tex_store{ nullptr };
     ColorRGBA32          m_lightmap_buffer[kLightmapBlockWidth * kLightmapBlockHeight] = {};
+
+    static LightmapManager sm_instance;
 };
 
 } // MrQ2

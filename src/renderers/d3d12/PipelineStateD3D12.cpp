@@ -85,6 +85,15 @@ void PipelineStateD3D12::Shutdown()
 void PipelineStateD3D12::SetPrimitiveTopology(const PrimitiveTopologyD3D12 topology)
 {
     m_topology = topology;
+
+    if (topology == PrimitiveTopologyD3D12::kLineList)
+    {
+        m_pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+    }
+    else
+    {
+        m_pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    }
 }
 
 void PipelineStateD3D12::SetShaderProgram(const ShaderProgramD3D12 & shader_prog)

@@ -144,6 +144,7 @@ private:
     void DrawNullModel(const FrameData & frame_data, const entity_t & entity);
 
     // Lighting/shading:
+    bool ShouldCullAliasMD2Model(const cplane_t frustum[4], const entity_t & entity, vec3_t bbox[8]) const;
     void ShadeAliasMD2Model(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const;
     void CalcPointLightColor(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const;
 
@@ -194,7 +195,7 @@ private:
     };
 
     using DrawCmdList = FixedSizeArray<DrawCmd, 2048>;
-    using VBuffers    = VertexBuffers<DrawVertex3D, RenderInterface::kNumFrameBuffers>;
+    using VBuffers    = VertexBuffers<DrawVertex3D>;
 
     PipelineState        m_pipeline_solid_geometry;
     PipelineState        m_pipeline_translucent_world_geometry;

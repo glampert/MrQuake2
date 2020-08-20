@@ -86,6 +86,9 @@
     <ClCompile Include="..\..\src\renderers\common\Lightmaps.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\renderers\common\DebugDraw.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\renderers\d3d11\BufferD3D11.hpp">
@@ -163,12 +166,18 @@
     <ClInclude Include="..\..\src\renderers\common\Lightmaps.hpp">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\DebugDraw.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw2D.fx">
       <Filter>Backend\Shaders</Filter>
     </FxCompile>
     <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw3D.fx">
+      <Filter>Backend\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\src\renderers\shaders\hlsl\DrawDebug.fx">
       <Filter>Backend\Shaders</Filter>
     </FxCompile>
   </ItemGroup>

@@ -493,6 +493,8 @@ namespace Config
     extern CvarWrapper r_skip_brush_mods;
     extern CvarWrapper r_intensity;
     extern CvarWrapper r_water_hack;
+    extern CvarWrapper r_draw_model_bounds;
+    extern CvarWrapper r_draw_world_bounds;
 
     // Cache all the CVars above.
     void Initialize();

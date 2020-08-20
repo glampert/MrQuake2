@@ -23,8 +23,7 @@ void SpriteBatch::Init(const RenderDevice & device, const uint32_t max_verts)
 
 void SpriteBatch::Shutdown()
 {
-    m_deferred_textured_quads.clear();
-    m_deferred_textured_quads.shrink_to_fit();
+    m_textured_quads.clear();
     m_buffers.Shutdown();
 }
 
@@ -54,7 +53,7 @@ void SpriteBatch::EndFrame(GraphicsContext & context, const ConstantBuffer & cbu
     }
     else // Handle small unique textured draws:
     {
-        for (const DeferredTexQuad & d : m_deferred_textured_quads)
+        for (const DeferredTexQuad & d : m_textured_quads)
         {
             context.SetTexture(d.tex->BackendTexture(), 0);
 
@@ -65,10 +64,7 @@ void SpriteBatch::EndFrame(GraphicsContext & context, const ConstantBuffer & cbu
     }
 
     // Clear cache for next frame:
-    if (!m_deferred_textured_quads.empty())
-    {
-        m_deferred_textured_quads.clear();
-    }
+    m_textured_quads.clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -91,38 +87,38 @@ void SpriteBatch::PushQuad(float x, float y, float w, float h, float u0, float v
     ColorFloats(color, r, g, b, a);
 
     DrawVertex2D quad[4];
-    quad[0].xy_uv[0] = x;
-    quad[0].xy_uv[1] = y;
-    quad[0].xy_uv[2] = u0;
-    quad[0].xy_uv[3] = v0;
-    quad[0].rgba[0]  = r;
-    quad[0].rgba[1]  = g;
-    quad[0].rgba[2]  = b;
-    quad[0].rgba[3]  = a;
-    quad[1].xy_uv[0] = x + w;
-    quad[1].xy_uv[1] = y;
-    quad[1].xy_uv[2] = u1;
-    quad[1].xy_uv[3] = v0;
-    quad[1].rgba[0]  = r;
-    quad[1].rgba[1]  = g;
-    quad[1].rgba[2]  = b;
-    quad[1].rgba[3]  = a;
-    quad[2].xy_uv[0] = x + w;
-    quad[2].xy_uv[1] = y + h;
-    quad[2].xy_uv[2] = u1;
-    quad[2].xy_uv[3] = v1;
-    quad[2].rgba[0]  = r;
-    quad[2].rgba[1]  = g;
-    quad[2].rgba[2]  = b;
-    quad[2].rgba[3]  = a;
-    quad[3].xy_uv[0] = x;
-    quad[3].xy_uv[1] = y + h;
-    quad[3].xy_uv[2] = u0;
-    quad[3].xy_uv[3] = v1;
-    quad[3].rgba[0]  = r;
-    quad[3].rgba[1]  = g;
-    quad[3].rgba[2]  = b;
-    quad[3].rgba[3]  = a;
+    quad[0].position[0] = x;
+    quad[0].position[1] = y;
+    quad[0].texture_uv[0] = u0;
+    quad[0].texture_uv[1] = v0;
+    quad[0].rgba[0] = r;
+    quad[0].rgba[1] = g;
+    quad[0].rgba[2] = b;
+    quad[0].rgba[3] = a;
+    quad[1].position[0] = x + w;
+    quad[1].position[1] = y;
+    quad[1].texture_uv[0] = u1;
+    quad[1].texture_uv[1] = v0;
+    quad[1].rgba[0] = r;
+    quad[1].rgba[1] = g;
+    quad[1].rgba[2] = b;
+    quad[1].rgba[3] = a;
+    quad[2].position[0] = x + w;
+    quad[2].position[1] = y + h;
+    quad[2].texture_uv[0] = u1;
+    quad[2].texture_uv[1] = v1;
+    quad[2].rgba[0] = r;
+    quad[2].rgba[1] = g;
+    quad[2].rgba[2] = b;
+    quad[2].rgba[3] = a;
+    quad[3].position[0] = x;
+    quad[3].position[1] = y + h;
+    quad[3].texture_uv[0] = u0;
+    quad[3].texture_uv[1] = v1;
+    quad[3].rgba[0] = r;
+    quad[3].rgba[1] = g;
+    quad[3].rgba[2] = b;
+    quad[3].rgba[3] = a;
     PushQuadVerts(quad);
 }
 
@@ -133,7 +129,7 @@ void SpriteBatch::PushQuadTextured(float x, float y, float w, float h, const Tex
     MRQ2_ASSERT(tex != nullptr);
     const auto quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color);
-    m_deferred_textured_quads.push_back({ tex, quad_start_vtx });
+    m_textured_quads.push_back({ tex, quad_start_vtx });
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -143,7 +139,7 @@ void SpriteBatch::PushQuadTexturedUVs(float x, float y, float w, float h, float 
     MRQ2_ASSERT(tex != nullptr);
     const auto quad_start_vtx = m_buffers.CurrentPosition();
     PushQuad(x, y, w, h, u0, v0, u1, v1, color);
-    m_deferred_textured_quads.push_back({ tex, quad_start_vtx });
+    m_textured_quads.push_back({ tex, quad_start_vtx });
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -159,8 +155,9 @@ void SpriteBatches::Init(const RenderDevice & device)
     const VertexInputLayout vertex_input_layout = {
         // DrawVertex2D
         {
-            { VertexInputLayout::kVertexPosition, VertexInputLayout::kFormatFloat4, offsetof(DrawVertex2D, xy_uv) },
-            { VertexInputLayout::kVertexColor,    VertexInputLayout::kFormatFloat4, offsetof(DrawVertex2D, rgba)  },
+            { VertexInputLayout::kVertexPosition,  VertexInputLayout::kFormatFloat2, offsetof(DrawVertex2D, position)   },
+            { VertexInputLayout::kVertexTexCoords, VertexInputLayout::kFormatFloat2, offsetof(DrawVertex2D, texture_uv) },
+            { VertexInputLayout::kVertexColor,     VertexInputLayout::kFormatFloat4, offsetof(DrawVertex2D, rgba)       },
         }
     };
     if (!m_shader_draw_sprites.LoadFromFile(device, vertex_input_layout, "Draw2D"))
