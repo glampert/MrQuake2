@@ -205,7 +205,6 @@ inline float Vec3Normalize(vec3_t v)
 void PerpendicularVector(vec3_t dst, const vec3_t src);
 void VectorsFromAngles(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
 void RotatePointAroundVector(vec3_t dst, const vec3_t dir, const vec3_t point, const float degrees);
-int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_s * p);
 
 /*
 ===============================================================================
@@ -254,6 +253,111 @@ struct alignas(16) RenderMatrix final
     static RenderMatrix RotationZ(float angle_radians);
     static RenderMatrix RotationAxis(float angle_radians, float x, float y, float z);
 };
+
+/*
+===============================================================================
+
+    Frustum
+
+===============================================================================
+*/
+struct alignas(16) Frustum final
+{
+    // view * projection:
+    RenderMatrix clipMatrix;
+    RenderMatrix projection;
+
+    // Frustum planes:
+    enum { A, B, C, D };
+    float p[6][4];
+
+    // Sets everything to zero / identity.
+    Frustum();
+
+    // Compute a fresh projection matrix for the frustum.
+    void SetProjection(float fovyRadians, int width, int height, float zn, float zf);
+
+    // Compute frustum planes from camera matrix. Also sets clipMatrix by multiplying view and projection.
+    void SetClipPlanes(const RenderMatrix & view);
+
+    // Test if point inside frustum.
+    bool TestPoint(float x, float y, float z) const;
+
+    // Bounding sphere inside frustum or partially intersecting.
+    bool TestSphere(float x, float y, float z, float radius) const;
+
+    // Cube inside frustum or partially intersecting.
+    bool TestCube(float x, float y, float z, float size) const;
+
+    // Axis-aligned bounding box. True if box is partly intersecting or fully contained in the frustum.
+    bool TestAabb(const vec3_t mins, const vec3_t maxs) const;
+};
+
+/*
+===============================================================================
+
+    Frustum inline methods:
+
+===============================================================================
+*/
+
+inline bool Frustum::TestPoint(const float x, const float y, const float z) const
+{
+    for (int i = 0; i < 6; ++i)
+    {
+        if ((p[i][A] * x + p[i][B] * y + p[i][C] * z + p[i][D]) <= 0.0f)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+inline bool Frustum::TestSphere(const float x, const float y, const float z, const float radius) const
+{
+    for (int i = 0; i < 6; ++i)
+    {
+        if ((p[i][A] * x + p[i][B] * y + p[i][C] * z + p[i][D]) <= -radius)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+inline bool Frustum::TestCube(const float x, const float y, const float z, const float size) const
+{
+    for (int i = 0; i < 6; ++i)
+    {
+        if ((p[i][A] * (x - size) + p[i][B] * (y - size) + p[i][C] * (z - size) + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * (x + size) + p[i][B] * (y - size) + p[i][C] * (z - size) + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * (x - size) + p[i][B] * (y + size) + p[i][C] * (z - size) + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * (x + size) + p[i][B] * (y + size) + p[i][C] * (z - size) + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * (x - size) + p[i][B] * (y - size) + p[i][C] * (z + size) + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * (x + size) + p[i][B] * (y - size) + p[i][C] * (z + size) + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * (x - size) + p[i][B] * (y + size) + p[i][C] * (z + size) + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * (x + size) + p[i][B] * (y + size) + p[i][C] * (z + size) + p[i][D]) > 0.0f) { continue; }
+        return false;
+    }
+    return true;
+}
+
+inline bool Frustum::TestAabb(const vec3_t mins, const vec3_t maxs) const
+{
+    for (int i = 0; i < 6; ++i)
+    {
+        if ((p[i][A] * mins[0] + p[i][B] * mins[1] + p[i][C] * mins[2] + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * maxs[0] + p[i][B] * mins[1] + p[i][C] * mins[2] + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * mins[0] + p[i][B] * maxs[1] + p[i][C] * mins[2] + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * maxs[0] + p[i][B] * maxs[1] + p[i][C] * mins[2] + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * mins[0] + p[i][B] * mins[1] + p[i][C] * maxs[2] + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * maxs[0] + p[i][B] * mins[1] + p[i][C] * maxs[2] + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * mins[0] + p[i][B] * maxs[1] + p[i][C] * maxs[2] + p[i][D]) > 0.0f) { continue; }
+        if ((p[i][A] * maxs[0] + p[i][B] * maxs[1] + p[i][C] * maxs[2] + p[i][D]) > 0.0f) { continue; }
+        return false;
+    }
+    return true;
+}
 
 /*
 ===============================================================================
@@ -465,6 +569,7 @@ namespace Config
     extern CvarWrapper r_debug;
     extern CvarWrapper r_debug_frame_events;
     extern CvarWrapper r_draw_fps_counter;
+    extern CvarWrapper r_draw_cull_stats;
     extern CvarWrapper r_surf_use_debug_color;
     extern CvarWrapper r_blend_debug_color;
     extern CvarWrapper r_max_anisotropy;

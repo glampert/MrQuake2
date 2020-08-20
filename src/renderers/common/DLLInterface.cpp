@@ -279,6 +279,21 @@ void DLLInterface::RenderView(refdef_t * const view_def)
     // Draw a fullscreen overlay with the blend color for screen flash effects.
     R_Flash(frame_data.view_def.blend);
 
+    // Frustum culling stats:
+    if (Config::r_draw_cull_stats.IsSet())
+    {
+        char text[128];
+
+        sprintf_s(text, "Alias culled: %d", frame_data.alias_models_culled);
+        DrawAltString(10, 20, text);
+
+        sprintf_s(text, "Brush culled: %d", frame_data.brush_models_culled);
+        DrawAltString(10, 30, text);
+
+        sprintf_s(text, "World culled: %d", frame_data.world_nodes_culled);
+        DrawAltString(10, 40, text);
+    }
+
     DebugDraw::EndFrame(context, sm_per_view_shader_consts.CurrentBuffer());
 }
 

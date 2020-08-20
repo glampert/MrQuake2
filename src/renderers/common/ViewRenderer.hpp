@@ -64,10 +64,15 @@ public:
         vec3_t up_vec{};
 
         // View frustum for the frame, so we can cull bounding boxes out of view
-        cplane_t frustum[4] = {};
+        Frustum frustum;
 
         // Batched from RenderSolidEntities for the translucencies pass.
         FixedSizeArray<const entity_t *, kMaxTranslucentEntities> translucent_entities;
+
+        // Debug counters
+        int alias_models_culled{ 0 };
+        int brush_models_culled{ 0 };
+        int world_nodes_culled{ 0 };
     };
 
     ViewRenderer() = default;
@@ -121,7 +126,6 @@ private:
 
     // Frame setup & rendering:
     void SetUpViewClusters(const FrameData & frame_data);
-    void SetUpFrustum(FrameData & frame_data) const;
     void RenderWorldModel(FrameData & frame_data);
     void RenderSkyBox(FrameData & frame_data);
     void RenderSolidEntities(FrameData & frame_data);
@@ -131,20 +135,20 @@ private:
     void RenderDLights(const FrameData & frame_data);
 
     // World rendering:
-    void RecursiveWorldNode(const FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node);
+    void RecursiveWorldNode(FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node);
     void MarkLeaves(ModelInstance & world_mdl);
     void DrawTextureChains(FrameData & frame_data);
     void DrawAnimatedWaterPolys(const ModelSurface & surf, float frame_time, const vec4_t color);
 
     // Entity rendering:
-    void DrawBrushModel(const FrameData & frame_data, const entity_t & entity);
+    void DrawBrushModel(FrameData & frame_data, const entity_t & entity);
     void DrawSpriteModel(const FrameData & frame_data, const entity_t & entity);
-    void DrawAliasMD2Model(const FrameData & frame_data, const entity_t & entity);
+    void DrawAliasMD2Model(FrameData & frame_data, const entity_t & entity);
     void DrawBeamModel(const FrameData & frame_data, const entity_t & entity);
     void DrawNullModel(const FrameData & frame_data, const entity_t & entity);
 
     // Lighting/shading:
-    bool ShouldCullAliasMD2Model(const cplane_t frustum[4], const entity_t & entity, vec3_t bbox[8]) const;
+    bool ShouldCullAliasMD2Model(const Frustum & frustum, const entity_t & entity, vec3_t bbox[8]) const;
     void ShadeAliasMD2Model(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const;
     void CalcPointLightColor(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const;
 

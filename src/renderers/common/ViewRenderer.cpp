@@ -42,23 +42,6 @@ static const TextureImage * TextureAnimation(const ModelTexInfo * tex, const int
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Returns true if the bounding box is completely outside the frustum
-// and should be culled. False if visible and allowed to draw.
-static bool ShouldCullBBox(const cplane_t frustum[4], const vec3_t mins, const vec3_t maxs)
-{
-    // FIXME - culling doesn't seem to working correctly right now...
-    /*for (int i = 0; i < 4; ++i)
-    {
-        if (MrQ2::BoxOnPlaneSide(mins, maxs, &frustum[i]) == 2)
-        {
-            return true;
-        }
-    }*/
-    return false;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 static const ModelLeaf * FindLeafNodeForPoint(const vec3_t p, const ModelInstance & model)
 {
     MRQ2_ASSERT(model.data.nodes != nullptr);
@@ -137,23 +120,6 @@ static const std::uint8_t * GetClusterPVS(std::uint8_t * const out_pvs, const in
 
     auto * vid_data = reinterpret_cast<const std::uint8_t *>(model.data.vis) + model.data.vis->bitofs[cluster][DVIS_PVS];
     return DecompressModelVis(out_pvs, vid_data, model);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-// Sign bits are used for fast box-on-plane-side tests.
-static std::uint8_t SignBitsForPlane(const cplane_t & plane)
-{
-    std::uint8_t bits = 0;
-    for (int i = 0; i < 3; ++i)
-    {
-        // If the value is negative, set a bit for it.
-        if (plane.normal[i] < 0.0f)
-        {
-            bits |= (1 << i);
-        }
-    }
-    return bits;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -367,42 +333,6 @@ void ViewRenderer::SetUpViewClusters(const FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewRenderer::SetUpFrustum(FrameData & frame_data) const
-{
-    // Rotate VPN right by FOV_X/2 degrees
-    MrQ2::RotatePointAroundVector(frame_data.frustum[0].normal,
-                                  frame_data.up_vec,
-                                  frame_data.forward_vec,
-                                  -(90.0f - frame_data.view_def.fov_x / 2.0f));
-
-    // Rotate VPN left by FOV_X/2 degrees
-    MrQ2::RotatePointAroundVector(frame_data.frustum[1].normal,
-                                  frame_data.up_vec,
-                                  frame_data.forward_vec,
-                                  (90.0f - frame_data.view_def.fov_x / 2.0f));
-
-    // Rotate VPN up by FOV_X/2 degrees
-    MrQ2::RotatePointAroundVector(frame_data.frustum[2].normal,
-                                  frame_data.right_vec,
-                                  frame_data.forward_vec,
-                                  (90.0f - frame_data.view_def.fov_y / 2.0f));
-
-    // Rotate VPN down by FOV_X/2 degrees
-    MrQ2::RotatePointAroundVector(frame_data.frustum[3].normal,
-                                  frame_data.right_vec,
-                                  frame_data.forward_vec,
-                                  -(90.0f - frame_data.view_def.fov_y / 2.0f));
-
-    for (int i = 0; i < 4; ++i)
-    {
-        frame_data.frustum[i].type = PLANE_ANYZ;
-        frame_data.frustum[i].dist = Vec3Dot(frame_data.view_def.vieworg, frame_data.frustum[i].normal);
-        frame_data.frustum[i].signbits = SignBitsForPlane(frame_data.frustum[i]);
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 const PipelineState & ViewRenderer::PipelineStateForPass(const int pass) const
 {
     switch (pass)
@@ -567,7 +497,8 @@ void ViewRenderer::RenderViewSetup(FrameData & frame_data)
     frame_data.view_proj_matrix = RenderMatrix::Multiply(frame_data.view_matrix, frame_data.proj_matrix);
 
     // Update the frustum planes
-    SetUpFrustum(frame_data);
+    frame_data.frustum.projection = frame_data.proj_matrix;
+    frame_data.frustum.SetClipPlanes(frame_data.view_matrix);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -576,9 +507,7 @@ void ViewRenderer::RenderViewSetup(FrameData & frame_data)
 // be drawn and add them to the appropriate draw chain, so the
 // next call to DrawTextureChains() will actually render what
 // was marked for draw in here.
-void ViewRenderer::RecursiveWorldNode(const FrameData & frame_data,
-                                       const ModelInstance & world_mdl,
-                                       const ModelNode * const node)
+void ViewRenderer::RecursiveWorldNode(FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * const node)
 {
     MRQ2_ASSERT(node != nullptr);
 
@@ -590,8 +519,9 @@ void ViewRenderer::RecursiveWorldNode(const FrameData & frame_data,
     {
         return;
     }
-    if (ShouldCullBBox(frame_data.frustum, node->minmaxs, node->minmaxs + 3))
+    if (!frame_data.frustum.TestAabb(node->minmaxs, node->minmaxs + 3))
     {
+        frame_data.world_nodes_culled++;
         return;
     }
 
@@ -1380,7 +1310,7 @@ void ViewRenderer::RenderSolidEntities(FrameData & frame_data)
 
 // Draw an inline brush model either using immediate mode emulation or vertex/index buffers.
 // This renders things like doors, windows and moving platforms.
-void ViewRenderer::DrawBrushModel(const FrameData & frame_data, const entity_t & entity)
+void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entity)
 {
     if (Config::r_skip_brush_mods.IsSet())
     {
@@ -1414,8 +1344,9 @@ void ViewRenderer::DrawBrushModel(const FrameData & frame_data, const entity_t &
         Vec3Add(entity.origin, model->data.maxs, maxs);
     }
 
-    if (ShouldCullBBox(frame_data.frustum, mins, maxs))
+    if (!frame_data.frustum.TestAabb(mins, maxs))
     {
+        frame_data.brush_models_culled++;
         return;
     }
 
@@ -1673,23 +1604,22 @@ void ViewRenderer::DrawSpriteModel(const FrameData & frame_data, const entity_t 
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewRenderer::DrawAliasMD2Model(const FrameData & frame_data, const entity_t & entity)
+void ViewRenderer::DrawAliasMD2Model(FrameData & frame_data, const entity_t & entity)
 {
     if (!(entity.flags & RF_WEAPONMODEL))
     {
         vec3_t bbox[8] = {};
         const bool cull = ShouldCullAliasMD2Model(frame_data.frustum, entity, bbox);
+        if (cull)
+        {
+            frame_data.alias_models_culled++;
+            return;
+        }
 
         if (Config::r_draw_model_bounds.IsSet())
         {
             DebugDraw::AddAABB(bbox, ColorRGBA32{ 0xFF0000FF }); // red
         }
-
-        // TODO: Not working correctly
-        //if (cull)
-        //{
-        //    return;
-        //}
     }
 
     vec4_t shade_light = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -1862,7 +1792,7 @@ void ViewRenderer::DrawNullModel(const FrameData & frame_data, const entity_t & 
 
 ///////////////////////////////////////////////////////////////////////////////
 
-bool ViewRenderer::ShouldCullAliasMD2Model(const cplane_t frustum[4], const entity_t & entity, vec3_t bbox[8]) const
+bool ViewRenderer::ShouldCullAliasMD2Model(const Frustum & frustum, const entity_t & entity, vec3_t bbox[8]) const
 {
     const auto   * model     = reinterpret_cast<const ModelInstance *>(entity.model);
     const dmdl_t * paliashdr = model->hunk.ViewBaseAs<const dmdl_t>();
@@ -1954,27 +1884,17 @@ bool ViewRenderer::ShouldCullAliasMD2Model(const cplane_t frustum[4], const enti
         Vec3Add(entity.origin, bbox[i], bbox[i]);
     }
 
-    int aggregatemask = ~0;
-    for (int p = 0; p < 8; ++p)
+    bool intersectsFrustum = false;
+    for (int i = 0; i < 8; ++i)
     {
-        int mask = 0;
-        for (int f = 0; f < 4; ++f)
+        if (frustum.TestPoint(bbox[i][0], bbox[i][1], bbox[i][2]))
         {
-            const float dp = Vec3Dot(frustum[f].normal, bbox[p]);
-            if ((dp - frustum[f].dist) < 0.0f)
-            {
-                mask |= (1 << f);
-            }
+            intersectsFrustum = true;
+            break;
         }
-        aggregatemask &= mask;
     }
 
-    if (aggregatemask)
-    {
-        return true;
-    }
-
-    return false;
+    return !intersectsFrustum;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

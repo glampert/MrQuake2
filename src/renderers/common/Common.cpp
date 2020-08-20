@@ -211,83 +211,6 @@ void RotatePointAroundVector(vec3_t dst, const vec3_t dir, const vec3_t point, c
 
 ///////////////////////////////////////////////////////////////////////////////
 
-int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_s * p)
-{
-    // Returns 1, 2, or 1 + 2
-
-    float dist1, dist2;
-
-    // fast axial cases
-    if (p->type < 3)
-    {
-        if (p->dist <= emins[p->type])
-        {
-            return 1;
-        }
-        if (p->dist >= emaxs[p->type])
-        {
-            return 2;
-        }
-        return 3;
-    }
-
-    // general case
-    switch (p->signbits)
-    {
-    case 0:
-        dist1 = p->normal[0] * emaxs[0] + p->normal[1] * emaxs[1] + p->normal[2] * emaxs[2];
-        dist2 = p->normal[0] * emins[0] + p->normal[1] * emins[1] + p->normal[2] * emins[2];
-        break;
-    case 1:
-        dist1 = p->normal[0] * emins[0] + p->normal[1] * emaxs[1] + p->normal[2] * emaxs[2];
-        dist2 = p->normal[0] * emaxs[0] + p->normal[1] * emins[1] + p->normal[2] * emins[2];
-        break;
-    case 2:
-        dist1 = p->normal[0] * emaxs[0] + p->normal[1] * emins[1] + p->normal[2] * emaxs[2];
-        dist2 = p->normal[0] * emins[0] + p->normal[1] * emaxs[1] + p->normal[2] * emins[2];
-        break;
-    case 3:
-        dist1 = p->normal[0] * emins[0] + p->normal[1] * emins[1] + p->normal[2] * emaxs[2];
-        dist2 = p->normal[0] * emaxs[0] + p->normal[1] * emaxs[1] + p->normal[2] * emins[2];
-        break;
-    case 4:
-        dist1 = p->normal[0] * emaxs[0] + p->normal[1] * emaxs[1] + p->normal[2] * emins[2];
-        dist2 = p->normal[0] * emins[0] + p->normal[1] * emins[1] + p->normal[2] * emaxs[2];
-        break;
-    case 5:
-        dist1 = p->normal[0] * emins[0] + p->normal[1] * emaxs[1] + p->normal[2] * emins[2];
-        dist2 = p->normal[0] * emaxs[0] + p->normal[1] * emins[1] + p->normal[2] * emaxs[2];
-        break;
-    case 6:
-        dist1 = p->normal[0] * emaxs[0] + p->normal[1] * emins[1] + p->normal[2] * emins[2];
-        dist2 = p->normal[0] * emins[0] + p->normal[1] * emaxs[1] + p->normal[2] * emaxs[2];
-        break;
-    case 7:
-        dist1 = p->normal[0] * emins[0] + p->normal[1] * emins[1] + p->normal[2] * emins[2];
-        dist2 = p->normal[0] * emaxs[0] + p->normal[1] * emaxs[1] + p->normal[2] * emaxs[2];
-        break;
-    default:
-        dist1 = dist2 = 0.0f; // shut up compiler
-        MRQ2_ASSERT(false);
-        break;
-    } // switch
-
-    int sides = 0;
-    if (dist1 >= p->dist)
-    {
-        sides = 1;
-    }
-    if (dist2 < p->dist)
-    {
-        sides |= 2;
-    }
-
-    MRQ2_ASSERT(sides != 0);
-    return sides;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 inline void Vec3MergeXY(const vec3_t V1, const vec3_t V2, vec3_t out)
 {
     out[0] = V1[0];
@@ -575,6 +498,107 @@ RenderMatrix RenderMatrix::RotationAxis(const float angle_radians, const float x
     Vec4Copy(r2, M.rows[2]);
     Vec4Copy(r3, M.rows[3]);
     return M;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Frustum
+///////////////////////////////////////////////////////////////////////////////
+
+Frustum::Frustum()
+    : clipMatrix{ RenderMatrix::kIdentity }
+    , projection{ RenderMatrix::kIdentity }
+{
+    for (int x = 0; x < 6; ++x)
+    {
+        for (int y = 0; y < 4; ++y)
+        {
+            p[x][y] = 0.0f;
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+static inline void NormalizePlane(float p[4])
+{
+    // plane *= 1/sqrt(p.a * p.a + p.b * p.b + p.c * p.c);
+    const float invLen = 1.0f / sqrtf((p[0] * p[0]) + (p[1] * p[1]) + (p[2] * p[2]));
+    p[0] *= invLen;
+    p[1] *= invLen;
+    p[2] *= invLen;
+    p[3] *= invLen;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Frustum::SetProjection(const float fovyRadians, const int width, const int height, const float zn, const float zf)
+{
+    float * matrix = projection.floats;
+
+    const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+    const float yScale = 1.0f / tanf(fovyRadians / 2.0f);
+    const float xScale = yScale / aspectRatio;
+
+    matrix[0] = xScale;
+    matrix[1] = 0.0f;
+    matrix[2] = 0.0f;
+    matrix[3] = 0.0f;
+
+    matrix[4] = 0.0f;
+    matrix[5] = yScale;
+    matrix[6] = 0.0f;
+    matrix[7] = 0.0f;
+
+    matrix[8] = 0.0f;
+    matrix[9] = 0.0f;
+    matrix[10] = zf / (zn - zf);
+    matrix[11] = -1.0f;
+
+    matrix[12] = 0.0f;
+    matrix[13] = 0.0f;
+    matrix[14] = zn * zf / (zn - zf);
+    matrix[15] = 0.0f;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Frustum::SetClipPlanes(const RenderMatrix & view)
+{
+    // Compute a clip matrix:
+    clipMatrix = view * projection;
+
+    // Compute and normalize the 6 frustum planes:
+    const float * m = clipMatrix.floats;
+    p[0][A] = m[3] - m[0];
+    p[0][B] = m[7] - m[4];
+    p[0][C] = m[11] - m[8];
+    p[0][D] = m[15] - m[12];
+    NormalizePlane(p[0]);
+    p[1][A] = m[3] + m[0];
+    p[1][B] = m[7] + m[4];
+    p[1][C] = m[11] + m[8];
+    p[1][D] = m[15] + m[12];
+    NormalizePlane(p[1]);
+    p[2][A] = m[3] + m[1];
+    p[2][B] = m[7] + m[5];
+    p[2][C] = m[11] + m[9];
+    p[2][D] = m[15] + m[13];
+    NormalizePlane(p[2]);
+    p[3][A] = m[3] - m[1];
+    p[3][B] = m[7] - m[5];
+    p[3][C] = m[11] - m[9];
+    p[3][D] = m[15] - m[13];
+    NormalizePlane(p[3]);
+    p[4][A] = m[3] - m[2];
+    p[4][B] = m[7] - m[6];
+    p[4][C] = m[11] - m[10];
+    p[4][D] = m[15] - m[14];
+    NormalizePlane(p[4]);
+    p[5][A] = m[3] + m[2];
+    p[5][B] = m[7] + m[6];
+    p[5][C] = m[11] + m[10];
+    p[5][D] = m[15] + m[14];
+    NormalizePlane(p[5]);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -938,6 +962,7 @@ CvarWrapper r_renderdoc;
 CvarWrapper r_debug;
 CvarWrapper r_debug_frame_events;
 CvarWrapper r_draw_fps_counter;
+CvarWrapper r_draw_cull_stats;
 CvarWrapper r_surf_use_debug_color;
 CvarWrapper r_blend_debug_color;
 CvarWrapper r_max_anisotropy;
@@ -981,6 +1006,7 @@ void Initialize()
     r_debug = GameInterface::Cvar::Get("r_debug", "0", CvarWrapper::kFlagArchive);
     r_debug_frame_events = GameInterface::Cvar::Get("r_debug_frame_events", "0", CvarWrapper::kFlagArchive);
     r_draw_fps_counter = GameInterface::Cvar::Get("r_draw_fps_counter", "0", CvarWrapper::kFlagArchive);
+    r_draw_cull_stats = GameInterface::Cvar::Get("r_draw_cull_stats", "0", CvarWrapper::kFlagArchive);
     r_surf_use_debug_color = GameInterface::Cvar::Get("r_surf_use_debug_color", "0", 0);
     r_blend_debug_color = GameInterface::Cvar::Get("r_blend_debug_color", "0", 0);
     r_max_anisotropy = GameInterface::Cvar::Get("r_max_anisotropy", "1", CvarWrapper::kFlagArchive);
