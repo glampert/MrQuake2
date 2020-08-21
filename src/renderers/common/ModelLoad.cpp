@@ -842,8 +842,7 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
     mdl.data.surfaces     = out;
     mdl.data.num_surfaces = count;
 
-    LightmapManager & lightmap_mgr = LightmapManager::Instance();
-    lightmap_mgr.BeginBuildLightmaps();
+    LightmapManager::BeginBuildLightmaps();
 
     for (int surf_num = 0; surf_num < count; ++surf_num, ++in, ++out)
     {
@@ -916,7 +915,7 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
         //
         if (!(out->texinfo->flags & (SURF_SKY | SURF_TRANS33 | SURF_TRANS66 | SURF_WARP)))
         {
-            lightmap_mgr.CreateSurfaceLightmap(out);
+            LightmapManager::CreateSurfaceLightmap(out);
         }
 
         //
@@ -928,7 +927,7 @@ static void LoadFaces(ModelInstance & mdl, const void * const mdl_data, const lu
         }
     }
 
-    lightmap_mgr.FinishBuildLightmaps();
+    LightmapManager::FinishBuildLightmaps();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -269,22 +269,28 @@ static void SetCacheState(ModelSurface * surf, const lightstyle_t * lightstyles)
 // Write out each lightmap to a PNG on UploadBlock
 constexpr bool kDebugDumpLightmapsToFile = false;
 
-// Global instance
-LightmapManager LightmapManager::sm_instance;
+// Global instance data
+TextureStore *       LightmapManager::sm_tex_store{ nullptr };
+int                  LightmapManager::sm_current_lightmap_texture{ 1 }; // Index 0 is reserved for the dynamic lightmap.
+int                  LightmapManager::sm_allocated[kLightmapBlockWidth] = {};
+const TextureImage * LightmapManager::sm_textures[kMaxLightmapTextures] = {};
+ColorRGBA32          LightmapManager::sm_lightmap_buffer[kLightmapBlockWidth * kLightmapBlockHeight] = {};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void LightmapManager::Init(TextureStore & tex_store)
 {
-    m_tex_store = &tex_store;
+    sm_tex_store = &tex_store;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void LightmapManager::Shutdown()
 {
-    for (auto & t : m_textures) t = nullptr;
-    m_tex_store = nullptr;
+    for (auto & t : sm_textures)
+        t = nullptr;
+
+    sm_tex_store = nullptr;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -292,7 +298,8 @@ void LightmapManager::Shutdown()
 void LightmapManager::BeginRegistration()
 {
     // Null out all the textures, they will be recreated on demand.
-    for (auto & t : m_textures) t = nullptr;
+    for (auto & t : sm_textures)
+        t = nullptr;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -306,7 +313,7 @@ void LightmapManager::EndRegistration()
 
 void LightmapManager::BeginBuildLightmaps()
 {
-    m_current_lightmap_texture = 1; // Index 0 is reserved for the dynamic lightmap.
+    sm_current_lightmap_texture = 1; // Index 0 is reserved for the dynamic lightmap.
     Reset();
 }
 
@@ -321,8 +328,8 @@ void LightmapManager::FinishBuildLightmaps()
 
 void LightmapManager::Reset()
 {
-    std::memset(m_allocated,       0, sizeof(m_allocated));
-    std::memset(m_lightmap_buffer, 0, sizeof(m_lightmap_buffer));
+    std::memset(sm_allocated,       0, sizeof(sm_allocated));
+    std::memset(sm_lightmap_buffer, 0, sizeof(sm_lightmap_buffer));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -337,13 +344,13 @@ bool LightmapManager::AllocBlock(const int w, const int h, int * x, int * y)
 
         for (j = 0; j < w; ++j)
         {
-            if (m_allocated[i + j] >= best)
+            if (sm_allocated[i + j] >= best)
             {
                 break;
             }
-            if (m_allocated[i + j] > best2)
+            if (sm_allocated[i + j] > best2)
             {
-                best2 = m_allocated[i + j];
+                best2 = sm_allocated[i + j];
             }
         }
 
@@ -361,7 +368,7 @@ bool LightmapManager::AllocBlock(const int w, const int h, int * x, int * y)
 
     for (int i = 0; i < w; ++i)
     {
-        m_allocated[*x + i] = best + h;
+        sm_allocated[*x + i] = best + h;
     }
 
     return true;
@@ -371,36 +378,36 @@ bool LightmapManager::AllocBlock(const int w, const int h, int * x, int * y)
 
 void LightmapManager::UploadBlock(const bool is_dynamic)
 {
-    MRQ2_ASSERT(m_tex_store != nullptr);
-    MRQ2_ASSERT(m_current_lightmap_texture < kMaxLightmapTextures);
-    MRQ2_ASSERT(m_current_lightmap_texture >= 1);
+    MRQ2_ASSERT(sm_tex_store != nullptr);
+    MRQ2_ASSERT(sm_current_lightmap_texture < kMaxLightmapTextures);
+    MRQ2_ASSERT(sm_current_lightmap_texture >= 1);
 
-    const int texture_index = is_dynamic ? 0 : m_current_lightmap_texture;
+    const int texture_index = is_dynamic ? 0 : sm_current_lightmap_texture;
 
     // Allocate on demand
-    if (m_textures[texture_index] == nullptr)
+    if (sm_textures[texture_index] == nullptr)
     {
         // This will also upload and initialize the lightmap with m_lightmap_buffer
-        m_textures[texture_index] = m_tex_store->AllocLightmap(m_lightmap_buffer);
+        sm_textures[texture_index] = sm_tex_store->AllocLightmap(sm_lightmap_buffer);
     }
     else
     {
-        MRQ2_ASSERT(m_textures[texture_index]->BasePixels() == m_lightmap_buffer);
-        MRQ2_ASSERT(m_textures[texture_index]->Width()  == kLightmapBlockWidth);
-        MRQ2_ASSERT(m_textures[texture_index]->Height() == kLightmapBlockHeight);
-        MRQ2_ASSERT(m_textures[texture_index]->NumMipMapLevels() == 1);
+        MRQ2_ASSERT(sm_textures[texture_index]->BasePixels() == sm_lightmap_buffer);
+        MRQ2_ASSERT(sm_textures[texture_index]->Width()  == kLightmapBlockWidth);
+        MRQ2_ASSERT(sm_textures[texture_index]->Height() == kLightmapBlockHeight);
+        MRQ2_ASSERT(sm_textures[texture_index]->NumMipMapLevels() == 1);
 
         constexpr uint32_t  num_mip_levels = 1;
-        const ColorRGBA32 * mip_init_data[num_mip_levels]  = { m_textures[texture_index]->BasePixels() };
-        const Vec2u16       mip_dimensions[num_mip_levels] = { m_textures[texture_index]->MipMapDimensions(0) };
+        const ColorRGBA32 * mip_init_data[num_mip_levels]  = { sm_textures[texture_index]->BasePixels() };
+        const Vec2u16       mip_dimensions[num_mip_levels] = { sm_textures[texture_index]->MipMapDimensions(0) };
 
         TextureUpload upload_info{};
-        upload_info.texture  = &m_textures[texture_index]->BackendTexture();
+        upload_info.texture  = &sm_textures[texture_index]->BackendTexture();
         upload_info.is_scrap = true;
         upload_info.mipmaps.num_mip_levels = num_mip_levels;
         upload_info.mipmaps.mip_init_data  = mip_init_data;
         upload_info.mipmaps.mip_dimensions = mip_dimensions;
-        m_tex_store->Device().UploadContext().UploadTextureImmediate(upload_info);
+        sm_tex_store->Device().UploadContext().UploadTextureImmediate(upload_info);
     }
 
     if (kDebugDumpLightmapsToFile)
@@ -411,9 +418,9 @@ void LightmapManager::UploadBlock(const bool is_dynamic)
     if (!is_dynamic)
     {
         // Current texture atlas is full, start to another one.
-        ++m_current_lightmap_texture;
+        ++sm_current_lightmap_texture;
 
-        if (m_current_lightmap_texture == kMaxLightmapTextures)
+        if (sm_current_lightmap_texture == kMaxLightmapTextures)
         {
             GameInterface::Errorf("Ran out of lightmap textures! (%i)", kMaxLightmapTextures);
         }
@@ -422,12 +429,12 @@ void LightmapManager::UploadBlock(const bool is_dynamic)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void LightmapManager::DebugDumpToFile() const
+void LightmapManager::DebugDumpToFile()
 {
     // Dump the current lightmap to a PNG
     char name[512] = {};
-    sprintf_s(name, "lightmaps/%c_lightmap_%d.png", Config::r_lightmap_format.AsStr()[0], m_current_lightmap_texture);
-    PNGSaveToFile(name, kLightmapBlockWidth, kLightmapBlockHeight, m_lightmap_buffer);
+    sprintf_s(name, "lightmaps/%c_lightmap_%d.png", Config::r_lightmap_format.AsStr()[0], sm_current_lightmap_texture);
+    PNGSaveToFile(name, kLightmapBlockWidth, kLightmapBlockHeight, sm_lightmap_buffer);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -453,9 +460,9 @@ void LightmapManager::CreateSurfaceLightmap(ModelSurface * surf)
         }
     }
 
-    surf->lightmap_texture_num = m_current_lightmap_texture;
+    surf->lightmap_texture_num = sm_current_lightmap_texture;
 
-    auto * lm_block = reinterpret_cast<std::uint8_t *>(m_lightmap_buffer);
+    auto * lm_block = reinterpret_cast<std::uint8_t *>(sm_lightmap_buffer);
     lm_block += (surf->light_t * kLightmapBlockWidth + surf->light_s) * kLightmapBytesPerPixel;
     const int lm_stride = kLightmapBlockWidth * kLightmapBytesPerPixel;
 

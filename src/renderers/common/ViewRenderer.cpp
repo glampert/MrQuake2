@@ -752,8 +752,6 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
         context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, consts);
     }
 
-    LightmapManager & lightmap_mgr = LightmapManager::Instance();
-
     // Draw with sorting by texture:
     for (const TextureImage * tex : frame_data.tex_store)
     {
@@ -785,7 +783,7 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
                             auto * lightmap_tex = m_tex_white2x2;
                             if (surf->lightmap_texture_num >= 0)
                             {
-                                lightmap_tex = lightmap_mgr.LightmapAtIndex(surf->lightmap_texture_num);
+                                lightmap_tex = LightmapManager::LightmapAtIndex(surf->lightmap_texture_num);
                             }
                             context.SetTexture(lightmap_tex->BackendTexture(), kLightmapTextureSlot);
 
@@ -805,7 +803,7 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
                 {
                     if (surf->lightmap_texture_num >= 0)
                     {
-                        auto * lightmap_tex = lightmap_mgr.LightmapAtIndex(surf->lightmap_texture_num);
+                        auto * lightmap_tex = LightmapManager::LightmapAtIndex(surf->lightmap_texture_num);
 
                         if (lightmap_tex != batch_args.lightmap_tex)
                         {
@@ -848,8 +846,6 @@ void ViewRenderer::RenderTranslucentSurfaces(FrameData & frame_data)
     {
         return;
     }
-
-    LightmapManager & lightmap_mgr = LightmapManager::Instance();
 
     // The textures are prescaled up for a better
     // lighting range, so scale it back down.
@@ -905,7 +901,7 @@ void ViewRenderer::RenderTranslucentSurfaces(FrameData & frame_data)
 
             if (surf->lightmap_texture_num >= 0)
             {
-                args.lightmap_tex = lightmap_mgr.LightmapAtIndex(surf->lightmap_texture_num);
+                args.lightmap_tex = LightmapManager::LightmapAtIndex(surf->lightmap_texture_num);
             }
 
             MiniImBatch batch = BeginBatch(args);
@@ -1145,7 +1141,7 @@ void ViewRenderer::DrawAnimatedWaterPolys(const ModelSurface & surf, const float
 
     if (surf.lightmap_texture_num >= 0)
     {
-        args.lightmap_tex = LightmapManager::Instance().LightmapAtIndex(surf.lightmap_texture_num);
+        args.lightmap_tex = LightmapManager::LightmapAtIndex(surf.lightmap_texture_num);
     }
 
     // HACK: There's some noticeable z-fighting happening with lava and water touching walls when you go underwater.
@@ -1430,8 +1426,6 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
         context.SetAndUpdateConstantBufferForDraw(m_per_draw_shader_consts, cbuffer_slot, consts);
     }
 
-    LightmapManager & lightmap_mgr = LightmapManager::Instance();
-
     ModelSurface * surf = &model->data.surfaces[model->data.first_model_surface];
     const int num_surfaces = model->data.num_model_surfaces;
 
@@ -1481,7 +1475,7 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
                         auto * lightmap_tex = m_tex_white2x2;
                         if (surf->lightmap_texture_num >= 0)
                         {
-                            lightmap_tex = lightmap_mgr.LightmapAtIndex(surf->lightmap_texture_num);
+                            lightmap_tex = LightmapManager::LightmapAtIndex(surf->lightmap_texture_num);
                         }
                         context.SetTexture(lightmap_tex->BackendTexture(), kLightmapTextureSlot);
 
@@ -1498,7 +1492,7 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
 
                         if (surf->lightmap_texture_num >= 0)
                         {
-                            args.lightmap_tex = lightmap_mgr.LightmapAtIndex(surf->lightmap_texture_num);
+                            args.lightmap_tex = LightmapManager::LightmapAtIndex(surf->lightmap_texture_num);
                         }
 
                         MiniImBatch batch = BeginBatch(args);

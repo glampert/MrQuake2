@@ -259,14 +259,14 @@ void TextureStore::Init(const RenderDevice & device)
 
     GameInterface::Printf("TextureStore initialized.");
 
-    LightmapManager::Instance().Init(*this);
+    LightmapManager::Init(*this);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void TextureStore::Shutdown()
 {
-    LightmapManager::Instance().Shutdown();
+    LightmapManager::Shutdown();
 
     tex_scrap    = nullptr;
     tex_conchars = nullptr;
@@ -651,7 +651,7 @@ void TextureStore::BeginRegistration()
     // Reference them on every BeginRegistration so they will always have the most current timestamp.
     TouchResidentTextures();
 
-    LightmapManager::Instance().BeginRegistration();
+    LightmapManager::BeginRegistration();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -660,7 +660,7 @@ void TextureStore::EndRegistration()
 {
     GameInterface::Printf("==== TextureStore::EndRegistration ====");
 
-    LightmapManager::Instance().EndRegistration();
+    LightmapManager::EndRegistration();
 
     int num_textures_removed = 0;
     int num_lmaps_removed = 0;

@@ -41,39 +41,35 @@ class LightmapManager final
 {
 public:
 
-    static LightmapManager & Instance() { return sm_instance; }
+    static void Init(TextureStore & tex_store);
+    static void Shutdown();
 
-    void Init(TextureStore & tex_store);
-    void Shutdown();
+    static void BeginRegistration();
+    static void EndRegistration();
 
-    void BeginRegistration();
-    void EndRegistration();
+    static void BeginBuildLightmaps();
+    static void CreateSurfaceLightmap(ModelSurface * surf);
+    static void FinishBuildLightmaps();
 
-    void BeginBuildLightmaps();
-    void CreateSurfaceLightmap(ModelSurface * surf);
-    void FinishBuildLightmaps();
-
-    const TextureImage * LightmapAtIndex(const size_t index) const
+    static const TextureImage * LightmapAtIndex(const size_t index)
     {
-        MRQ2_ASSERT(index < ArrayLength(m_textures));
-        MRQ2_ASSERT(m_textures[index] != nullptr);
-        return m_textures[index];
+        MRQ2_ASSERT(index < ArrayLength(sm_textures));
+        MRQ2_ASSERT(sm_textures[index] != nullptr);
+        return sm_textures[index];
     }
 
 private:
 
-    bool AllocBlock(const int w, const int h, int * x, int * y);
-    void UploadBlock(const bool is_dynamic);
-    void Reset();
-    void DebugDumpToFile() const;
+    static bool AllocBlock(const int w, const int h, int * x, int * y);
+    static void UploadBlock(const bool is_dynamic);
+    static void Reset();
+    static void DebugDumpToFile();
 
-    int                  m_current_lightmap_texture{ 1 }; // Index 0 is reserved for the dynamic lightmap.
-    int                  m_allocated[kLightmapBlockWidth] = {};
-    const TextureImage * m_textures[kMaxLightmapTextures] = {};
-    TextureStore *       m_tex_store{ nullptr };
-    ColorRGBA32          m_lightmap_buffer[kLightmapBlockWidth * kLightmapBlockHeight] = {};
-
-    static LightmapManager sm_instance;
+    static TextureStore *       sm_tex_store;
+    static int                  sm_current_lightmap_texture;
+    static int                  sm_allocated[kLightmapBlockWidth];
+    static const TextureImage * sm_textures[kMaxLightmapTextures];
+    static ColorRGBA32          sm_lightmap_buffer[kLightmapBlockWidth * kLightmapBlockHeight];
 };
 
 } // MrQ2
