@@ -584,6 +584,7 @@ namespace Config
     extern CvarWrapper r_lightmap_format;
     extern CvarWrapper r_lightmap_intensity;
     extern CvarWrapper r_debug_lightmaps;
+    extern CvarWrapper r_show_lightmap_textures;
     extern CvarWrapper r_no_draw;
 
     // ViewRenderer configs
@@ -600,6 +601,7 @@ namespace Config
     extern CvarWrapper r_water_hack;
     extern CvarWrapper r_draw_model_bounds;
     extern CvarWrapper r_draw_world_bounds;
+    extern CvarWrapper r_dynamic_lightmaps;
 
     // Cache all the CVars above.
     void Initialize();

@@ -112,7 +112,7 @@ void ModelStore::EndRegistration()
     GameInterface::Printf("==== ModelStore::EndRegistration ====");
 
     int num_removed = 0;
-    auto remove_pred = [this, &num_removed](ModelInstance * mdl)
+    auto RemovePred = [this, &num_removed](ModelInstance * mdl)
     {
         if (mdl->reg_num != m_registration_num)
         {
@@ -126,7 +126,7 @@ void ModelStore::EndRegistration()
     // "erase_if"
     auto first = m_models_cache.begin();
     auto last  = m_models_cache.end();
-    m_models_cache.erase(std::remove_if(first, last, remove_pred), last);
+    m_models_cache.erase(std::remove_if(first, last, RemovePred), last);
 
     GameInterface::Printf("Freed %i unused models.", num_removed);
 }

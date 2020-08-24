@@ -5,6 +5,7 @@
 #include "DLLInterface.hpp"
 #include "RenderDocUtils.hpp"
 #include "DebugDraw.hpp"
+#include "Lightmaps.hpp"
 
 namespace MrQ2
 {
@@ -292,6 +293,21 @@ void DLLInterface::RenderView(refdef_t * const view_def)
 
         sprintf_s(text, "World culled: %d", frame_data.world_nodes_culled);
         DrawAltString(10, 40, text);
+    }
+
+    // Debug visualization of the lightmap textures
+    if (Config::r_show_lightmap_textures.IsSet())
+    {
+        char text[128];
+        sprintf_s(text, "LM updates: d:%d, s:%d, blk:%d",
+                  LightmapManager::sm_dynamic_lightmap_updates,
+                  LightmapManager::sm_static_lightmap_updates,
+                  LightmapManager::sm_num_lightmaps_buffers);
+
+        DrawAltString(10, 50, text);
+
+        LightmapManager::DebugDisplayTextures(sm_sprite_batches.Get(SpriteBatch::kDrawPics),
+                                              sm_renderer.RenderWidth(), sm_renderer.RenderHeight());
     }
 
     DebugDraw::EndFrame(context, sm_per_view_shader_consts.CurrentBuffer());

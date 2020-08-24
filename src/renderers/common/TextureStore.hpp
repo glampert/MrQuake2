@@ -212,7 +212,7 @@ public:
     const TextureImage * FindOrLoad(const char * name, TextureType tt); // Load if necessary
 
     // Lightmaps
-    const TextureImage * AllocLightmap(const ColorRGBA32* pixels);
+    const TextureImage * AllocLightmap(const ColorRGBA32* pixels, const uint32_t w, const uint32_t h, const char * name);
 
     // Dumps all loaded textures to the correct paths, creating dirs as needed.
     void DumpAllLoadedTexturesToFile(const char * path, const char * file_type, bool dump_mipmaps) const;
@@ -315,7 +315,6 @@ private:
     // Scrap texture atlas to group small textures
     ScrapAtlas m_scrap;
     bool m_scrap_dirty{ false };
-    int m_next_lmap_index{ 0 };
 
     // Loaded textures cache
     std::uint32_t m_registration_num{ 0 };

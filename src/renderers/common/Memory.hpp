@@ -25,6 +25,7 @@ enum class MemTag : std::uint8_t
     // Tags from the Ref lib
     kRenderer,
     kTextures,
+    kLightmaps,
     kWorldModel,
     kAliasModel,
     kSpriteModel,

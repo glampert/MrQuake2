@@ -6,6 +6,7 @@
 #include "Lightmaps.hpp"
 #include "TextureStore.hpp"
 #include "ModelStructs.hpp"
+#include "ImmediateModeBatching.hpp"
 
 // Quake includes
 #include "common/q_common.h"
@@ -253,7 +254,7 @@ static void BuildLightmap(std::uint8_t * dest, const int stride,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void SetCacheState(ModelSurface * surf, const lightstyle_t * lightstyles)
+static void SetSurfaceCachedLightingInfo(ModelSurface * surf, const lightstyle_t * lightstyles)
 {
     for (int lmap = 0; lmap < kMaxLightmaps && surf->styles[lmap] != 255; ++lmap)
     {
@@ -266,15 +267,20 @@ static void SetCacheState(ModelSurface * surf, const lightstyle_t * lightstyles)
 // LightmapManager
 ///////////////////////////////////////////////////////////////////////////////
 
-// Write out each lightmap to a PNG on UploadBlock
-constexpr bool kDebugDumpLightmapsToFile = false;
-
 // Global instance data
+int                  LightmapManager::sm_static_lightmap_updates{ 0 };
+int                  LightmapManager::sm_dynamic_lightmap_updates{ 0 };
+int                  LightmapManager::sm_num_lightmaps_buffers{ 0 };
+int                  LightmapManager::sm_lightmap_count{ 0 };
 TextureStore *       LightmapManager::sm_tex_store{ nullptr };
-int                  LightmapManager::sm_current_lightmap_texture{ 1 }; // Index 0 is reserved for the dynamic lightmap.
-int                  LightmapManager::sm_allocated[kLightmapBlockWidth] = {};
-const TextureImage * LightmapManager::sm_textures[kMaxLightmapTextures] = {};
-ColorRGBA32          LightmapManager::sm_lightmap_buffer[kLightmapBlockWidth * kLightmapBlockHeight] = {};
+const TextureImage * LightmapManager::sm_static_lightmaps[kMaxLightmapTextures] = {};
+const TextureImage * LightmapManager::sm_dynamic_lightmaps[kMaxLightmapTextures] = {};
+LmImageBuffer *      LightmapManager::sm_static_lightmap_buffers[kMaxLightmapTextures] = {};
+LmImageBuffer *      LightmapManager::sm_dynamic_lightmap_buffers[kMaxLightmapTextures] = {};
+bool                 LightmapManager::sm_dirtied_static_lightmaps[kMaxLightmapTextures] = {};
+bool                 LightmapManager::sm_dirtied_dynamic_lightmaps[kMaxLightmapTextures] = {};
+LmImageBufferPool    LightmapManager::sm_lightmap_buffer_pool{ MemTag::kLightmaps };
+int                  LightmapManager::sm_allocated_blocks[kLightmapTextureWidth] = {};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -287,10 +293,64 @@ void LightmapManager::Init(TextureStore & tex_store)
 
 void LightmapManager::Shutdown()
 {
-    for (auto & t : sm_textures)
-        t = nullptr;
+    for (int lmap = 0; lmap < kMaxLightmapTextures; ++lmap)
+    {
+        sm_static_lightmaps[lmap]  = nullptr;
+        sm_dynamic_lightmaps[lmap] = nullptr;
+
+        sm_static_lightmap_buffers[lmap]  = nullptr;
+        sm_dynamic_lightmap_buffers[lmap] = nullptr;
+    }
 
     sm_tex_store = nullptr;
+    sm_lightmap_count = 0;
+    sm_lightmap_buffer_pool.Drain();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void LightmapManager::Update()
+{
+    auto UploadLightmap = [](const TextureImage * lightmap_tex)
+    {
+        const ColorRGBA32 * pixels[] = { lightmap_tex->BasePixels() };
+        const Vec2u16 dimensions = lightmap_tex->MipMapDimensions(0);
+
+        TextureUpload upload_info{};
+        upload_info.texture  = &lightmap_tex->BackendTexture();
+        upload_info.is_scrap = true;
+        upload_info.mipmaps.num_mip_levels = 1;
+        upload_info.mipmaps.mip_init_data  = pixels;
+        upload_info.mipmaps.mip_dimensions = &dimensions;
+        sm_tex_store->Device().UploadContext().UploadTextureImmediate(upload_info);
+    };
+
+    sm_dynamic_lightmap_updates = 0;
+    sm_static_lightmap_updates  = 0;
+    sm_num_lightmaps_buffers    = sm_lightmap_buffer_pool.BlockCount() * sm_lightmap_buffer_pool.PoolGranularity();
+
+    for (int lmap = 0; lmap < sm_lightmap_count; ++lmap)
+    {
+        if (sm_dirtied_dynamic_lightmaps[lmap])
+        {
+            sm_dirtied_dynamic_lightmaps[lmap] = false;
+
+            auto * dynamic_lightmap_tex = sm_dynamic_lightmaps[lmap];
+            UploadLightmap(dynamic_lightmap_tex);
+
+            ++sm_dynamic_lightmap_updates;
+        }
+
+        if (sm_dirtied_static_lightmaps[lmap])
+        {
+            sm_dirtied_static_lightmaps[lmap] = false;
+
+            auto * static_lightmap_tex = sm_static_lightmaps[lmap];
+            UploadLightmap(static_lightmap_tex);
+
+            ++sm_static_lightmap_updates;
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -298,8 +358,25 @@ void LightmapManager::Shutdown()
 void LightmapManager::BeginRegistration()
 {
     // Null out all the textures, they will be recreated on demand.
-    for (auto & t : sm_textures)
-        t = nullptr;
+    for (int lmap = 0; lmap < sm_lightmap_count; ++lmap)
+    {
+        sm_static_lightmaps[lmap]  = nullptr;
+        sm_dynamic_lightmaps[lmap] = nullptr;
+
+        if (sm_static_lightmap_buffers[lmap] != nullptr)
+        {
+            sm_lightmap_buffer_pool.Deallocate(sm_static_lightmap_buffers[lmap]);
+            sm_static_lightmap_buffers[lmap] = nullptr;
+        }
+
+        if (sm_dynamic_lightmap_buffers[lmap] != nullptr)
+        {
+            sm_lightmap_buffer_pool.Deallocate(sm_dynamic_lightmap_buffers[lmap]);
+            sm_dynamic_lightmap_buffers[lmap] = nullptr;
+        }
+    }
+
+    sm_lightmap_count = 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -313,44 +390,51 @@ void LightmapManager::EndRegistration()
 
 void LightmapManager::BeginBuildLightmaps()
 {
-    sm_current_lightmap_texture = 1; // Index 0 is reserved for the dynamic lightmap.
-    Reset();
+    MRQ2_ASSERT(sm_tex_store != nullptr);
+
+    sm_lightmap_count = 0;
+
+    // Start lightmap[0]
+    sm_static_lightmap_buffers[0]  = sm_lightmap_buffer_pool.Allocate();
+    sm_dynamic_lightmap_buffers[0] = sm_lightmap_buffer_pool.Allocate();
+
+    ResetBlocks();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void LightmapManager::FinishBuildLightmaps()
 {
-    UploadBlock(false);
+    NextLightmapTexture(false);
+    ResetBlocks();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void LightmapManager::Reset()
+void LightmapManager::ResetBlocks()
 {
-    std::memset(sm_allocated,       0, sizeof(sm_allocated));
-    std::memset(sm_lightmap_buffer, 0, sizeof(sm_lightmap_buffer));
+    std::memset(sm_allocated_blocks, 0, sizeof(sm_allocated_blocks));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 bool LightmapManager::AllocBlock(const int w, const int h, int * x, int * y)
 {
-    int best = kLightmapBlockHeight;
+    int best = kLightmapTextureHeight;
 
-    for (int i = 0; i < kLightmapBlockWidth - w; ++i)
+    for (int i = 0; i < kLightmapTextureWidth - w; ++i)
     {
         int j, best2 = 0;
 
         for (j = 0; j < w; ++j)
         {
-            if (sm_allocated[i + j] >= best)
+            if (sm_allocated_blocks[i + j] >= best)
             {
                 break;
             }
-            if (sm_allocated[i + j] > best2)
+            if (sm_allocated_blocks[i + j] > best2)
             {
-                best2 = sm_allocated[i + j];
+                best2 = sm_allocated_blocks[i + j];
             }
         }
 
@@ -361,14 +445,14 @@ bool LightmapManager::AllocBlock(const int w, const int h, int * x, int * y)
         }
     }
 
-    if ((best + h) > kLightmapBlockHeight)
+    if ((best + h) > kLightmapTextureHeight)
     {
         return false;
     }
 
     for (int i = 0; i < w; ++i)
     {
-        sm_allocated[*x + i] = best + h;
+        sm_allocated_blocks[*x + i] = best + h;
     }
 
     return true;
@@ -376,65 +460,41 @@ bool LightmapManager::AllocBlock(const int w, const int h, int * x, int * y)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void LightmapManager::UploadBlock(const bool is_dynamic)
+void LightmapManager::NextLightmapTexture(const bool new_buffers)
 {
     MRQ2_ASSERT(sm_tex_store != nullptr);
-    MRQ2_ASSERT(sm_current_lightmap_texture < kMaxLightmapTextures);
-    MRQ2_ASSERT(sm_current_lightmap_texture >= 1);
+    MRQ2_ASSERT(sm_lightmap_count >= 0 && sm_lightmap_count < kMaxLightmapTextures);
 
-    const int texture_index = is_dynamic ? 0 : sm_current_lightmap_texture;
+    MRQ2_ASSERT(sm_static_lightmaps[sm_lightmap_count]  == nullptr);
+    MRQ2_ASSERT(sm_dynamic_lightmaps[sm_lightmap_count] == nullptr);
 
-    // Allocate on demand
-    if (sm_textures[texture_index] == nullptr)
+    MRQ2_ASSERT(sm_static_lightmap_buffers[sm_lightmap_count]  != nullptr);
+    MRQ2_ASSERT(sm_dynamic_lightmap_buffers[sm_lightmap_count] != nullptr);
+
+    char name[256];
+
+    // Allocate textures on demand.
+    // This will also upload and initialize the lightmaps with their CPU-side buffers.
+
+    // Static
+    sprintf_s(name, "static_lightmap_%d", sm_lightmap_count);
+    sm_static_lightmaps[sm_lightmap_count] = sm_tex_store->AllocLightmap(sm_static_lightmap_buffers[sm_lightmap_count]->pixels, kLightmapTextureWidth, kLightmapTextureHeight, name);
+
+    // Dynamic
+    sprintf_s(name, "dyn_lightmap_%d", sm_lightmap_count);
+    sm_dynamic_lightmaps[sm_lightmap_count] = sm_tex_store->AllocLightmap(sm_dynamic_lightmap_buffers[sm_lightmap_count]->pixels, kLightmapTextureWidth, kLightmapTextureHeight, name);
+
+    // Current lightmap texture is full, start another one.
+    if ((++sm_lightmap_count) == kMaxLightmapTextures)
     {
-        // This will also upload and initialize the lightmap with m_lightmap_buffer
-        sm_textures[texture_index] = sm_tex_store->AllocLightmap(sm_lightmap_buffer);
-    }
-    else
-    {
-        MRQ2_ASSERT(sm_textures[texture_index]->BasePixels() == sm_lightmap_buffer);
-        MRQ2_ASSERT(sm_textures[texture_index]->Width()  == kLightmapBlockWidth);
-        MRQ2_ASSERT(sm_textures[texture_index]->Height() == kLightmapBlockHeight);
-        MRQ2_ASSERT(sm_textures[texture_index]->NumMipMapLevels() == 1);
-
-        constexpr uint32_t  num_mip_levels = 1;
-        const ColorRGBA32 * mip_init_data[num_mip_levels]  = { sm_textures[texture_index]->BasePixels() };
-        const Vec2u16       mip_dimensions[num_mip_levels] = { sm_textures[texture_index]->MipMapDimensions(0) };
-
-        TextureUpload upload_info{};
-        upload_info.texture  = &sm_textures[texture_index]->BackendTexture();
-        upload_info.is_scrap = true;
-        upload_info.mipmaps.num_mip_levels = num_mip_levels;
-        upload_info.mipmaps.mip_init_data  = mip_init_data;
-        upload_info.mipmaps.mip_dimensions = mip_dimensions;
-        sm_tex_store->Device().UploadContext().UploadTextureImmediate(upload_info);
+        GameInterface::Errorf("Ran out of lightmap textures! (%i)", kMaxLightmapTextures);
     }
 
-    if (kDebugDumpLightmapsToFile)
+    if (new_buffers)
     {
-        DebugDumpToFile();
+        sm_static_lightmap_buffers[sm_lightmap_count] = sm_lightmap_buffer_pool.Allocate();
+        sm_dynamic_lightmap_buffers[sm_lightmap_count] = sm_lightmap_buffer_pool.Allocate();
     }
-
-    if (!is_dynamic)
-    {
-        // Current texture atlas is full, start to another one.
-        ++sm_current_lightmap_texture;
-
-        if (sm_current_lightmap_texture == kMaxLightmapTextures)
-        {
-            GameInterface::Errorf("Ran out of lightmap textures! (%i)", kMaxLightmapTextures);
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void LightmapManager::DebugDumpToFile()
-{
-    // Dump the current lightmap to a PNG
-    char name[512] = {};
-    sprintf_s(name, "lightmaps/%c_lightmap_%d.png", Config::r_lightmap_format.AsStr()[0], sm_current_lightmap_texture);
-    PNGSaveToFile(name, kLightmapBlockWidth, kLightmapBlockHeight, sm_lightmap_buffer);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -451,26 +511,28 @@ void LightmapManager::CreateSurfaceLightmap(ModelSurface * surf)
 
     if (!AllocBlock(smax, tmax, &surf->light_s, &surf->light_t))
     {
-        UploadBlock(false);
-        Reset();
+        NextLightmapTexture(true);
+        ResetBlocks();
 
         if (!AllocBlock(smax, tmax, &surf->light_s, &surf->light_t))
         {
-            GameInterface::Errorf("Consecutive calls to LightmapManager::AllocBlock(%d,%d) failed", smax, tmax);
+            GameInterface::Errorf("Consecutive calls to LightmapManager::AllocBlock(%i,%i) failed", smax, tmax);
         }
     }
 
-    surf->lightmap_texture_num = sm_current_lightmap_texture;
+    surf->lightmap_texture_num = sm_lightmap_count;
 
-    auto * lm_block = reinterpret_cast<std::uint8_t *>(sm_lightmap_buffer);
-    lm_block += (surf->light_t * kLightmapBlockWidth + surf->light_s) * kLightmapBytesPerPixel;
-    const int lm_stride = kLightmapBlockWidth * kLightmapBytesPerPixel;
+    auto * lm_block = reinterpret_cast<std::uint8_t *>(sm_static_lightmap_buffers[sm_lightmap_count]->pixels);
+    MRQ2_ASSERT(lm_block != nullptr);
+
+    lm_block += (surf->light_t * kLightmapTextureWidth + surf->light_s) * kLightmapBytesPerPixel;
+    const int lm_stride = kLightmapTextureWidth * kLightmapBytesPerPixel;
 
     const float lightmap_intensity = Config::r_lightmap_intensity.AsFloat();
 
     // No dynamic lights at this point, just the base lightmaps
-    const int frame_num = -1;
-    const int num_dlights = 0;
+    const int frame_num      = -1;
+    const int num_dlights    =  0;
     const dlight_t * dlights = nullptr;
 
     // Default lightstyles
@@ -483,8 +545,92 @@ void LightmapManager::CreateSurfaceLightmap(ModelSurface * surf)
         lightstyles[i].white  = 3.0f;
     }
 
-    SetCacheState(surf, lightstyles);
     BuildLightmap(lm_block, lm_stride, frame_num, lightmap_intensity, surf, num_dlights, dlights, lightstyles);
+    SetSurfaceCachedLightingInfo(surf, lightstyles);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+const TextureImage * LightmapManager::UpdateSurfaceLightmap(const ModelSurface * surf, const int lightmap_index, const lightstyle_t * lightstyles,
+                                                            const dlight_t * dlights, const int num_dlights, const int frame_num,
+                                                            const bool update_surf_cache, const bool dynamic_lightmap)
+{
+    MRQ2_ASSERT(lightmap_index >= 0 && lightmap_index < sm_lightmap_count);
+    const float lightmap_intensity = Config::r_lightmap_intensity.AsFloat();
+
+    const int smax = (surf->extents[0] >> 4) + 1;
+    const int tmax = (surf->extents[1] >> 4) + 1;
+
+    auto * lm_block = reinterpret_cast<std::uint8_t *>(dynamic_lightmap ? sm_dynamic_lightmap_buffers[lightmap_index]->pixels : sm_static_lightmap_buffers[lightmap_index]->pixels);
+    MRQ2_ASSERT(lm_block != nullptr);
+
+    lm_block += (surf->light_t * kLightmapTextureWidth + surf->light_s) * kLightmapBytesPerPixel;
+    const int lm_stride = kLightmapTextureWidth * kLightmapBytesPerPixel;
+
+    BuildLightmap(lm_block, lm_stride, frame_num, lightmap_intensity, surf, num_dlights, dlights, lightstyles);
+
+    if (update_surf_cache)
+    {
+        SetSurfaceCachedLightingInfo(const_cast<ModelSurface *>(surf), lightstyles);
+    }
+
+    if (dynamic_lightmap)
+    {
+        sm_dirtied_dynamic_lightmaps[lightmap_index] = true;
+        return sm_dynamic_lightmaps[lightmap_index];
+    }
+    else
+    {
+        sm_dirtied_static_lightmaps[lightmap_index] = true;
+        return sm_static_lightmaps[lightmap_index];
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void LightmapManager::DebugDisplayTextures(SpriteBatch & batch, const int scr_w, const int scr_h)
+{
+    const float scale = 1.0f;
+    float x = 5.0f;
+    float y = 65.0f;
+
+    auto Background = [&]()
+    {
+        batch.PushQuadTextured(x, y, (scr_w - 10.0f), (kLightmapTextureHeight + 5.0f) * scale,
+                               sm_tex_store->tex_white2x2, ColorRGBA32{ 0xFFFFFFFF });
+        x += 5.0f;
+        y += 5.0f;
+    };
+
+    auto TexturedQuad = [&](const TextureImage * tex, const bool is_last)
+    {
+        const float w = tex->Width()  * scale;
+        const float h = tex->Height() * scale;
+
+        batch.PushQuadTextured(x, y, w, h, tex, ColorRGBA32{ 0xFFFFFFFF });
+
+        x += w + 1.0f;
+        if (!is_last && (x + w + 1.0f) >= scr_w) // Wrap around if next one would be clipped
+        {
+            x = 5.0f;
+            y += h + 6.0f;
+            Background();
+        }
+    };
+
+    Background();
+
+    for (int lmap = 0; lmap < sm_lightmap_count; ++lmap)
+    {
+        auto * tex = sm_dynamic_lightmaps[lmap];
+        TexturedQuad(tex, lmap == (sm_lightmap_count - 1));
+    }
+
+    for (int lmap = 0; lmap < sm_lightmap_count; ++lmap)
+    {
+        auto * tex = sm_static_lightmaps[lmap];
+        TexturedQuad(tex, lmap == (sm_lightmap_count - 1));
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -133,12 +133,15 @@ private:
     void RenderTranslucentEntities(FrameData & frame_data);
     void RenderParticles(const FrameData & frame_data);
     void RenderDLights(const FrameData & frame_data);
+    void MarkDLights(const dlight_t * light, const int bit, ModelInstance & world_mdl, const ModelNode * node);
+    void PushDLights(FrameData & frame_data);
 
     // World rendering:
     void RecursiveWorldNode(FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node);
     void MarkLeaves(ModelInstance & world_mdl);
+    const TextureImage * GetSurfaceLightmap(const refdef_t & view_def, const ModelSurface & surf) const;
     void DrawTextureChains(FrameData & frame_data);
-    void DrawAnimatedWaterPolys(const ModelSurface & surf, float frame_time, const vec4_t color);
+    void DrawAnimatedWaterPolys(const refdef_t & view_def, const ModelSurface & surf, float frame_time, const vec4_t color);
 
     // Entity rendering:
     void DrawBrushModel(FrameData & frame_data, const entity_t & entity);

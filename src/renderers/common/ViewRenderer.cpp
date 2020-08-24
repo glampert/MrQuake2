@@ -466,6 +466,9 @@ void ViewRenderer::DoRenderView(FrameData & frame_data)
     RenderDLights(frame_data);
 
     FlushImmediateModeDrawCmds(frame_data);
+
+    // Update dynamic lightmaps.
+    LightmapManager::Update();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -473,6 +476,8 @@ void ViewRenderer::DoRenderView(FrameData & frame_data)
 void ViewRenderer::RenderViewSetup(FrameData & frame_data)
 {
     ++m_frame_count;
+
+    PushDLights(frame_data);
 
     // Find current view clusters
     SetUpViewClusters(frame_data);
@@ -719,6 +724,84 @@ void ViewRenderer::MarkLeaves(ModelInstance & world_mdl)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+const TextureImage * ViewRenderer::GetSurfaceLightmap(const refdef_t & view_def, const ModelSurface & surf) const
+{
+    // Not a lightmapped surface.
+    if (surf.lightmap_texture_num < 0)
+    {
+        return m_tex_white2x2;
+    }
+
+    // If we're using the fallback path emulating dynamic lights with sprites just return the base static ligthmap.
+    if (!Config::r_dynamic_lightmaps.IsSet())
+    {
+        return LightmapManager::LightmapAtIndex(surf.lightmap_texture_num);
+    }
+
+    // These surface types are not lightmapped.
+    constexpr int kNoLightmapSurfaceFlags = (SURF_SKY | SURF_TRANS33 | SURF_TRANS66 | SURF_WARP);
+
+    bool is_dynamic = false;
+    int lmap = 0;
+
+    // See if we need to update the dynamic lightmap
+    for (; lmap < kMaxLightmaps && surf.styles[lmap] != 255; ++lmap)
+    {
+        if (view_def.lightstyles[surf.styles[lmap]].white != surf.cached_light[lmap])
+        {
+            if (!(surf.texinfo->flags & kNoLightmapSurfaceFlags))
+            {
+                is_dynamic = true;
+            }
+            break;
+        }
+    }
+
+    // Is the surface lit by a dynamic light source?
+    if (!is_dynamic)
+    {
+        if (surf.dlight_frame == m_frame_count)
+        {
+            if (!(surf.texinfo->flags & kNoLightmapSurfaceFlags))
+            {
+                is_dynamic = true;
+            }
+        }
+    }
+
+    const TextureImage * lightmap_tex;
+
+    if (is_dynamic)
+    {
+        bool update_surf_cache;
+        bool dynamic_lightmap;
+
+        // Update existing surface lightmap
+        if ((surf.styles[lmap] >= 32 || surf.styles[lmap] == 0) && (surf.dlight_frame != m_frame_count))
+        {
+            update_surf_cache = true;
+            dynamic_lightmap  = false;
+        }
+        else // Update the dynamic lightmap
+        {
+            update_surf_cache = false;
+            dynamic_lightmap  = true;
+        }
+
+        lightmap_tex = LightmapManager::UpdateSurfaceLightmap(&surf, surf.lightmap_texture_num, view_def.lightstyles,
+                                                              view_def.dlights, view_def.num_dlights, m_frame_count,
+                                                              update_surf_cache, dynamic_lightmap);
+    }
+    else // Static lightmap
+    {
+        lightmap_tex = LightmapManager::LightmapAtIndex(surf.lightmap_texture_num);
+    }
+
+    return lightmap_tex;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void ViewRenderer::DrawTextureChains(FrameData & frame_data)
 {
     const bool do_draw   = !Config::r_skip_draw_texture_chains.IsSet();
@@ -763,8 +846,6 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
             continue;
         }
 
-        // TODO: Missing handling of (surf->texinfo->flags & SURF_FLOWING) here and for brush models
-
         if (do_draw)
         {
             if (use_vb_ib && kUseVertexAndIndexBuffers) // Use the prebaked vertex and index buffers
@@ -778,13 +859,9 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
                             const auto range = poly->index_buffer;
                             MRQ2_ASSERT(range.first_index >= 0 && range.index_count > 0 && range.base_vertex >= 0);
 
-                            context.SetTexture(tex->BackendTexture(), kDiffuseTextureSlot);
+                            auto * lightmap_tex = GetSurfaceLightmap(frame_data.view_def, *surf);
 
-                            auto * lightmap_tex = m_tex_white2x2;
-                            if (surf->lightmap_texture_num >= 0)
-                            {
-                                lightmap_tex = LightmapManager::LightmapAtIndex(surf->lightmap_texture_num);
-                            }
+                            context.SetTexture(tex->BackendTexture(), kDiffuseTextureSlot);
                             context.SetTexture(lightmap_tex->BackendTexture(), kLightmapTextureSlot);
 
                             context.DrawIndexed(range.first_index, range.index_count, range.base_vertex);
@@ -803,7 +880,7 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
                 {
                     if (surf->lightmap_texture_num >= 0)
                     {
-                        auto * lightmap_tex = LightmapManager::LightmapAtIndex(surf->lightmap_texture_num);
+                        auto * lightmap_tex = GetSurfaceLightmap(frame_data.view_def, *surf);
 
                         if (lightmap_tex != batch_args.lightmap_tex)
                         {
@@ -888,21 +965,16 @@ void ViewRenderer::RenderTranslucentSurfaces(FrameData & frame_data)
 
         if (surf->flags & kSurf_DrawTurb) // Draw with vertex animation/displacement
         {
-            DrawAnimatedWaterPolys(*surf, frame_data.view_def.time, color_alpha);
+            DrawAnimatedWaterPolys(frame_data.view_def, *surf, frame_data.view_def.time, color_alpha);
         }
         else // Static translucent surface (glass, completely still fluid)
         {
             BeginBatchArgs args;
             args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
             args.diffuse_tex  = surf->texinfo->teximage;
-            args.lightmap_tex = nullptr;
+            args.lightmap_tex = GetSurfaceLightmap(frame_data.view_def, *surf);
             args.topology     = PrimitiveTopology::kTriangleList;
             args.depth_hack   = false;
-
-            if (surf->lightmap_texture_num >= 0)
-            {
-                args.lightmap_tex = LightmapManager::LightmapAtIndex(surf->lightmap_texture_num);
-            }
 
             MiniImBatch batch = BeginBatch(args);
             {
@@ -1044,6 +1116,11 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
 // This is used to simulate gunshot flares for example. The sprite is rendered with additive blending (qglBlendFunc(GL_ONE, GL_ONE)).
 void ViewRenderer::RenderDLights(const FrameData & frame_data)
 {
+    if (Config::r_dynamic_lightmaps.IsSet())
+    {
+        return;
+    }
+
     const int num_dlights = frame_data.view_def.num_dlights;
     if (num_dlights <= 0)
     {
@@ -1101,6 +1178,64 @@ void ViewRenderer::RenderDLights(const FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void ViewRenderer::MarkDLights(const dlight_t * light, const int bit, ModelInstance & world_mdl, const ModelNode * node)
+{
+    if (node->contents != -1)
+    {
+        return;
+    }
+
+    const cplane_t * split_plane = node->plane;
+    const float dist = Vec3Dot(light->origin, split_plane->normal) - split_plane->dist;
+
+    if (dist > light->intensity - kDLightCutoff)
+    {
+        MarkDLights(light, bit, world_mdl, node->children[0]);
+        return;
+    }
+    if (dist < -light->intensity + kDLightCutoff)
+    {
+        MarkDLights(light, bit, world_mdl, node->children[1]);
+        return;
+    }
+
+    // Mark the polygons
+    ModelSurface * surf = world_mdl.data.surfaces + node->first_surface;
+    for (int i = 0; i < node->num_surfaces; ++i, ++surf)
+    {
+        if (surf->dlight_frame != m_frame_count)
+        {
+            surf->dlight_bits  = 0;
+            surf->dlight_frame = m_frame_count;
+        }
+        surf->dlight_bits |= bit;
+    }
+
+    MarkDLights(light, bit, world_mdl, node->children[0]);
+    MarkDLights(light, bit, world_mdl, node->children[1]);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewRenderer::PushDLights(FrameData & frame_data)
+{
+    if (Config::r_dynamic_lightmaps.IsSet())
+    {
+        const dlight_t * l = frame_data.view_def.dlights;
+        const int num_dlights = frame_data.view_def.num_dlights;
+
+        ModelInstance & world_mdl = frame_data.world_model;
+        const ModelNode * nodes = world_mdl.data.nodes;
+
+        for (int i = 0; i < num_dlights; ++i, ++l)
+        {
+            MarkDLights(l, 1 << i, world_mdl, nodes);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 constexpr float kTurbScale = (256.0f / (2.0f * M_PI));
 
 #ifdef _MSC_VER
@@ -1120,7 +1255,7 @@ static const float s_turb_sin[] = {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewRenderer::DrawAnimatedWaterPolys(const ModelSurface & surf, const float frame_time, const vec4_t color)
+void ViewRenderer::DrawAnimatedWaterPolys(const refdef_t & view_def, const ModelSurface & surf, const float frame_time, const vec4_t color)
 {
     float scroll;
     if (surf.texinfo->flags & SURF_FLOWING)
@@ -1135,14 +1270,9 @@ void ViewRenderer::DrawAnimatedWaterPolys(const ModelSurface & surf, const float
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
     args.diffuse_tex  = surf.texinfo->teximage;
-    args.lightmap_tex = nullptr;
+    args.lightmap_tex = GetSurfaceLightmap(view_def, surf);
     args.topology     = PrimitiveTopology::kTriangleFan;
     args.depth_hack   = false;
-
-    if (surf.lightmap_texture_num >= 0)
-    {
-        args.lightmap_tex = LightmapManager::LightmapAtIndex(surf.lightmap_texture_num);
-    }
 
     // HACK: There's some noticeable z-fighting happening with lava and water touching walls when you go underwater.
     // Adding a small offset to the positions resolves it. No idea why this didn't happen with the original
@@ -1369,27 +1499,17 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
 
     const auto mdl_mtx = MakeEntityModelMatrix(entity, /* flipUpV = */false);
 
-    /* TODO
     // Calculate dynamic lighting for bmodel
-    if (!gl_flashblend->value)
+    if (Config::r_dynamic_lightmaps.IsSet())
     {
-        lt = r_newrefdef.dlights;
-        for (k = 0; k < r_newrefdef.num_dlights; k++, lt++)
+        const int num_dlights = frame_data.view_def.num_dlights;
+        const dlight_t * l = frame_data.view_def.dlights;
+
+        for (int i = 0; i < num_dlights; ++i, ++l)
         {
-            R_MarkLights(lt, 1 << k, currentmodel->nodes + currentmodel->firstnode);
+            MarkDLights(l, 1 << i, frame_data.world_model, model->data.nodes + model->data.first_node);
         }
     }
-    */
-
-    /* TODO
-    // Handle transparency pass
-    if (entity.flags & RF_TRANSLUCENT)
-    {
-        qglEnable(GL_BLEND);
-        qglColor4f(1, 1, 1, 0.25);
-        GL_TexEnv(GL_MODULATE);
-    }
-    */
 
     const bool use_vb_ib = Config::r_use_vertex_index_buffers.IsSet();
     auto & context  = frame_data.context;
@@ -1447,20 +1567,6 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
             }
             else 
             {
-                // TODO handle water polys (SURF_DRAWTURB) as done in R_RenderBrushPoly
-                /*
-                else if (qglMTexCoord2fSGIS && !(psurf->flags & SURF_DRAWTURB))
-                {
-                    GL_RenderLightmappedPoly(psurf);
-                }
-                else
-                {
-                    GL_EnableMultitexture(false);
-                    R_RenderBrushPoly(psurf);
-                    GL_EnableMultitexture(true);
-                }
-                */
-
                 if (const ModelPoly * poly = surf->polys)
                 {
                     // IndexBuffer rendering
@@ -1470,13 +1576,9 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
                         MRQ2_ASSERT(range.first_index >= 0 && range.base_vertex >= 0);
 
                         auto * tex = TextureAnimation(surf->texinfo, entity.frame);
-                        context.SetTexture(tex->BackendTexture(), kDiffuseTextureSlot);
+                        auto * lightmap_tex = GetSurfaceLightmap(frame_data.view_def, *surf);
 
-                        auto * lightmap_tex = m_tex_white2x2;
-                        if (surf->lightmap_texture_num >= 0)
-                        {
-                            lightmap_tex = LightmapManager::LightmapAtIndex(surf->lightmap_texture_num);
-                        }
+                        context.SetTexture(tex->BackendTexture(), kDiffuseTextureSlot);
                         context.SetTexture(lightmap_tex->BackendTexture(), kLightmapTextureSlot);
 
                         context.DrawIndexed(range.first_index, range.index_count, range.base_vertex);
@@ -1486,14 +1588,9 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
                         BeginBatchArgs args;
                         args.model_matrix = mdl_mtx;
                         args.diffuse_tex  = TextureAnimation(surf->texinfo, entity.frame);
-                        args.lightmap_tex = nullptr;
+                        args.lightmap_tex = GetSurfaceLightmap(frame_data.view_def, *surf);
                         args.topology     = PrimitiveTopology::kTriangleList;
                         args.depth_hack   = false;
-
-                        if (surf->lightmap_texture_num >= 0)
-                        {
-                            args.lightmap_tex = LightmapManager::LightmapAtIndex(surf->lightmap_texture_num);
-                        }
 
                         MiniImBatch batch = BeginBatch(args);
                         {
@@ -1510,20 +1607,6 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
     {
         MRQ2_POP_GPU_MARKER(context);
     }
-
-    /* TODO
-    if (!(entity.flags & RF_TRANSLUCENT))
-    {
-        if (!qglMTexCoord2fSGIS)
-            R_BlendLightmaps();
-    }
-    else
-    {
-        qglDisable(GL_BLEND);
-        qglColor4f(1, 1, 1, 1);
-        GL_TexEnv(GL_REPLACE);
-    }
-    */
 }
 
 ///////////////////////////////////////////////////////////////////////////////

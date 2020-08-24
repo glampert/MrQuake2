@@ -59,8 +59,8 @@ public:
     int ObjectsAlive() const;
     int BlockCount()   const;
 
-    constexpr static std::size_t PoolGranularity();
-    constexpr static std::size_t PooledObjectSize();
+    constexpr static int PoolGranularity();
+    constexpr static int PooledObjectSize();
 
 private:
 
@@ -214,13 +214,13 @@ inline int Pool<T, kGranularity>::BlockCount() const
 }
 
 template<typename T, int kGranularity>
-constexpr std::size_t Pool<T, kGranularity>::PoolGranularity()
+constexpr int Pool<T, kGranularity>::PoolGranularity()
 {
     return kGranularity;
 }
 
 template<typename T, int kGranularity>
-constexpr std::size_t Pool<T, kGranularity>::PooledObjectSize()
+constexpr int Pool<T, kGranularity>::PooledObjectSize()
 {
     return sizeof(T);
 }

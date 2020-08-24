@@ -313,20 +313,16 @@ void TextureStore::UploadScrapIfNeeded()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const TextureImage * TextureStore::AllocLightmap(const ColorRGBA32* pixels)
+const TextureImage * TextureStore::AllocLightmap(const ColorRGBA32* pixels, const uint32_t w, const uint32_t h, const char * name)
 {
-    MRQ2_ASSERT(pixels   != nullptr);
+    MRQ2_ASSERT((w + h) > 0);
+    MRQ2_ASSERT(pixels != nullptr);
+    MRQ2_ASSERT(name != nullptr);
     MRQ2_ASSERT(m_device != nullptr);
-
-    char lmap_name[128] = {};
-    sprintf_s(lmap_name, "lightmap_%i", m_next_lmap_index++);
-
-    const uint32_t w = kLightmapBlockWidth;
-    const uint32_t h = kLightmapBlockHeight;
 
     // Create a one mip level texture tagged as a scrap image.
     TextureImage * new_lightmap = m_teximages_pool.Allocate();
-    ::new(new_lightmap) TextureImage{ pixels, m_registration_num, TextureType::kLightmap, /*scrap =*/true, w, h, {}, {}, lmap_name };
+    ::new(new_lightmap) TextureImage{ pixels, m_registration_num, TextureType::kLightmap, /*scrap =*/true, w, h, {}, {}, name };
 
     constexpr uint32_t  num_mip_levels = 1;
     const ColorRGBA32 * mip_init_data[num_mip_levels]  = { new_lightmap->BasePixels() };
@@ -646,7 +642,6 @@ void TextureStore::BeginRegistration()
 {
     GameInterface::Printf("==== TextureStore::BeginRegistration ====");
     ++m_registration_num;
-    m_next_lmap_index = 0;
 
     // Reference them on every BeginRegistration so they will always have the most current timestamp.
     TouchResidentTextures();
@@ -665,7 +660,7 @@ void TextureStore::EndRegistration()
     int num_textures_removed = 0;
     int num_lmaps_removed = 0;
 
-    auto remove_pred = [this, &num_textures_removed, &num_lmaps_removed](TextureImage * tex)
+    auto RemovePred = [this, &num_textures_removed, &num_lmaps_removed](TextureImage * tex)
     {
         if (tex->m_reg_num != m_registration_num)
         {
@@ -682,7 +677,7 @@ void TextureStore::EndRegistration()
     // "erase_if"
     auto first = m_teximages_cache.begin();
     auto last  = m_teximages_cache.end();
-    m_teximages_cache.erase(std::remove_if(first, last, remove_pred), last);
+    m_teximages_cache.erase(std::remove_if(first, last, RemovePred), last);
 
     GameInterface::Printf("Freed %i unused textures (%i lightmaps).", num_textures_removed, num_lmaps_removed);
 }

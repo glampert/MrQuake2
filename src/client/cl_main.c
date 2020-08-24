@@ -1665,6 +1665,11 @@ void CL_FixCvarCheats(void)
     int i;
     cheatvar_t * var;
 
+    // LAMPERT: Allow cheat on MP
+    float cheats = Cvar_VariableValue("cheats");
+    if (cheats)
+        return;
+
     if (!strcmp(cl.configstrings[CS_MAXCLIENTS], "1") || !cl.configstrings[CS_MAXCLIENTS][0])
         return; // single player can cheat
 

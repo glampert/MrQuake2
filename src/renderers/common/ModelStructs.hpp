@@ -165,13 +165,12 @@ struct ModelSurface
     std::int16_t texture_mins[2];
     std::int16_t extents[2];
 
-    int light_s, light_t;   // lightmap tex coordinates
-    int dlight_s, dlight_t; // lightmap tex coordinates for dynamic lightmaps
+    // lightmap tex coordinates
+    int light_s;
+    int light_t;
 
     ModelPoly * polys; // multiple if warped
     const ModelSurface * texture_chain;
-    const ModelSurface * lightmap_chain;
-
     ModelTexInfo * texinfo;
 
     // dynamic lighting info:

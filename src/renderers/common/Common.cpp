@@ -977,6 +977,7 @@ CvarWrapper r_sky_force_full_draw;
 CvarWrapper r_lightmap_format;
 CvarWrapper r_lightmap_intensity;
 CvarWrapper r_debug_lightmaps;
+CvarWrapper r_show_lightmap_textures;
 CvarWrapper r_no_draw;
 
 // ViewRenderer configs
@@ -993,6 +994,7 @@ CvarWrapper r_intensity;
 CvarWrapper r_water_hack;
 CvarWrapper r_draw_model_bounds; // MD2 and Brush models
 CvarWrapper r_draw_world_bounds; // World geometry
+CvarWrapper r_dynamic_lightmaps;
 
 void Initialize()
 {
@@ -1021,6 +1023,7 @@ void Initialize()
     r_lightmap_format = GameInterface::Cvar::Get("r_lightmap_format", "D", CvarWrapper::kFlagArchive);
     r_lightmap_intensity = GameInterface::Cvar::Get("r_lightmap_intensity", "3", CvarWrapper::kFlagArchive);
     r_debug_lightmaps = GameInterface::Cvar::Get("r_debug_lightmaps", "0", 0);
+    r_show_lightmap_textures = GameInterface::Cvar::Get("r_show_lightmap_textures", "0", 0);
     r_no_draw = GameInterface::Cvar::Get("r_no_draw", "0", 0);
 
     r_use_vertex_index_buffers = GameInterface::Cvar::Get("r_use_vertex_index_buffers", "1", CvarWrapper::kFlagArchive);
@@ -1036,6 +1039,7 @@ void Initialize()
     r_water_hack = GameInterface::Cvar::Get("r_water_hack", "0.5", CvarWrapper::kFlagArchive);
     r_draw_model_bounds = GameInterface::Cvar::Get("r_draw_model_bounds", "0", 0);
     r_draw_world_bounds = GameInterface::Cvar::Get("r_draw_world_bounds", "0", 0);
+    r_dynamic_lightmaps = GameInterface::Cvar::Get("r_dynamic_lightmaps", "1", CvarWrapper::kFlagArchive);
 }
 
 } // Config

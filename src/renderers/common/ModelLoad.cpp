@@ -646,13 +646,13 @@ static void BuildPolygonFromSurface(ModelInstance & mdl, ModelSurface & surf)
         s -= surf.texture_mins[0];
         s += surf.light_s * 16;
         s += 8;
-        s /= kLightmapBlockWidth * 16;
+        s /= kLightmapTextureWidth * 16;
 
         t = Vec3Dot(vec, surf.texinfo->vecs[1]) + surf.texinfo->vecs[1][3];
         t -= surf.texture_mins[1];
         t += surf.light_t * 16;
         t += 8;
-        t /= kLightmapBlockHeight * 16;
+        t /= kLightmapTextureHeight * 16;
 
         poly->vertexes[i].lightmap_s = s;
         poly->vertexes[i].lightmap_t = t;

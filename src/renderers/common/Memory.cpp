@@ -23,6 +23,7 @@ static const char * const MemTag_Strings[] = {
     "kGame",
     "kRenderer",
     "kTextures",
+    "kLightmaps",
     "kWorldModel",
     "kAliasModel",
     "kSpriteModel",
