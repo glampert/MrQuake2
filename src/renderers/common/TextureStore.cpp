@@ -13,6 +13,85 @@
 #include "common/q_files.h"
 
 ///////////////////////////////////////////////////////////////////////////////
+// STB memory hooks
+///////////////////////////////////////////////////////////////////////////////
+
+#define Stb_AllocMagic_64(a, b, c, d, e, f, g, h)                                                    \
+    (((uint64_t)(a) << 0)  | ((uint64_t)(b) << 8)  | ((uint64_t)(c) << 16) | ((uint64_t)(d) << 24) | \
+     ((uint64_t)(e) << 32) | ((uint64_t)(f) << 40) | ((uint64_t)(g) << 48) | ((uint64_t)(h) << 56))
+
+struct Stb_AllocHeader
+{
+    static constexpr uint64_t kAlignment = 16;
+    static constexpr uint64_t kMagic = Stb_AllocMagic_64('S', 'T', 'B', 'I', 'M', 'A', 'G', 'E');
+
+    uint64_t size;
+    uint64_t magic;
+};
+
+static inline void * Stb_MemAlloc(const size_t size_bytes)
+{
+    const size_t alloc_size = size_bytes + sizeof(Stb_AllocHeader) + Stb_AllocHeader::kAlignment;
+    static_assert((sizeof(Stb_AllocHeader) % Stb_AllocHeader::kAlignment) == 0);
+
+    void * memory = MrQ2::MemAllocTracked(alloc_size, MrQ2::MemTag::kTextures);
+    void * aligned_ptr = MrQ2::AlignPtr(memory, Stb_AllocHeader::kAlignment);
+
+    auto * header = static_cast<Stb_AllocHeader *>(aligned_ptr);
+    header->size  = alloc_size;
+    header->magic = Stb_AllocHeader::kMagic;
+
+    void * user_memory = header + 1;
+    return user_memory;
+}
+
+static inline void Stb_MemFree(const void * ptr)
+{
+    if (ptr != nullptr)
+    {
+        auto * header = reinterpret_cast<const Stb_AllocHeader *>(static_cast<const uint8_t *>(ptr) - sizeof(Stb_AllocHeader));
+
+        MRQ2_ASSERT(header->size != 0);
+        MRQ2_ASSERT(header->magic == Stb_AllocHeader::kMagic);
+
+        MrQ2::MemFreeTracked(header, header->size, MrQ2::MemTag::kTextures);
+    }
+}
+
+static inline void * Stb_MemReAlloc(const void * old_ptr, const size_t old_size, const size_t new_size)
+{
+    if (old_ptr == nullptr)
+    {
+        return Stb_MemAlloc(new_size);
+    }
+
+    auto * header = reinterpret_cast<const Stb_AllocHeader *>(static_cast<const uint8_t *>(old_ptr) - sizeof(Stb_AllocHeader));
+
+    MRQ2_ASSERT(header->size != 0);
+    MRQ2_ASSERT(header->magic == Stb_AllocHeader::kMagic);
+    MRQ2_ASSERT(old_size == (header->size - sizeof(Stb_AllocHeader) - Stb_AllocHeader::kAlignment));
+
+    void * new_ptr = Stb_MemAlloc(new_size);
+    std::memcpy(new_ptr, old_ptr, old_size);
+    Stb_MemFree(old_ptr);
+
+    return new_ptr;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// STB Image (stbi)
+///////////////////////////////////////////////////////////////////////////////
+
+#define STBI_ASSERT(expr) MRQ2_ASSERT(expr)
+#define STBI_MALLOC(size) Stb_MemAlloc(size)
+#define STBI_REALLOC_SIZED(ptr, oldsz, newsz) Stb_MemReAlloc(ptr, oldsz, newsz)
+#define STBI_FREE(ptr) Stb_MemFree(ptr)
+#define STB_IMAGE_STATIC
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#include "external/stb/stb_image.h"
+
+///////////////////////////////////////////////////////////////////////////////
 // STB Image Write (stbiw)
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -25,42 +104,9 @@
 // STB Image Resize (stbir)
 ///////////////////////////////////////////////////////////////////////////////
 
-struct StbIR_AllocHeader
-{
-    size_t alloc_total;
-    size_t padding;
-};
-
-static inline void * StbIR_MemAlloc(const size_t size_bytes)
-{
-    constexpr size_t alignment = 16;
-    const size_t alloc_total = sizeof(StbIR_AllocHeader) + size_bytes + alignment;
-    static_assert((sizeof(StbIR_AllocHeader) % alignment) == 0);
-
-    void * memory = MrQ2::MemAllocTracked(alloc_total, MrQ2::MemTag::kTextures);
-    void * aligned_ptr = MrQ2::AlignPtr(memory, alignment);
-
-    auto * header = static_cast<StbIR_AllocHeader *>(aligned_ptr);
-    header->alloc_total = alloc_total;
-    header->padding = 0;
-
-    void * user_memory = header + 1;
-    return user_memory;
-}
-
-static inline void StbIR_MemFree(const void * ptr)
-{
-    auto * header = reinterpret_cast<const StbIR_AllocHeader *>(static_cast<const uint8_t *>(ptr) - sizeof(StbIR_AllocHeader));
-
-    MRQ2_ASSERT(header->alloc_total != 0);
-    MRQ2_ASSERT(header->padding == 0);
-
-    MrQ2::MemFreeTracked(header, header->alloc_total, MrQ2::MemTag::kTextures);
-}
-
 #define STBIR_ASSERT(expr) MRQ2_ASSERT(expr)
-#define STBIR_MALLOC(count, context) StbIR_MemAlloc(count)
-#define STBIR_FREE(ptr, context) StbIR_MemFree(ptr)
+#define STBIR_MALLOC(size, context) Stb_MemAlloc(size)
+#define STBIR_FREE(ptr, context) Stb_MemFree(ptr)
 #define STB_IMAGE_RESIZE_STATIC
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "external/stb/stb_image_resize.h"
@@ -598,29 +644,43 @@ void TextureStore::TouchResidentTextures()
     // Little dot for particles (8x8 white/alpha texture)
     if (tex_particle == nullptr)
     {
-        constexpr uint32_t Dims = 8;
-        const uint8_t dot_texture[Dims][Dims] = {
-            { 0, 0, 0, 0, 0, 0, 0, 0 },
-            { 0, 0, 1, 1, 0, 0, 0, 0 },
-            { 0, 1, 1, 1, 1, 0, 0, 0 },
-            { 0, 1, 1, 1, 1, 0, 0, 0 },
-            { 0, 0, 1, 1, 0, 0, 0, 0 },
-            { 0, 0, 0, 0, 0, 0, 0, 0 },
-            { 0, 0, 0, 0, 0, 0, 0, 0 },
-            { 0, 0, 0, 0, 0, 0, 0, 0 },
-        };
+        int w = 0, h = 0;
+        ColorRGBA32 * pixels = nullptr;
 
-        auto * pixels = new(MemTag::kTextures) ColorRGBA32[Dims * Dims];
-        for (int x = 0; x < Dims; ++x)
+        if (Config::r_hd_particles.IsSet())
         {
-            for (int y = 0; y < Dims; ++y)
+            if (!PNGLoadFromFile("MrQ2/particle.png", &pixels, &w, &h))
             {
-                pixels[x + (y * Dims)] = BytesToColor(255, 255, 255, dot_texture[x][y] * 255);
+                GameInterface::Errorf("Failed to load high quality particle texture 'MrQ2/particle.png'");
+            }
+        }
+        else // Classic Quake2 dot texture
+        {
+            constexpr int Dims = 8;
+            const uint8_t dot_texture[Dims][Dims] = {
+                { 0, 0, 0, 0, 0, 0, 0, 0 },
+                { 0, 0, 1, 1, 0, 0, 0, 0 },
+                { 0, 1, 1, 1, 1, 0, 0, 0 },
+                { 0, 1, 1, 1, 1, 0, 0, 0 },
+                { 0, 0, 1, 1, 0, 0, 0, 0 },
+                { 0, 0, 0, 0, 0, 0, 0, 0 },
+                { 0, 0, 0, 0, 0, 0, 0, 0 },
+                { 0, 0, 0, 0, 0, 0, 0, 0 },
+            };
+
+            w = h = Dims;
+            pixels = new(MemTag::kTextures) ColorRGBA32[Dims * Dims];
+
+            for (int x = 0; x < Dims; ++x)
+            {
+                for (int y = 0; y < Dims; ++y)
+                {
+                    pixels[x + (y * Dims)] = BytesToColor(255, 255, 255, dot_texture[x][y] * 255);
+                }
             }
         }
 
-        TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic, false,
-                                           Dims, Dims, {}, {}, "pics/particle.pcx");
+        TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic, false, w, h, {}, {}, "pics/particle.pcx");
         m_teximages_cache.push_back(tex);
         tex_particle = tex;
     }
@@ -1370,6 +1430,40 @@ bool TGALoadFromFile(const char * const filename, ColorRGBA32 ** pic, int * widt
             ;
         }
     }
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// PNG loader using STBI
+///////////////////////////////////////////////////////////////////////////////
+
+bool PNGLoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height)
+{
+    *pic    = nullptr;
+    *width  = 0;
+    *height = 0;
+
+    GameInterface::FS::ScopedFile file{ filename };
+    if (!file.IsLoaded())
+    {
+        GameInterface::Printf("Bad PNG file '%s'", filename);
+        return false;
+    }
+
+    int n = 0;
+    stbi_uc * img_data = stbi_load_from_memory(reinterpret_cast<stbi_uc const *>(file.data_ptr), file.length, width, height, &n, TextureImage::kBytesPerPixel);
+    if (img_data == nullptr)
+    {
+        GameInterface::Printf("stbi_load_from_memory('%s') failed!", filename);
+        return false;
+    }
+
+    const size_t pixel_count = (*width) * (*height);
+    *pic = new(MemTag::kTextures) ColorRGBA32[pixel_count];
+
+    std::memcpy(*pic, img_data, pixel_count * sizeof(ColorRGBA32));
+    stbi_image_free(img_data);
 
     return true;
 }

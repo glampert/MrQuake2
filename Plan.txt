@@ -10,4 +10,6 @@
 
 - Make bullet hits in the walls leave a damage decal.
 
+- Maybe a cartoon shader would look better???
+
 - Do some CPU profiling with Optick (brofiler)!

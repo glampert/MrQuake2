@@ -146,7 +146,7 @@ void ViewRenderer::Init(const RenderDevice & device, const TextureStore & tex_st
 {
     m_tex_white2x2 = tex_store.tex_white2x2;
 
-    constexpr uint32_t kViewDrawBatchSize = 25000; // max vertices * num buffers
+    constexpr uint32_t kViewDrawBatchSize = 35000; // max vertices * num buffers
     m_vertex_buffers.Init(device, kViewDrawBatchSize);
 
     m_per_draw_shader_consts.Init(device, sizeof(PerDrawShaderConstants), ConstantBuffer::kOptimizeForSingleDraw);
@@ -1070,8 +1070,9 @@ void ViewRenderer::RenderTranslucentEntities(FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Classic blocky Quake2 particles using a single triangle and
+// Classic blocky Quake2 particles are rendered using a single triangle and
 // a special 8x8 texture with a dot-like pattern in its top-left corner.
+// Modern HD particles use a soft sprite and require a full quadrilateral to be rendered.
 void ViewRenderer::RenderParticles(const FrameData & frame_data)
 {
     const int num_particles = frame_data.view_def.num_particles;
@@ -1079,6 +1080,8 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
     {
         return;
     }
+
+    const bool high_quality_particles = Config::r_hd_particles.IsSet();
 
     vec3_t up, right;
     Vec3Scale(frame_data.up_vec,    1.5f, up);
@@ -1104,9 +1107,13 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
                       (p->origin[2] - frame_data.camera_origin[2]) * frame_data.forward_vec[2];
 
         if (scale < 20.0f)
+        {
             scale = 1.0f;
+        }
         else
+        {
             scale = 1.0f + scale * 0.004f;
+        }
 
         const ColorRGBA32 color = TextureStore::ColorForIndex(p->color & 0xFF);
         const std::uint8_t bR = (color & 0xFF);
@@ -1124,26 +1131,75 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
         v.rgba[2] = fB;
         v.rgba[3] = fA;
 
-        v.position[0] = p->origin[0];
-        v.position[1] = p->origin[1];
-        v.position[2] = p->origin[2];
-        v.texture_uv[0] = 0.0625f;
-        v.texture_uv[1] = 0.0625f;
-        batch.PushVertex(v);
+        if (high_quality_particles)
+        {
+            // First triangle:
+            v.position[0] = p->origin[0];
+            v.position[1] = p->origin[1];
+            v.position[2] = p->origin[2];
+            v.texture_uv[0] = 0.0f;
+            v.texture_uv[1] = 0.0f;
+            batch.PushVertex(v);
 
-        v.position[0] = p->origin[0] + up[0] * scale;
-        v.position[1] = p->origin[1] + up[1] * scale;
-        v.position[2] = p->origin[2] + up[2] * scale;
-        v.texture_uv[0] = 1.0625f;
-        v.texture_uv[1] = 0.0625f;
-        batch.PushVertex(v);
+            v.position[0] = p->origin[0] + up[0] * scale;
+            v.position[1] = p->origin[1] + up[1] * scale;
+            v.position[2] = p->origin[2] + up[2] * scale;
+            v.texture_uv[0] = 0.0f;
+            v.texture_uv[1] = 1.0f;
+            batch.PushVertex(v);
 
-        v.position[0] = p->origin[0] + right[0] * scale;
-        v.position[1] = p->origin[1] + right[1] * scale;
-        v.position[2] = p->origin[2] + right[2] * scale;
-        v.texture_uv[0] = 0.0625f;
-        v.texture_uv[1] = 1.0625f;
-        batch.PushVertex(v);
+            v.position[0] = p->origin[0] + ((up[0] + right[0]) * scale);
+            v.position[1] = p->origin[1] + ((up[1] + right[1]) * scale);
+            v.position[2] = p->origin[2] + ((up[2] + right[2]) * scale);
+            v.texture_uv[0] = 1.0f;
+            v.texture_uv[1] = 1.0f;
+            batch.PushVertex(v);
+
+            // Second triangle:
+            v.position[0] = p->origin[0] + ((up[0] + right[0]) * scale);
+            v.position[1] = p->origin[1] + ((up[1] + right[1]) * scale);
+            v.position[2] = p->origin[2] + ((up[2] + right[2]) * scale);
+            v.texture_uv[0] = 1.0f;
+            v.texture_uv[1] = 1.0f;
+            batch.PushVertex(v);
+
+            v.position[0] = p->origin[0] + right[0] * scale;
+            v.position[1] = p->origin[1] + right[1] * scale;
+            v.position[2] = p->origin[2] + right[2] * scale;
+            v.texture_uv[0] = 1.0f;
+            v.texture_uv[1] = 0.0f;
+            batch.PushVertex(v);
+
+            v.position[0] = p->origin[0];
+            v.position[1] = p->origin[1];
+            v.position[2] = p->origin[2];
+            v.texture_uv[0] = 0.0f;
+            v.texture_uv[1] = 0.0f;
+            batch.PushVertex(v);
+        }
+        else // The classic Quake2 dot particle is rendered with just a single triangle
+        {
+            v.position[0] = p->origin[0];
+            v.position[1] = p->origin[1];
+            v.position[2] = p->origin[2];
+            v.texture_uv[0] = 0.0625f;
+            v.texture_uv[1] = 0.0625f;
+            batch.PushVertex(v);
+
+            v.position[0] = p->origin[0] + up[0] * scale;
+            v.position[1] = p->origin[1] + up[1] * scale;
+            v.position[2] = p->origin[2] + up[2] * scale;
+            v.texture_uv[0] = 1.0625f;
+            v.texture_uv[1] = 0.0625f;
+            batch.PushVertex(v);
+
+            v.position[0] = p->origin[0] + right[0] * scale;
+            v.position[1] = p->origin[1] + right[1] * scale;
+            v.position[2] = p->origin[2] + right[2] * scale;
+            v.texture_uv[0] = 0.0625f;
+            v.texture_uv[1] = 1.0625f;
+            batch.PushVertex(v);
+        }
     }
 
     EndBatch(batch);

@@ -588,6 +588,7 @@ namespace Config
     extern CvarWrapper r_show_lightmap_textures;
     extern CvarWrapper r_no_draw;
     extern CvarWrapper r_lightlevel;
+    extern CvarWrapper r_hd_particles;
 
     // ViewRenderer configs
     extern CvarWrapper r_use_vertex_index_buffers;

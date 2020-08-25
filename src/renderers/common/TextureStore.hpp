@@ -327,6 +327,7 @@ private:
 // ============================================================================
 
 bool TGALoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height);
+bool PNGLoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height);
 bool PCXLoadFromFile(const char * filename, Color8 ** pic, int * width, int * height, ColorRGBA32 * palette);
 
 bool TGASaveToFile(const char * filename, int width, int height, const ColorRGBA32 * pixels);

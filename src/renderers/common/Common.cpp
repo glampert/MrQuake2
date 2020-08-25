@@ -988,6 +988,7 @@ CvarWrapper r_debug_lightmaps;
 CvarWrapper r_show_lightmap_textures;
 CvarWrapper r_no_draw;
 CvarWrapper r_lightlevel;
+CvarWrapper r_hd_particles;
 
 // ViewRenderer configs
 CvarWrapper r_use_vertex_index_buffers;
@@ -1036,6 +1037,7 @@ void Initialize()
     r_show_lightmap_textures = GameInterface::Cvar::Get("r_show_lightmap_textures", "0", 0);
     r_no_draw = GameInterface::Cvar::Get("r_no_draw", "0", 0);
     r_lightlevel = GameInterface::Cvar::Get("r_lightlevel", "0", 0);
+    r_hd_particles = GameInterface::Cvar::Get("r_hd_particles", "1", CvarWrapper::kFlagArchive);
 
     r_use_vertex_index_buffers = GameInterface::Cvar::Get("r_use_vertex_index_buffers", "1", CvarWrapper::kFlagArchive);
     r_force_null_entity_models = GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0);
