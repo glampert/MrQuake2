@@ -20,14 +20,14 @@ constexpr bool kLogNewDeleteCalls = false;
 constexpr bool kHunkAllocVerbose  = false;
 
 static const char * const MemTag_Strings[] = {
-    "kGame",
-    "kRenderer",
-    "kTextures",
-    "kLightmaps",
-    "kWorldModel",
-    "kAliasModel",
-    "kSpriteModel",
-    "kVertIndexBuffer",
+    "Game",
+    "Renderer",
+    "Textures",
+    "Lightmaps",
+    "WorldModel",
+    "AliasModel",
+    "SpriteModel",
+    "VertIndexBuffer",
 };
 
 static_assert(ArrayLength(MemTag_Strings) == unsigned(MemTag::kCount), "Update this if the enum changes!");
@@ -46,7 +46,7 @@ struct MemCounts
 };
 
 // Current allocation counts for each memory tag
-static MemCounts MemTag_Counts[unsigned(MemTag::kCount)];
+static MemCounts MemTag_Counts[unsigned(MemTag::kCount)] = {};
 
 ///////////////////////////////////////////////////////////////////////////////
 

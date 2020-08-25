@@ -921,6 +921,14 @@ void CvarWrapper::SetStr(const char * value)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void CvarWrapper::SetValueDirect(float value)
+{
+    MRQ2_ASSERT(IsNotNull());
+    m_wrapped_var->value = value;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 unsigned CvarWrapper::Flags() const
 {
     MRQ2_ASSERT(IsNotNull());
@@ -979,6 +987,7 @@ CvarWrapper r_lightmap_intensity;
 CvarWrapper r_debug_lightmaps;
 CvarWrapper r_show_lightmap_textures;
 CvarWrapper r_no_draw;
+CvarWrapper r_lightlevel;
 
 // ViewRenderer configs
 CvarWrapper r_use_vertex_index_buffers;
@@ -995,6 +1004,7 @@ CvarWrapper r_water_hack;
 CvarWrapper r_draw_model_bounds; // MD2 and Brush models
 CvarWrapper r_draw_world_bounds; // World geometry
 CvarWrapper r_dynamic_lightmaps;
+CvarWrapper r_alias_shadows;
 
 void Initialize()
 {
@@ -1025,6 +1035,7 @@ void Initialize()
     r_debug_lightmaps = GameInterface::Cvar::Get("r_debug_lightmaps", "0", 0);
     r_show_lightmap_textures = GameInterface::Cvar::Get("r_show_lightmap_textures", "0", 0);
     r_no_draw = GameInterface::Cvar::Get("r_no_draw", "0", 0);
+    r_lightlevel = GameInterface::Cvar::Get("r_lightlevel", "0", 0);
 
     r_use_vertex_index_buffers = GameInterface::Cvar::Get("r_use_vertex_index_buffers", "1", CvarWrapper::kFlagArchive);
     r_force_null_entity_models = GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0);
@@ -1040,6 +1051,7 @@ void Initialize()
     r_draw_model_bounds = GameInterface::Cvar::Get("r_draw_model_bounds", "0", 0);
     r_draw_world_bounds = GameInterface::Cvar::Get("r_draw_world_bounds", "0", 0);
     r_dynamic_lightmaps = GameInterface::Cvar::Get("r_dynamic_lightmaps", "1", CvarWrapper::kFlagArchive);
+    r_alias_shadows = GameInterface::Cvar::Get("r_alias_shadows", "1", CvarWrapper::kFlagArchive);
 }
 
 } // Config

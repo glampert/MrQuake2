@@ -465,6 +465,7 @@ public:
     void SetInt(int value);
     void SetFloat(float value);
     void SetStr(const char * value);
+    void SetValueDirect(float value); // Directly change the value without setting the modified flag.
 
     // Cvar flags
     unsigned Flags() const;
@@ -586,6 +587,7 @@ namespace Config
     extern CvarWrapper r_debug_lightmaps;
     extern CvarWrapper r_show_lightmap_textures;
     extern CvarWrapper r_no_draw;
+    extern CvarWrapper r_lightlevel;
 
     // ViewRenderer configs
     extern CvarWrapper r_use_vertex_index_buffers;
@@ -602,6 +604,7 @@ namespace Config
     extern CvarWrapper r_draw_model_bounds;
     extern CvarWrapper r_draw_world_bounds;
     extern CvarWrapper r_dynamic_lightmaps;
+    extern CvarWrapper r_alias_shadows;
 
     // Cache all the CVars above.
     void Initialize();

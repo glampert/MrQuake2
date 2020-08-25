@@ -133,8 +133,9 @@ private:
     void RenderTranslucentEntities(FrameData & frame_data);
     void RenderParticles(const FrameData & frame_data);
     void RenderDLights(const FrameData & frame_data);
-    void MarkDLights(const dlight_t * light, const int bit, ModelInstance & world_mdl, const ModelNode * node);
-    void PushDLights(FrameData & frame_data);
+    void MarkDLights(const dlight_t * light, const int bit, ModelInstance & world_mdl, const ModelNode * node) const;
+    void PushDLights(FrameData & frame_data) const;
+    void SetLightLevel(const FrameData & frame_data) const;
 
     // World rendering:
     void RecursiveWorldNode(FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * node);
@@ -152,13 +153,14 @@ private:
 
     // Lighting/shading:
     bool ShouldCullAliasMD2Model(const Frustum & frustum, const entity_t & entity, vec3_t bbox[8]) const;
-    void ShadeAliasMD2Model(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const;
-    void CalcPointLightColor(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const;
+    void ShadeAliasMD2Model(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color, vec3_t out_light_spot) const;
+    void CalcPointLightColor(const FrameData & frame_data, const vec3_t point, vec4_t out_shade_light_color, vec3_t out_light_spot) const;
 
     // Defined in DrawAliasMD2.cpp
     void DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t * const alias_header, const float backlerp,
-                               const vec3_t shade_light, const RenderMatrix & model_matrix,
-                               const TextureImage * const model_skin);
+                               const vec3_t shade_light, const RenderMatrix & model_matrix, const TextureImage * const model_skin);
+    void DrawAliasMD2Shadow(const entity_t & entity, const dmdl_t * const alias_header,
+                            const RenderMatrix & model_matrix, const vec3_t light_spot);
 
 private:
 

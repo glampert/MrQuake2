@@ -469,6 +469,45 @@ void ViewRenderer::DoRenderView(FrameData & frame_data)
 
     // Update dynamic lightmaps.
     LightmapManager::Update();
+
+    SetLightLevel(frame_data);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Original Quake2 hack from ref_gl to convey the current ambient light at the camera position back to the game.
+void ViewRenderer::SetLightLevel(const FrameData & frame_data) const
+{
+    if (frame_data.view_def.rdflags & RDF_NOWORLDMODEL)
+    {
+        return;
+    }
+
+    // Save off light value for server to look at (BIG HACK!)
+
+    float  light_level = 0.0f;
+    vec4_t shade_light = { 1.0f, 1.0f, 1.0f, 1.0f };
+    vec3_t light_spot  = {};
+    CalcPointLightColor(frame_data, frame_data.view_def.vieworg, shade_light, light_spot);
+
+    // pick the greatest component, which should be the same
+    // as the mono value returned by software
+    if (shade_light[0] > shade_light[1])
+    {
+        if (shade_light[0] > shade_light[2])
+            light_level = 150.0f * shade_light[0];
+        else
+            light_level = 150.0f * shade_light[2];
+    }
+    else
+    {
+        if (shade_light[1] > shade_light[2])
+            light_level = 150.0f * shade_light[1];
+        else
+            light_level = 150.0f * shade_light[2];
+    }
+
+    Config::r_lightlevel.SetValueDirect(light_level);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1178,7 +1217,7 @@ void ViewRenderer::RenderDLights(const FrameData & frame_data)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewRenderer::MarkDLights(const dlight_t * light, const int bit, ModelInstance & world_mdl, const ModelNode * node)
+void ViewRenderer::MarkDLights(const dlight_t * light, const int bit, ModelInstance & world_mdl, const ModelNode * node) const
 {
     if (node->contents != -1)
     {
@@ -1217,7 +1256,7 @@ void ViewRenderer::MarkDLights(const dlight_t * light, const int bit, ModelInsta
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewRenderer::PushDLights(FrameData & frame_data)
+void ViewRenderer::PushDLights(FrameData & frame_data) const
 {
     if (Config::r_dynamic_lightmaps.IsSet())
     {
@@ -1478,7 +1517,7 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
 
     if (Config::r_draw_model_bounds.IsSet())
     {
-        DebugDraw::AddAABB(mins, maxs, ColorRGBA32{ 0xFF00FF00 }); // greed
+        DebugDraw::AddAABB(mins, maxs, ColorRGBA32{ 0xFF00FF00 }); // green
     }
 
     vec3_t model_origin;
@@ -1700,7 +1739,9 @@ void ViewRenderer::DrawAliasMD2Model(FrameData & frame_data, const entity_t & en
     }
 
     vec4_t shade_light = { 1.0f, 1.0f, 1.0f, 1.0f };
-    ShadeAliasMD2Model(frame_data, entity, shade_light);
+    vec3_t light_spot  = {};
+
+    ShadeAliasMD2Model(frame_data, entity, shade_light, light_spot);
 
     const float  backlerp = (Config::r_lerp_entity_models.IsSet() ? entity.backlerp : 0.0f);
     const auto   mdl_mtx  = MakeEntityModelMatrix(entity, /* flipUpV = */false);
@@ -1735,6 +1776,20 @@ void ViewRenderer::DrawAliasMD2Model(FrameData & frame_data, const entity_t & en
 
     // Draw interpolated frame:
     DrawAliasMD2FrameLerp(entity, model->hunk.ViewBaseAs<dmdl_t>(), backlerp, shade_light, mdl_mtx, skin);
+
+    // Simple projected shadow:
+    const bool draw_shadows = Config::r_alias_shadows.IsSet();
+    if (draw_shadows && !(entity.flags & (RF_TRANSLUCENT | RF_WEAPONMODEL)))
+    {
+        // Switch to projected shadows mode then back to previous render mode.
+        // We want alpha blending to be enabled for the shadows.
+        const auto prev_pass = m_current_pass;
+        m_current_pass = kPass_TranslucentEntities;
+
+        DrawAliasMD2Shadow(entity, model->hunk.ViewBaseAs<dmdl_t>(), mdl_mtx, light_spot);
+
+        m_current_pass = prev_pass;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1815,17 +1870,12 @@ void ViewRenderer::DrawBeamModel(const FrameData & frame_data, const entity_t & 
 
 void ViewRenderer::DrawNullModel(const FrameData & frame_data, const entity_t & entity)
 {
-    vec4_t color;
-    if (entity.flags & RF_FULLBRIGHT)
+    vec4_t color = { 1.0f, 1.0f, 1.0f, 1.0f };
+    vec3_t light_spot = {};
+
+    if (!(entity.flags & RF_FULLBRIGHT))
     {
-        color[0] = 1.0f;
-        color[1] = 1.0f;
-        color[2] = 1.0f;
-        color[3] = 1.0f;
-    }
-    else
-    {
-        CalcPointLightColor(frame_data, entity, color);
+        CalcPointLightColor(frame_data, entity.origin, color, light_spot);
     }
 
     const vec2_t uvs[3] = {
@@ -1976,7 +2026,7 @@ bool ViewRenderer::ShouldCullAliasMD2Model(const Frustum & frustum, const entity
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewRenderer::ShadeAliasMD2Model(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const
+void ViewRenderer::ShadeAliasMD2Model(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color, vec3_t out_light_spot) const
 {
     //
     // Hacks for the original Quake2 ref_gl follow
@@ -1988,12 +2038,13 @@ void ViewRenderer::ShadeAliasMD2Model(const FrameData & frame_data, const entity
         // PMM - special case for godmode
         if ((entity.flags & RF_SHELL_RED) && (entity.flags & RF_SHELL_BLUE) && (entity.flags & RF_SHELL_GREEN))
         {
-            for (int i = 0; i < 3; ++i)
+            for (int i = 0; i < 4; ++i)
                 out_shade_light_color[i] = 1.0f;
         }
         else if (entity.flags & (RF_SHELL_RED | RF_SHELL_BLUE | RF_SHELL_DOUBLE))
         {
-            Vec3Zero(out_shade_light_color);
+            Vec3Zero(out_shade_light_color); // RGB
+            out_shade_light_color[3] = 1.0f; // A
 
             if (entity.flags & RF_SHELL_RED)
             {
@@ -2023,7 +2074,8 @@ void ViewRenderer::ShadeAliasMD2Model(const FrameData & frame_data, const entity
         }
         else if (entity.flags & (RF_SHELL_HALF_DAM | RF_SHELL_GREEN))
         {
-            Vec3Zero(out_shade_light_color);
+            Vec3Zero(out_shade_light_color); // RGB
+            out_shade_light_color[3] = 1.0f; // A
 
             // PMM - new colors
             if (entity.flags & RF_SHELL_HALF_DAM)
@@ -2040,12 +2092,12 @@ void ViewRenderer::ShadeAliasMD2Model(const FrameData & frame_data, const entity
     }
     else if (entity.flags & RF_FULLBRIGHT)
     {
-        for (int i = 0; i < 3; ++i)
+        for (int i = 0; i < 4; ++i)
             out_shade_light_color[i] = 1.0f;
     }
     else
     {
-        CalcPointLightColor(frame_data, entity, out_shade_light_color);
+        CalcPointLightColor(frame_data, entity.origin, out_shade_light_color, out_light_spot);
     }
 
     if (entity.flags & RF_MINLIGHT)
@@ -2084,16 +2136,165 @@ void ViewRenderer::ShadeAliasMD2Model(const FrameData & frame_data, const entity
         out_shade_light_color[0] = 1.0f;
         out_shade_light_color[1] = 0.0f;
         out_shade_light_color[2] = 0.0f;
+        out_shade_light_color[3] = 1.0f;
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ViewRenderer::CalcPointLightColor(const FrameData & frame_data, const entity_t & entity, vec4_t out_shade_light_color) const
+static int RecursiveLightPoint(const ModelInstance & world_mdl, const ModelNode * node, const lightstyle_t * lightstyles,
+                               const vec3_t start, const vec3_t end, vec3_t out_point_color, vec3_t out_light_spot)
 {
-    // TODO - compute lighting (R_LightPoint - sample lightmap color at point)
-    out_shade_light_color[0] = out_shade_light_color[1] =
-    out_shade_light_color[2] = out_shade_light_color[3] = 1.0f;
+    MRQ2_ASSERT(node != nullptr);
+    MRQ2_ASSERT(lightstyles != nullptr);
+
+    if (node->contents != -1)
+    {
+        return -1; // Didn't hit anything
+    }
+
+    // Calculate mid point
+    const cplane_t * const plane = node->plane;
+    const float front = Vec3Dot(start, plane->normal) - plane->dist;
+    const float back  = Vec3Dot(end,   plane->normal) - plane->dist;
+    const int   side  = (front < 0.0f);
+
+    if ((back < 0.0f) == side)
+    {
+        return RecursiveLightPoint(world_mdl, node->children[side], lightstyles, start, end, out_point_color, out_light_spot);
+    }
+
+    const float frac = front / (front - back);
+
+    vec3_t mid;
+    mid[0] = start[0] + (end[0] - start[0]) * frac;
+    mid[1] = start[1] + (end[1] - start[1]) * frac;
+    mid[2] = start[2] + (end[2] - start[2]) * frac;
+
+    // Go down front side
+    const int r = RecursiveLightPoint(world_mdl, node->children[side], lightstyles, start, mid, out_point_color, out_light_spot);
+    if (r >= 0)
+    {
+        return r; // Hit something
+    }
+    if ((back < 0.0f) == side)
+    {
+        return -1; // Didn't hit anything
+    }
+
+    Vec3Copy(mid, out_light_spot);
+
+    // Check for impact on this node
+    const float lightmap_intensity = Config::r_lightmap_intensity.AsFloat();
+    const ModelSurface * surf = world_mdl.data.surfaces + node->first_surface;
+
+    for (int i = 0; i < node->num_surfaces; ++i, ++surf)
+    {
+        if (surf->flags & (kSurf_DrawTurb | kSurf_DrawSky))
+        {
+            continue; // No lightmaps
+        }
+
+        const ModelTexInfo * tex = surf->texinfo;
+
+        const int s = static_cast<int>(Vec3Dot(mid, tex->vecs[0]) + tex->vecs[0][3]);
+        const int t = static_cast<int>(Vec3Dot(mid, tex->vecs[1]) + tex->vecs[1][3]);
+
+        if (s < surf->texture_mins[0] || t < surf->texture_mins[1])
+        {
+            continue;
+        }
+
+        int ds = s - surf->texture_mins[0];
+        int dt = t - surf->texture_mins[1];
+
+        if (ds > surf->extents[0] || dt > surf->extents[1])
+        {
+            continue;
+        }
+
+        if (surf->samples == nullptr)
+        {
+            return 0;
+        }
+
+        ds >>= 4;
+        dt >>= 4;
+
+        Vec3Zero(out_point_color);
+
+        const std::uint8_t * lightmap = surf->samples;
+        lightmap += 3 * (dt * ((surf->extents[0] >> 4) + 1) + ds);
+
+        for (int lmap = 0; lmap < kMaxLightmaps && surf->styles[lmap] != 255; ++lmap)
+        {
+            vec3_t scale;
+            for (int v = 0; v < 3; ++v)
+            {
+                scale[v] = lightmap_intensity * lightstyles[surf->styles[lmap]].rgb[v];
+            }
+
+            out_point_color[0] += lightmap[0] * scale[0] * (1.0f / 255.0f);
+            out_point_color[1] += lightmap[1] * scale[1] * (1.0f / 255.0f);
+            out_point_color[2] += lightmap[2] * scale[2] * (1.0f / 255.0f);
+
+            lightmap += 3 * ((surf->extents[0] >> 4) + 1) * ((surf->extents[1] >> 4) + 1);
+        }
+
+        return 1;
+    }
+
+    // Go down back side
+    return RecursiveLightPoint(world_mdl, node->children[!side], lightstyles, mid, end, out_point_color, out_light_spot);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewRenderer::CalcPointLightColor(const FrameData & frame_data, const vec3_t point, vec4_t out_shade_light_color, vec3_t out_light_spot) const
+{
+    const ModelInstance & world_mdl = frame_data.world_model;
+
+    if (world_mdl.data.light_data == nullptr) // fullbright
+    {
+        out_shade_light_color[0] = 1.0f;
+        out_shade_light_color[1] = 1.0f;
+        out_shade_light_color[2] = 1.0f;
+        out_shade_light_color[3] = 1.0f;
+        return;
+    }
+
+    const vec3_t end_point = { point[0], point[1], point[2] - 2048.0f };
+
+    vec3_t out_point_color = {};
+    const int r = RecursiveLightPoint(world_mdl, world_mdl.data.nodes, frame_data.view_def.lightstyles, point, end_point, out_point_color, out_light_spot);
+
+    if (r == -1)
+    {
+        Vec3Zero(out_shade_light_color);
+    }
+    else
+    {
+        Vec3Copy(out_point_color, out_shade_light_color);
+    }
+    out_shade_light_color[3] = 1.0f;
+
+    // Add dynamic lights:
+    const dlight_t * dl = frame_data.view_def.dlights;
+    const int num_dlights = frame_data.view_def.num_dlights;
+
+    for (int lnum = 0; lnum < num_dlights; ++lnum, ++dl)
+    {
+        vec3_t dist = {};
+        Vec3Sub(point, dl->origin, dist);
+
+        float add = dl->intensity - Vec3Length(dist);
+        add *= (1.0f / 256.0f);
+
+        if (add > 0.0f)
+        {
+            Vec3MAdd(out_shade_light_color, add, dl->color, out_shade_light_color);
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

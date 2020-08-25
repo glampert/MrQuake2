@@ -82,12 +82,12 @@ const char * const TextureFilterOptionNames[kNumTextureFilterOptions] = {
 };
 
 static const char * const TextureType_Strings[] = {
-    "kSkin",
-    "kSprite",
-    "kWall",
-    "kSky",
-    "kPic",
-    "kLightmap",
+    "Skin",
+    "Sprite",
+    "Wall",
+    "Sky",
+    "Pic",
+    "Lightmap",
 };
 
 static_assert(ArrayLength(TextureType_Strings) == unsigned(TextureType::kCount), "Update this if the enum changes!");

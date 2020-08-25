@@ -1252,6 +1252,10 @@ void ModelStore::LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, c
         mdl.vb.Init(device, vertex_count * sizeof(DrawVertex3D),  sizeof(DrawVertex3D));
         mdl.ib.Init(device, index_count  * sizeof(std::uint16_t), IndexBuffer::kFormatUInt16);
 
+        // Add the vertex and index buffer to the memory statistics
+        MemTagsTrackAlloc(vertex_count * sizeof(DrawVertex3D),  MemTag::kVertIndexBuffer);
+        MemTagsTrackAlloc(index_count  * sizeof(std::uint16_t), MemTag::kVertIndexBuffer);
+
         auto * vertex_iter = static_cast<DrawVertex3D  *>(mdl.vb.Map());
         auto * index_iter  = static_cast<std::uint16_t *>(mdl.ib.Map());
 

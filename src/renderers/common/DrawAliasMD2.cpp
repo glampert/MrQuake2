@@ -99,6 +99,9 @@ static inline const float * GetShadeDotsForEnt(const entity_t & entity)
     return s_vertex_normal_dots[index];
 }
 
+// This holds the last rendered frame of an MD2 model for a subsequent DrawAliasMD2Shadow.
+static vec3_t s_lerped_positions[MAX_VERTS] = {};
+
 ///////////////////////////////////////////////////////////////////////////////
 
 void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t * const alias_header, const float backlerp,
@@ -123,7 +126,6 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
     vec3_t delta, move;
     vec3_t frontv, backv;
     vec3_t vectors[3];
-    vec3_t lerped_positions[MAX_VERTS];
 
     // move should be the delta back to the previous frame * backlerp
     Vec3Sub(entity.oldorigin, entity.origin, delta);
@@ -155,7 +157,7 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
     Vec3Copy(frontv, lerp_in.frontv);
     Vec3Copy(backv, lerp_in.backv);
     Vec3Copy(move, lerp_in.move);
-    LerpEntityVerts(lerp_in, lerped_positions[0]);
+    LerpEntityVerts(lerp_in, s_lerped_positions[0]);
 
     BeginBatchArgs batch_args;
     batch_args.model_matrix = model_matrix;
@@ -193,7 +195,7 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
                 do
                 {
                     const std::size_t index_xyz = order[2];
-                    MRQ2_ASSERT(index_xyz < ArrayLength(lerped_positions));
+                    MRQ2_ASSERT(index_xyz < ArrayLength(s_lerped_positions));
                     order += 3;
 
                     DrawVertex3D dv;
@@ -205,7 +207,7 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
                     dv.rgba[1] = shade_light[1];
                     dv.rgba[2] = shade_light[2];
                     dv.rgba[3] = alpha;
-                    Vec3Copy(lerped_positions[index_xyz], dv.position);
+                    Vec3Copy(s_lerped_positions[index_xyz], dv.position);
 
                     if (doTriFanFirstVert)
                     {
@@ -228,7 +230,7 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
                     const float v = reinterpret_cast<const float *>(order)[1];
 
                     const std::size_t index_xyz = order[2];
-                    MRQ2_ASSERT(index_xyz < ArrayLength(lerped_positions));
+                    MRQ2_ASSERT(index_xyz < ArrayLength(s_lerped_positions));
                     order += 3;
 
                     // Normals and vertexes come from the frame list
@@ -243,7 +245,7 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
                     dv.rgba[1] = l * shade_light[1];
                     dv.rgba[2] = l * shade_light[2];
                     dv.rgba[3] = alpha;
-                    Vec3Copy(lerped_positions[index_xyz], dv.position);
+                    Vec3Copy(s_lerped_positions[index_xyz], dv.position);
 
                     if (doTriFanFirstVert)
                     {
@@ -257,6 +259,91 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
 
                 } while (--count);
             }
+        }
+        EndBatch(batch);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ViewRenderer::DrawAliasMD2Shadow(const entity_t & entity, const dmdl_t * const alias_header, const RenderMatrix & model_matrix, const vec3_t light_spot)
+{
+    constexpr float kShadowColorOpacity = 0.5f;
+
+    const float lheight = entity.origin[2] - light_spot[2];
+    const float height  = -lheight + 1.0f;
+    const float angle   = DegToRad(entity.angles[YAW]);
+
+    vec3_t shade_vector;
+    shade_vector[0] = std::cosf(-angle);
+    shade_vector[1] = std::sinf(-angle);
+    shade_vector[2] = 1.0f;
+    Vec3Normalize(shade_vector);
+
+    BeginBatchArgs batch_args;
+    batch_args.model_matrix = model_matrix;
+    batch_args.diffuse_tex  = nullptr;
+    batch_args.lightmap_tex = nullptr;
+    batch_args.depth_hack   = false;
+
+    const std::int32_t * order = GetAliasGLCmds(alias_header);
+    for (;;)
+    {
+        // get the vertex count and primitive type
+        std::int32_t count = *order++;
+        if (!count)
+        {
+            break; // done
+        }
+
+        bool doTriFanFirstVert;
+        if (count < 0)
+        {
+            count = -count;
+            batch_args.topology = PrimitiveTopology::kTriangleFan;
+            doTriFanFirstVert   = true;
+        }
+        else
+        {
+            batch_args.topology = PrimitiveTopology::kTriangleStrip;
+            doTriFanFirstVert   = false;
+        }
+
+        MiniImBatch batch = BeginBatch(batch_args);
+        {
+            do
+            {
+                const std::size_t index_xyz = order[2];
+                MRQ2_ASSERT(index_xyz < ArrayLength(s_lerped_positions));
+                order += 3;
+
+                // Reuse s_lerped_positions[] from the previous DrawAliasMD2FrameLerp call.
+                vec3_t point;
+                Vec3Copy(s_lerped_positions[index_xyz], point);
+
+                point[0] -= shade_vector[0] * (point[2] + lheight);
+                point[1] -= shade_vector[1] * (point[2] + lheight);
+                point[2] = height;
+
+                DrawVertex3D dv = {};
+                Vec3Copy(point, dv.position);
+
+                dv.rgba[0] = 0.0f;
+                dv.rgba[1] = 0.0f;
+                dv.rgba[2] = 0.0f;
+                dv.rgba[3] = kShadowColorOpacity;
+
+                if (doTriFanFirstVert)
+                {
+                    batch.SetTriangleFanFirstVertex(dv);
+                    doTriFanFirstVert = false;
+                }
+                else
+                {
+                    batch.PushVertex(dv);
+                }
+
+            } while (--count);
         }
         EndBatch(batch);
     }

@@ -492,7 +492,7 @@ void LightmapManager::NextLightmapTexture(const bool new_buffers)
 
     if (new_buffers)
     {
-        sm_static_lightmap_buffers[sm_lightmap_count] = sm_lightmap_buffer_pool.Allocate();
+        sm_static_lightmap_buffers[sm_lightmap_count]  = sm_lightmap_buffer_pool.Allocate();
         sm_dynamic_lightmap_buffers[sm_lightmap_count] = sm_lightmap_buffer_pool.Allocate();
     }
 }
