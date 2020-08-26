@@ -203,7 +203,7 @@ private:
         bool                   depth_hack;
     };
 
-    using DrawCmdList = FixedSizeArray<DrawCmd, 2048>;
+    using DrawCmdList = FixedSizeArray<DrawCmd, 4096>;
     using VBuffers    = VertexBuffers<DrawVertex3D>;
 
     PipelineState        m_pipeline_solid_geometry;

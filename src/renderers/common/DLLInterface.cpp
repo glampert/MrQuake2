@@ -554,7 +554,7 @@ void DLLInterface::DrawStretchRaw(const int x, const int y, int w, int h, const 
         }
     }
 
-    h += 45; // FIXME HACK - Image scaling is probably broken.
+    h += 75; // FIXME HACK - Image scaling is probably broken.
              // Cinematics are not filling up the buffer as they should...
 
     constexpr uint32_t  num_mip_levels = 1;

@@ -27,11 +27,6 @@ void SpriteBatch::Shutdown()
     m_buffers.Shutdown();
 }
 
-void SpriteBatch::BeginFrame()
-{
-    m_buffers.BeginFrame();
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 
 void SpriteBatch::EndFrame(GraphicsContext & context, const ConstantBuffer & cbuff, const PipelineState & pipeline_state, const TextureImage * opt_tex_atlas)
@@ -217,15 +212,11 @@ void SpriteBatches::EndFrame(GraphicsContext & context, const ConstantBuffer & c
 // MiniImBatch
 ///////////////////////////////////////////////////////////////////////////////
 
-bool MiniImBatch::sm_emulated_triangle_fans = true;
-
-///////////////////////////////////////////////////////////////////////////////
-
 void MiniImBatch::PushVertex(const DrawVertex3D & vert)
 {
     MRQ2_ASSERT(IsValid()); // Clear()ed?
 
-    if (sm_emulated_triangle_fans)
+    if (kEmulatedTriangleFans)
     {
         if (m_topology != PrimitiveTopology::kTriangleFan)
         {

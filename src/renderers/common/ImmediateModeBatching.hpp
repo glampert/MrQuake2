@@ -226,7 +226,7 @@ public:
     void Init(const RenderDevice & device, const uint32_t max_verts);
     void Shutdown();
 
-    void BeginFrame();
+    void BeginFrame() { m_buffers.BeginFrame(); }
     void EndFrame(GraphicsContext & context, const ConstantBuffer & cbuff, const PipelineState & pipeline_state, const TextureImage * const opt_tex_atlas = nullptr);
 
     DrawVertex2D * Increment(const uint32_t count)
@@ -328,7 +328,7 @@ public:
 
     void SetTriangleFanFirstVertex(const DrawVertex3D & vert)
     {
-        if (sm_emulated_triangle_fans)
+        if (kEmulatedTriangleFans)
         {
             m_tri_fan_vert_count = 1;
             m_tri_fan_first_vert = vert;
@@ -337,11 +337,6 @@ public:
         {
             PushVertex(vert);
         }
-    }
-
-    static void EnableEmulatedTriangleFans(const bool do_enable)
-    {
-        sm_emulated_triangle_fans = do_enable;
     }
 
     void PushVertex(const DrawVertex3D & vert);
@@ -370,7 +365,7 @@ private:
     // If set to true, deconstruct PrimitiveTopology::TriangleFan primitives in the
     // MiniImBatch into PrimitiveTopology::TriangleList primitives, to support back-end
     // APIs that are not capable of drawing triangle fans natively.
-    static bool       sm_emulated_triangle_fans;
+    static constexpr bool kEmulatedTriangleFans = true;
 };
 
 } // MrQ2

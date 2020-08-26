@@ -146,7 +146,7 @@ void ViewRenderer::Init(const RenderDevice & device, const TextureStore & tex_st
 {
     m_tex_white2x2 = tex_store.tex_white2x2;
 
-    constexpr uint32_t kViewDrawBatchSize = 35000; // max vertices * num buffers
+    constexpr uint32_t kViewDrawBatchSize = 38000; // max vertices * num buffers
     m_vertex_buffers.Init(device, kViewDrawBatchSize);
 
     m_per_draw_shader_consts.Init(device, sizeof(PerDrawShaderConstants), ConstantBuffer::kOptimizeForSingleDraw);
@@ -267,7 +267,15 @@ void ViewRenderer::EndBatch(MiniImBatch & batch)
         m_vertex_buffers.Increment(batch_size);
 
         MRQ2_ASSERT(m_current_pass < kRenderPassCount);
-        m_draw_cmds[m_current_pass].push_back(m_current_draw_cmd);
+        DrawCmdList & cmd_list = m_draw_cmds[m_current_pass];
+
+        if (cmd_list.size() == cmd_list.capacity())
+        {
+            GameInterface::Errorf("DrawCmdList for pass[%u] is full! Increase size. %u",
+                                  unsigned(m_current_pass), unsigned(cmd_list.size()));
+        }
+
+        cmd_list.push_back(m_current_draw_cmd);
     }
 
     batch.Clear();
