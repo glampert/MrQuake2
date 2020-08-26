@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -21,10 +21,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "client.h"
 #include "snd_loc.h"
-
-int cache_full_cycle;
-
-qbyte * S_Alloc(int size);
 
 /*
 ================
@@ -309,6 +305,7 @@ wavinfo_t GetWavinfo(char * name, qbyte * wav, int wavlength)
     {
         data_p += 32;
         info.loopstart = GetLittleLong();
+        //		Com_Printf("loopstart=%d\n", sfx->loopstart);
 
         // if the next chunk is a LIST chunk, look for a cue length marker
         FindNextChunk("LIST");
@@ -319,6 +316,7 @@ wavinfo_t GetWavinfo(char * name, qbyte * wav, int wavlength)
                 data_p += 24;
                 i = GetLittleLong(); // samples in loop
                 info.samples = info.loopstart + i;
+                //				Com_Printf("looped length: %i\n", i);
             }
         }
     }

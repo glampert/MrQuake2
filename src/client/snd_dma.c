@@ -33,9 +33,11 @@ void S_StopAllSounds(void);
 
 // only begin attenuating sound volumes when outside the FULLVOLUME range
 #define SOUND_FULLVOLUME 80
+
 #define SOUND_LOOPATTENUATE 0.003
 
 int s_registration_sequence;
+
 channel_t channels[MAX_CHANNELS];
 
 qboolean snd_initialized = false;
@@ -108,18 +110,17 @@ S_Init
 void S_Init(void)
 {
     cvar_t * cv;
-    Com_Printf("---- Sound initialization ----\n");
+
+    Com_Printf("\n------- sound initialization -------\n");
 
     cv = Cvar_Get("s_initsound", "1", 0);
     if (!cv->value)
-    {
         Com_Printf("not initializing.\n");
-    }
     else
     {
         s_volume = Cvar_Get("s_volume", "0.7", CVAR_ARCHIVE);
         s_khz = Cvar_Get("s_khz", "11", CVAR_ARCHIVE);
-        s_loadas8bit = Cvar_Get("s_loadas8bit", "1", CVAR_ARCHIVE);
+        s_loadas8bit = Cvar_Get("s_loadas8bit", "0", CVAR_ARCHIVE); // NOTE LAMPERT: s_loadas8bit doesn't seem to work on Windows! Set it to 0.
         s_mixahead = Cvar_Get("s_mixahead", "0.2", CVAR_ARCHIVE);
         s_show = Cvar_Get("s_show", "0", 0);
         s_testsound = Cvar_Get("s_testsound", "0", 0);
@@ -131,9 +132,7 @@ void S_Init(void)
         Cmd_AddCommand("soundinfo", S_SoundInfo_f);
 
         if (!SNDDMA_Init())
-        {
             return;
-        }
 
         S_InitScaletable();
 
@@ -192,6 +191,7 @@ void S_Shutdown(void)
 /*
 ==================
 S_FindName
+
 ==================
 */
 sfx_t * S_FindName(const char * name, qboolean create)
@@ -204,7 +204,7 @@ sfx_t * S_FindName(const char * name, qboolean create)
     if (!name[0])
         Com_Error(ERR_FATAL, "S_FindName: empty name\n");
 
-    if (Q_istrlen(name) >= MAX_QPATH)
+    if (strlen(name) >= MAX_QPATH)
         Com_Error(ERR_FATAL, "Sound name too long: %s", name);
 
     // see if already loaded
@@ -886,7 +886,7 @@ S_RawSamples
 Cinematic streaming and voice over network
 ============
 */
-void S_RawSamples(int samples, int rate, int width, int nchannels, qbyte * data)
+void S_RawSamples(int samples, int rate, int width, int num_channels, qbyte * data)
 {
     int i;
     int src, dst;
@@ -899,7 +899,8 @@ void S_RawSamples(int samples, int rate, int width, int nchannels, qbyte * data)
         s_rawend = paintedtime;
     scale = (float)rate / dma.speed;
 
-    if (nchannels == 2 && width == 2)
+    //Com_Printf ("%i < %i < %i\n", soundtime, paintedtime, s_rawend);
+    if (num_channels == 2 && width == 2)
     {
         if (scale == 1.0)
         { // optimized case
@@ -929,7 +930,7 @@ void S_RawSamples(int samples, int rate, int width, int nchannels, qbyte * data)
             }
         }
     }
-    else if (nchannels == 1 && width == 2)
+    else if (num_channels == 1 && width == 2)
     {
         for (i = 0;; i++)
         {
@@ -944,7 +945,7 @@ void S_RawSamples(int samples, int rate, int width, int nchannels, qbyte * data)
             LittleShort(((short *)data)[src]) << 8;
         }
     }
-    else if (nchannels == 2 && width == 1)
+    else if (num_channels == 2 && width == 1)
     {
         for (i = 0;; i++)
         {
@@ -959,7 +960,7 @@ void S_RawSamples(int samples, int rate, int width, int nchannels, qbyte * data)
             ((char *)data)[src * 2 + 1] << 16;
         }
     }
-    else if (nchannels == 1 && width == 1)
+    else if (num_channels == 1 && width == 1)
     {
         for (i = 0;; i++)
         {

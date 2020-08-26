@@ -195,6 +195,7 @@
     <ClInclude Include="..\src\game\m_tank.h" />
     <ClInclude Include="..\src\game\q_shared.h" />
     <ClInclude Include="..\src\server\server.h" />
+    <ClInclude Include="..\src\windows\resource.h" />
     <ClInclude Include="..\src\windows\winquake.h" />
   </ItemGroup>
   <ItemGroup>
@@ -275,7 +276,6 @@
     <ClCompile Include="..\src\game\p_weapon.c" />
     <ClCompile Include="..\src\game\q_shared.c" />
     <ClCompile Include="..\src\null\cd_null.c" />
-    <ClCompile Include="..\src\null\snddma_null.c" />
     <ClCompile Include="..\src\server\sv_ccmds.c" />
     <ClCompile Include="..\src\server\sv_ents.c" />
     <ClCompile Include="..\src\server\sv_game.c" />
@@ -286,6 +286,7 @@
     <ClCompile Include="..\src\server\sv_world.c" />
     <ClCompile Include="..\src\windows\in_win.c" />
     <ClCompile Include="..\src\windows\net_win.c" />
+    <ClCompile Include="..\src\windows\snd_win.c" />
     <ClCompile Include="..\src\windows\sys_win.c" />
     <ClCompile Include="..\src\windows\vid_win.c" />
     <ClCompile Include="..\src\windows\winquake.c" />
@@ -293,6 +294,12 @@
   <ItemGroup>
     <None Include="..\data\baseq2\config.cfg" />
     <None Include="..\data\baseq2\default.cfg" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\src\windows\q2.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\src\windows\q2.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

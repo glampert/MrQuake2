@@ -26,6 +26,9 @@
     <Filter Include="cfg">
       <UniqueIdentifier>{b7a0b2f1-3fad-4764-aafb-5153778b47c6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\windows\Resources">
+      <UniqueIdentifier>{ce9daac2-6ab8-4f8c-b9c9-b6276c9f0b45}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\client\adivtab.h">
@@ -165,6 +168,9 @@
     </ClInclude>
     <ClInclude Include="..\src\client\warpsin.h">
       <Filter>src\client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\windows\resource.h">
+      <Filter>src\windows\Resources</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -399,9 +405,6 @@
     <ClCompile Include="..\src\null\cd_null.c">
       <Filter>src\null</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\null\snddma_null.c">
-      <Filter>src\null</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\server\sv_ccmds.c">
       <Filter>src\server</Filter>
     </ClCompile>
@@ -441,6 +444,9 @@
     <ClCompile Include="..\src\windows\vid_win.c">
       <Filter>src\windows</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\windows\snd_win.c">
+      <Filter>src\windows</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\data\baseq2\config.cfg">
@@ -449,5 +455,15 @@
     <None Include="..\data\baseq2\default.cfg">
       <Filter>cfg</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\src\windows\q2.rc">
+      <Filter>src\windows\Resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\src\windows\q2.ico">
+      <Filter>src\windows\Resources</Filter>
+    </Image>
   </ItemGroup>
 </Project>
