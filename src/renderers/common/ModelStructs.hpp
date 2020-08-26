@@ -63,9 +63,6 @@ constexpr int kMaxMD2SkinHeight = 480;
 constexpr int kMaxMD2Skins  = 32;
 constexpr int kMaxLightmaps = 4;
 
-// Use vertex/index buffers for static world geometry instead of immediate mode batching?
-constexpr bool kUseVertexAndIndexBuffers = true;
-
 /*
 ===============================================================================
 
@@ -140,7 +137,7 @@ struct ModelPoly
     ModelTriangle * triangles; // (num_verts - 2) triangles with indexes into vertexes[]
     ModelPoly * next;
 
-    // Range in the ModelInstance index buffer for this polygon (used if kUseVertexAndIndexBuffers=true).
+    // Range in the ModelInstance index buffer for this polygon (used if r_use_vertex_index_buffers is set).
     struct IbRange {
         int first_index;
         int index_count;

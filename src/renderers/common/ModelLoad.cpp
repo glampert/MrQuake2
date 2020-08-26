@@ -1214,7 +1214,7 @@ void ModelStore::LoadBrushModel(TextureStore & tex_store, ModelInstance & mdl, c
     }
 
     // Vertex/Index buffer setup:
-    if (kUseVertexAndIndexBuffers)
+    if (Config::r_use_vertex_index_buffers.IsSet())
     {
         const float world_ambient_term = Config::r_world_ambient.AsFloat(); // Modulate with the vertex color
 

@@ -854,7 +854,7 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
     batch_args.topology     = PrimitiveTopology::kTriangleList;
     batch_args.depth_hack   = false;
 
-    if (use_vb_ib && kUseVertexAndIndexBuffers)
+    if (use_vb_ib)
     {
         MRQ2_PUSH_GPU_MARKER(context, "DrawTextureChains");
 
@@ -887,7 +887,7 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
 
         if (do_draw)
         {
-            if (use_vb_ib && kUseVertexAndIndexBuffers) // Use the prebaked vertex and index buffers
+            if (use_vb_ib) // Use the prebaked vertex and index buffers
             {
                 for (const ModelSurface * surf = tex->DrawChainPtr(); surf; surf = surf->texture_chain)
                 {
@@ -948,7 +948,7 @@ void ViewRenderer::DrawTextureChains(FrameData & frame_data)
         tex->SetDrawChainPtr(nullptr);
     }
 
-    if (use_vb_ib && kUseVertexAndIndexBuffers)
+    if (use_vb_ib)
     {
         MRQ2_POP_GPU_MARKER(context);
     }
@@ -1611,7 +1611,7 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
     auto & cbuffers = frame_data.cbuffers;
 
     // IndexBuffer rendering
-    if (use_vb_ib && kUseVertexAndIndexBuffers)
+    if (use_vb_ib)
     {
         MRQ2_PUSH_GPU_MARKER(context, "DrawBrushModel");
 
@@ -1665,7 +1665,7 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
                 if (const ModelPoly * poly = surf->polys)
                 {
                     // IndexBuffer rendering
-                    if (use_vb_ib && kUseVertexAndIndexBuffers && (poly->index_buffer.index_count > 0))
+                    if (use_vb_ib && (poly->index_buffer.index_count > 0))
                     {
                         const auto range = poly->index_buffer;
                         MRQ2_ASSERT(range.first_index >= 0 && range.base_vertex >= 0);
@@ -1698,7 +1698,7 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
         }
     }
 
-    if (use_vb_ib && kUseVertexAndIndexBuffers)
+    if (use_vb_ib)
     {
         MRQ2_POP_GPU_MARKER(context);
     }
