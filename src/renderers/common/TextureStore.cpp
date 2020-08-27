@@ -492,7 +492,7 @@ void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const ch
     char fullname[1024] = {};
     char filename[512] = {};
 
-    if (std::strncmp(file_type, "tga", 3) == 0)
+    if (std::strcmp(file_type, "tga") == 0)
     {
         for (const TextureImage * tex : m_teximages_cache)
         {
@@ -517,7 +517,7 @@ void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const ch
             }
         }
     }
-    else if (std::strncmp(file_type, "png", 3) == 0)
+    else if (std::strcmp(file_type, "png") == 0)
     {
         for (const TextureImage * tex : m_teximages_cache)
         {
@@ -539,6 +539,19 @@ void TextureStore::DumpAllLoadedTexturesToFile(const char * const path, const ch
                         GameInterface::Printf("Failed to write image '%s'", fullname);
                     }
                 }
+            }
+        }
+    }
+    else if (std::strcmp(file_type, "scrap") == 0) // Dump the scrap atlas as a PNG
+    {
+        if (tex_scrap != nullptr)
+        {
+            sprintf_s(fullname, "%s/%s.png", path, tex_scrap->Name().CStrNoExt(filename));
+            GameInterface::FS::CreatePath(fullname);
+
+            if (!PNGSaveToFile(fullname, tex_scrap->Width(), tex_scrap->Height(), tex_scrap->BasePixels()))
+            {
+                GameInterface::Printf("Failed to write image '%s'", fullname);
             }
         }
     }

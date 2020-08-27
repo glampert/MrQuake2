@@ -38,8 +38,8 @@ void Win32Window::Init(const char * name, HINSTANCE hInst, WNDPROC wndProc, cons
     wcex.hInstance     = m_hInst;
     wcex.lpszClassName = m_window_name.c_str();
     wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-    wcex.hIcon         = LoadIcon(nullptr, IDI_APPLICATION);
-    wcex.hIconSm       = LoadIcon(nullptr, IDI_APPLICATION);
+    wcex.hIcon         = LoadIcon(nullptr, "q2.ico");
+    wcex.hIconSm       = nullptr;
     wcex.hCursor       = LoadCursor(nullptr, IDC_ARROW);
 
     const auto result = RegisterClassEx(&wcex);

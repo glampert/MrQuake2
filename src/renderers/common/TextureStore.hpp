@@ -201,6 +201,7 @@ public:
     void Shutdown();
 
     void UploadScrapIfNeeded();
+    bool ScrapIsDirty() const { return m_scrap_dirty; }
     const RenderDevice & Device() const { return *m_device; }
 
     // Registration sequence:

@@ -163,6 +163,13 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
     if (Config::r_no_draw.IsSet())
         return;
 
+    // In case new menu graphics have been added to the scrap atlas.
+    if (sm_texture_store.ScrapIsDirty())
+    {
+        sm_renderer.WaitForGpu();
+        sm_texture_store.UploadScrapIfNeeded();
+    }
+
     const float   clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // RGBA
     const float   clear_depth    = 1.0f;
     const uint8_t clear_stencil  = 0;
@@ -732,7 +739,7 @@ void DLLInterface::DumpAllTexturesCmd()
     const int arg_count = GameInterface::Cmd::Argc();
     if (arg_count < 4)
     {
-        GameInterface::Printf("Usage: dump_textures <file_path> <png|tga> <dump_mipmaps=y|n>");
+        GameInterface::Printf("Usage: dump_textures <file_path> <png|tga|scrap> <dump_mipmaps=y|n>");
         return;
     }
 
