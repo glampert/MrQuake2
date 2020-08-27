@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#include "common/profiler.h"
 
 cvar_t * freelook;
 
@@ -1731,11 +1732,14 @@ CL_Frame
 */
 void CL_Frame(int msec)
 {
+    Optick_PushEvent("CL_Frame");
+
     static int extratime;
     static int lasttimecalled;
 
     if (dedicated->value)
     {
+        Optick_PopEvent();
         return;
     }
 
@@ -1745,10 +1749,12 @@ void CL_Frame(int msec)
     {
         if (cls.state == ca_connected && extratime < 100)
         {
+            Optick_PopEvent();
             return; // don't flood packets out while connecting
         }
         if (extratime < 1000 / cl_maxfps->value)
         {
+            Optick_PopEvent();
             return; // framerate is too high
         }
     }
@@ -1847,6 +1853,8 @@ void CL_Frame(int msec)
             }
         }
     }
+
+    Optick_PopEvent();
 }
 
 /*

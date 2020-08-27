@@ -33,6 +33,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   */
 
 #include "client.h"
+#include "common/profiler.h"
 
 float scr_con_current; // aproaches scr_conlines at scr_conspeed
 float scr_conlines;    // 0.0 to 1.0 lines of console to display
@@ -1273,6 +1274,8 @@ text to the screen.
 */
 void SCR_UpdateScreen(void)
 {
+    Optick_PushEvent("SCR_UpdateScreen");
+
     int i;
     int numframes;
     float separation[2] = { 0, 0 };
@@ -1286,11 +1289,13 @@ void SCR_UpdateScreen(void)
             cls.disable_screen = 0;
             Com_Printf("Loading plaque timed out.\n");
         }
+        Optick_PopEvent();
         return;
     }
 
     if (!scr_initialized || !con.initialized)
     {
+        Optick_PopEvent();
         return; // not initialized yet
     }
 
@@ -1407,4 +1412,6 @@ void SCR_UpdateScreen(void)
         }
     }
     re.EndFrame();
+
+    Optick_PopEvent();
 }

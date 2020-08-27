@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cl_view.c -- player rendering positioning
 
 #include "client.h"
+#include "common/profiler.h"
 
 //=============
 //
@@ -456,13 +457,17 @@ V_RenderView
 */
 void V_RenderView(float stereo_separation)
 {
+    Optick_PushEvent("V_RenderView");
+
     if (cls.state != ca_active)
     {
+        Optick_PopEvent();
         return;
     }
 
     if (!cl.refresh_prepped)
     {
+        Optick_PopEvent();
         return; // still loading
     }
 
@@ -582,6 +587,8 @@ void V_RenderView(float stereo_separation)
                       scr_vrect.y + scr_vrect.height - 1);
 
     SCR_DrawCrosshair();
+
+    Optick_PopEvent();
 }
 
 /*

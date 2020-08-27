@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "common/q_common.h"
+#include "common/profiler.h"
 #include <setjmp.h>
 
 void Con_Init(void);
@@ -1525,11 +1526,14 @@ Qcommon_Frame
 */
 void Qcommon_Frame(int msec)
 {
+    Optick_PushEvent("Qcommon_Frame");
+
     const char * s;
     int time_before = 0, time_between = 0, time_after = 0;
 
     if (setjmp(abortframe))
     {
+        Optick_PopEvent();
         return; // an ERR_DROP was thrown
     }
 
@@ -1628,6 +1632,8 @@ void Qcommon_Frame(int msec)
         Com_Printf("all:%3i sv:%3i gm:%3i cl:%3i rf:%3i\n",
                    all, sv, gm, cl, rf);
     }
+
+    Optick_PopEvent();
 }
 
 /*

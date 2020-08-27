@@ -7,6 +7,7 @@
 #include "TextureStore.hpp"
 #include "ModelStructs.hpp"
 #include "ImmediateModeBatching.hpp"
+#include "OptickProfiler.hpp"
 
 // Quake includes
 #include "common/q_common.h"
@@ -276,6 +277,8 @@ void LightmapManager::Shutdown()
 
 void LightmapManager::Update()
 {
+    OPTICK_EVENT();
+
     auto UploadLightmap = [](const TextureImage * lightmap_tex)
     {
         const ColorRGBA32 * pixels[] = { lightmap_tex->BasePixels() };

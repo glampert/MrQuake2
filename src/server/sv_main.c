@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "server.h"
+#include "common/profiler.h"
 
 netadr_t master_adr[MAX_MASTERS]; // address of group servers
 
@@ -745,11 +746,14 @@ SV_Frame
 */
 void SV_Frame(int msec)
 {
+    Optick_PushEvent("SV_Frame");
+
     time_before_game = time_after_game = 0;
 
     // if server is not active, do nothing
     if (!svs.initialized)
     {
+        Optick_PopEvent();
         return;
     }
 
@@ -777,6 +781,7 @@ void SV_Frame(int msec)
             svs.realtime = sv.time - 100;
         }
         NET_Sleep(sv.time - svs.realtime);
+        Optick_PopEvent();
         return;
     }
 
@@ -800,6 +805,8 @@ void SV_Frame(int msec)
 
     // clear teleport flags, etc for next frame
     SV_PrepWorldFrame();
+
+    Optick_PopEvent();
 }
 
 //============================================================================

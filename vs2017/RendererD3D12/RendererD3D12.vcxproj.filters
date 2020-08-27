@@ -180,6 +180,9 @@
     <ClInclude Include="..\..\src\renderers\common\DebugDraw.hpp">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\renderers\common\OptickProfiler.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw2D.fx">

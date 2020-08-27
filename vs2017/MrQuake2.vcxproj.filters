@@ -172,6 +172,9 @@
     <ClInclude Include="..\src\windows\resource.h">
       <Filter>src\windows\Resources</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\common\profiler.h">
+      <Filter>src\common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\client\cl_cin.c">
@@ -446,6 +449,9 @@
     </ClCompile>
     <ClCompile Include="..\src\windows\snd_win.c">
       <Filter>src\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\common\profiler.cpp">
+      <Filter>src\common</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

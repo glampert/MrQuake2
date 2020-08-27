@@ -6,6 +6,7 @@
 #include "ViewRenderer.hpp"
 #include "Lightmaps.hpp"
 #include "DebugDraw.hpp"
+#include "OptickProfiler.hpp"
 
 namespace MrQ2
 {
@@ -362,6 +363,8 @@ const PipelineState & ViewRenderer::PipelineStateForPass(const int pass) const
 
 void ViewRenderer::BatchImmediateModeDrawCmds()
 {
+    OPTICK_EVENT();
+
     MRQ2_ASSERT(m_batch_open == false);
     MRQ2_ASSERT(m_current_pass == kPass_Invalid);
 
@@ -377,6 +380,8 @@ void ViewRenderer::BatchImmediateModeDrawCmds()
 
 void ViewRenderer::FlushImmediateModeDrawCmds(FrameData & frame_data)
 {
+    OPTICK_EVENT();
+
     MRQ2_ASSERT(m_batch_open == false);
 
     auto PushRenderPassMarker = [](GraphicsContext & context, const int pass)
@@ -448,6 +453,8 @@ void ViewRenderer::FlushImmediateModeDrawCmds(FrameData & frame_data)
 
 void ViewRenderer::DoRenderView(FrameData & frame_data)
 {
+    OPTICK_EVENT();
+
     BatchImmediateModeDrawCmds();
 
     //
@@ -522,6 +529,8 @@ void ViewRenderer::SetLightLevel(const FrameData & frame_data) const
 
 void ViewRenderer::RenderViewSetup(FrameData & frame_data)
 {
+    OPTICK_EVENT();
+
     ++m_frame_count;
 
     PushDLights(frame_data);
@@ -561,6 +570,7 @@ void ViewRenderer::RenderViewSetup(FrameData & frame_data)
 // was marked for draw in here.
 void ViewRenderer::RecursiveWorldNode(FrameData & frame_data, const ModelInstance & world_mdl, const ModelNode * const node)
 {
+    OPTICK_EVENT();
     MRQ2_ASSERT(node != nullptr);
 
     if (node->contents == CONTENTS_SOLID)
@@ -851,6 +861,8 @@ const TextureImage * ViewRenderer::GetSurfaceLightmap(const refdef_t & view_def,
 
 void ViewRenderer::DrawTextureChains(FrameData & frame_data)
 {
+    OPTICK_EVENT();
+
     const bool do_draw   = !Config::r_skip_draw_texture_chains.IsSet();
     const bool use_vb_ib = Config::r_use_vertex_index_buffers.IsSet();
 
@@ -971,6 +983,8 @@ void ViewRenderer::RenderTranslucentSurfaces(FrameData & frame_data)
         return;
     }
 
+    OPTICK_EVENT();
+
     // The textures are prescaled up for a better
     // lighting range, so scale it back down.
     const float inv_intensity = 1.0f / Config::r_intensity.AsFloat();
@@ -1043,6 +1057,8 @@ void ViewRenderer::RenderTranslucentEntities(FrameData & frame_data)
         return;
     }
 
+    OPTICK_EVENT();
+
     const bool force_null_entity_models = Config::r_force_null_entity_models.IsSet();
 
     for (const entity_t * entity : frame_data.translucent_entities)
@@ -1088,6 +1104,8 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
     {
         return;
     }
+
+    OPTICK_EVENT();
 
     const bool high_quality_particles = Config::r_hd_particles.IsSet();
 
@@ -1229,6 +1247,8 @@ void ViewRenderer::RenderDLights(const FrameData & frame_data)
     {
         return;
     }
+
+    OPTICK_EVENT();
 
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
@@ -1438,6 +1458,8 @@ void ViewRenderer::DrawAnimatedWaterPolys(const refdef_t & view_def, const Model
 
 void ViewRenderer::RenderWorldModel(FrameData & frame_data)
 {
+    OPTICK_EVENT();
+
     m_alpha_world_surfaces = nullptr;
     m_skybox.Clear(); // RecursiveWorldNode adds to the sky bounds
 
@@ -1455,6 +1477,8 @@ void ViewRenderer::RenderWorldModel(FrameData & frame_data)
 
 void ViewRenderer::RenderSkyBox(FrameData & frame_data)
 {
+    OPTICK_EVENT();
+
     // Skybox bounds rendering if visible:
     if (m_skybox.IsAnyPlaneVisible() && !Config::r_skip_draw_sky.IsSet())
     {
@@ -1499,6 +1523,8 @@ void ViewRenderer::RenderSolidEntities(FrameData & frame_data)
     {
         return;
     }
+
+    OPTICK_EVENT();
 
     const int num_entities = frame_data.view_def.num_entities;
     const entity_t * const entities_list = frame_data.view_def.entities;
@@ -1545,6 +1571,8 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
     {
         return;
     }
+
+    OPTICK_EVENT();
 
     const auto * model = reinterpret_cast<const ModelInstance *>(entity.model);
     MRQ2_ASSERT(model != nullptr);
@@ -1716,6 +1744,8 @@ void ViewRenderer::DrawBrushModel(FrameData & frame_data, const entity_t & entit
 
 void ViewRenderer::DrawSpriteModel(const FrameData & frame_data, const entity_t & entity)
 {
+    OPTICK_EVENT();
+
     const auto * model = reinterpret_cast<const ModelInstance *>(entity.model);
     const auto * p_sprite = model->hunk.ViewBaseAs<dsprite_t>();
 
@@ -1786,6 +1816,8 @@ void ViewRenderer::DrawSpriteModel(const FrameData & frame_data, const entity_t 
 
 void ViewRenderer::DrawAliasMD2Model(FrameData & frame_data, const entity_t & entity)
 {
+    OPTICK_EVENT();
+
     if (!(entity.flags & RF_WEAPONMODEL))
     {
         vec3_t bbox[8] = {};

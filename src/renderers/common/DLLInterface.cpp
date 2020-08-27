@@ -6,6 +6,7 @@
 #include "RenderDocUtils.hpp"
 #include "DebugDraw.hpp"
 #include "Lightmaps.hpp"
+#include "OptickProfiler.hpp"
 
 namespace MrQ2
 {
@@ -160,6 +161,8 @@ void DLLInterface::CinematicSetPalette(const qbyte * const palette)
 
 void DLLInterface::BeginFrame(float /*camera_separation*/)
 {
+    OPTICK_EVENT();
+
     if (Config::r_no_draw.IsSet())
         return;
 
@@ -227,6 +230,8 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
 
 void DLLInterface::EndFrame()
 {
+    OPTICK_EVENT();
+
     if (Config::r_no_draw.IsSet())
         return;
 
@@ -251,6 +256,8 @@ void DLLInterface::EndFrame()
 
 void DLLInterface::RenderView(refdef_t * const view_def)
 {
+    OPTICK_EVENT();
+
     if (Config::r_no_draw.IsSet())
         return;
 
@@ -563,6 +570,10 @@ void DLLInterface::DrawStretchRaw(const int x, const int y, int w, int h, const 
 
     h += 75; // FIXME HACK - Image scaling is probably broken.
              // Cinematics are not filling up the buffer as they should...
+
+    // For D3D12 we need to make sure any pending frames for the cinematic texture have been rendered before we attempt to modify it.
+    // Alternatively this texture could be triple-buffered.
+    sm_renderer.WaitForGpu();
 
     constexpr uint32_t  num_mip_levels = 1;
     const ColorRGBA32 * mip_init_data[num_mip_levels]  = { cinematic_tex->BasePixels() };

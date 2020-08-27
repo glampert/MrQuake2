@@ -76,6 +76,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(ProjectDir)..\src;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)..\src\external\optick\lib\x64\debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -84,6 +85,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(ProjectDir)..\src;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)..\src\external\optick\lib\x64\release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -111,6 +113,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>OptickCore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -147,6 +150,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>OptickCore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -165,6 +169,7 @@
     <ClInclude Include="..\src\client\sound.h" />
     <ClInclude Include="..\src\client\vid.h" />
     <ClInclude Include="..\src\client\warpsin.h" />
+    <ClInclude Include="..\src\common\profiler.h" />
     <ClInclude Include="..\src\common\q_common.h" />
     <ClInclude Include="..\src\common\q_crc.h" />
     <ClInclude Include="..\src\common\q_files.h" />
@@ -227,6 +232,7 @@
     <ClCompile Include="..\src\common\md4.c" />
     <ClCompile Include="..\src\common\net_chan.c" />
     <ClCompile Include="..\src\common\pmove.c" />
+    <ClCompile Include="..\src\common\profiler.cpp" />
     <ClCompile Include="..\src\game\g_ai.c" />
     <ClCompile Include="..\src\game\g_chase.c" />
     <ClCompile Include="..\src\game\g_cmds.c" />

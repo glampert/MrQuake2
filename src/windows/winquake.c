@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "winquake.h"
+#include "common/profiler.h"
 #include "client/client.h"
 #include "client/cdaudio.h"
 #include "client/sound.h"
@@ -437,6 +438,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // main window message loop
     for (;;)
     {
+        Optick_BeginFrame();
+
         // if at a full screen console or minimized, don't update at full speed
         if (winquake.minimized || (dedicated && dedicated->value))
         {
@@ -463,5 +466,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
         Qcommon_Frame(time);
         oldtime = newtime;
+
+        Optick_EndFrame();
     }
 }
