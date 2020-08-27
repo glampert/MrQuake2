@@ -372,6 +372,14 @@ public:
 
     static constexpr int kNameMaxLen = 64; // MAX_QPATH
 
+    // Empty
+    PathName()
+    {
+        m_string[0] = '\0';
+        m_hash      = 0;
+        m_length    = 0;
+    }
+
     PathName(const char * const path)
     {
         MRQ2_ASSERT(path != nullptr);
@@ -582,7 +590,6 @@ namespace Config
     extern CvarWrapper r_world_ambient;
     extern CvarWrapper r_sky_use_pal_textures;
     extern CvarWrapper r_sky_force_full_draw;
-    extern CvarWrapper r_lightmap_format;
     extern CvarWrapper r_lightmap_intensity;
     extern CvarWrapper r_debug_lightmaps;
     extern CvarWrapper r_show_lightmap_textures;

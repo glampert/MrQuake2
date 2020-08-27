@@ -18,15 +18,7 @@ class TextureImage;
 class TextureStore;
 class SpriteBatch;
 
-enum class LightmapFormat : int
-{
-    kDefault    = 'D',
-    kRedChannel = 'R',
-    kRGBA       = 'C',
-    kInvAlpha   = 'A',
-};
-
-constexpr int kLightmapBytesPerPixel = 4; // RGBA
+constexpr int kLightmapBytesPerPixel = 4; // RGBA lightmaps
 constexpr int kMaxLightmapTextures   = 32;
 constexpr int kLightBlockSize        = 34 * 34 * 3;
 constexpr float kDLightCutoff        = 64.0f;
@@ -57,7 +49,7 @@ public:
     static void Shutdown();
     static void Update();
 
-    static void BeginRegistration();
+    static void BeginRegistration(const char * const map_name);
     static void EndRegistration();
 
 	// Build static surface lightmap.

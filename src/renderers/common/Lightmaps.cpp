@@ -93,8 +93,6 @@ static void AddDynamicLights(float dest_light_block[kLightBlockSize], const Mode
 
 static void StoreLightmap(std::uint8_t * dest, const int stride, const int smax, const int tmax, const float light_block[kLightBlockSize])
 {
-    const auto lightmap_format = LightmapFormat(Config::r_lightmap_format.AsStr()[0]);
-
     const float * light_block_ptr = light_block;
 
     for (int i = 0; i < tmax; i++, dest += stride)
@@ -138,35 +136,6 @@ static void StoreLightmap(std::uint8_t * dest, const int stride, const int smax,
                 a = a * t;
             }
 
-            switch (lightmap_format)
-            {
-            case LightmapFormat::kDefault:
-                break;
-
-            case LightmapFormat::kRedChannel:
-                r = a;
-                g = b = 0;
-                break;
-
-            case LightmapFormat::kRGBA:
-                // try faking colored lighting
-                a = 255 - ((r + g + b) / 3);
-                r *= a / 255.0f;
-                g *= a / 255.0f;
-                b *= a / 255.0f;
-                break;
-
-            case LightmapFormat::kInvAlpha:
-                // If we are doing alpha lightmaps we need to set the R, G, and B
-                // components to 0 and we need to set alpha to 1-alpha.
-                r = g = b = 0;
-                a = 255 - a;
-                break;
-
-            default:
-                GameInterface::Errorf("Invalid lightmap format: %d", int(lightmap_format));
-            } // switch
-
             dest[0] = static_cast<std::uint8_t>(r);
             dest[1] = static_cast<std::uint8_t>(g);
             dest[2] = static_cast<std::uint8_t>(b);
@@ -199,7 +168,7 @@ static void BuildLightmap(std::uint8_t * dest, const int stride,
     float light_block[kLightBlockSize] = {};
     if (size > (sizeof(light_block) >> 4))
     {
-        GameInterface::Errorf("Bad light block size!");
+        GameInterface::Errorf("Bad lightmap block size!");
     }
 
     // Set to full bright if no lightmap data
@@ -215,19 +184,15 @@ static void BuildLightmap(std::uint8_t * dest, const int stride,
     else
     {
         const std::uint8_t * lightmap = surf->samples;
-        vec3_t scale = { 1.0f, 1.0f, 1.0f };
+        vec3_t scale = {};
 
         // Add all the lightmaps
         for (int lmap = 0; lmap < kMaxLightmaps && surf->styles[lmap] != 255; ++lmap)
         {
-            // Use modulated lightstyles if we have then, otherwise scale is all 1s.
-            if (lightstyles != nullptr)
+            for (int i = 0; i < 3; ++i)
             {
-                for (int i = 0; i < 3; ++i)
-                {
-                    MRQ2_ASSERT(surf->styles[lmap] < MAX_LIGHTSTYLES);
-                    scale[i] = lmap_modulate * lightstyles[surf->styles[lmap]].rgb[i];
-                }
+                MRQ2_ASSERT(surf->styles[lmap] < MAX_LIGHTSTYLES);
+                scale[i] = lmap_modulate * lightstyles[surf->styles[lmap]].rgb[i];
             }
 
             float * light_block_ptr = light_block;
@@ -355,28 +320,59 @@ void LightmapManager::Update()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void LightmapManager::BeginRegistration()
+void LightmapManager::BeginRegistration(const char * const map_name)
 {
-    // Null out all the textures, they will be recreated on demand.
-    for (int lmap = 0; lmap < sm_lightmap_count; ++lmap)
+    static PathName s_current_map;
+
+    bool is_level_reload = false;
+    if (PathName{ map_name }.Hash() == s_current_map.Hash())
     {
-        sm_static_lightmaps[lmap]  = nullptr;
-        sm_dynamic_lightmaps[lmap] = nullptr;
-
-        if (sm_static_lightmap_buffers[lmap] != nullptr)
-        {
-            sm_lightmap_buffer_pool.Deallocate(sm_static_lightmap_buffers[lmap]);
-            sm_static_lightmap_buffers[lmap] = nullptr;
-        }
-
-        if (sm_dynamic_lightmap_buffers[lmap] != nullptr)
-        {
-            sm_lightmap_buffer_pool.Deallocate(sm_dynamic_lightmap_buffers[lmap]);
-            sm_dynamic_lightmap_buffers[lmap] = nullptr;
-        }
+        is_level_reload = true;
     }
 
-    sm_lightmap_count = 0;
+    s_current_map = PathName{ map_name };
+
+    // If we're reloading the same level we can preserve the existing lightmaps because the world model will be reused.
+    if (!is_level_reload)
+    {
+        // Null out all the textures, they will be recreated on demand.
+        for (int lmap = 0; lmap < sm_lightmap_count; ++lmap)
+        {
+            sm_static_lightmaps[lmap]  = nullptr;
+            sm_dynamic_lightmaps[lmap] = nullptr;
+
+            if (sm_static_lightmap_buffers[lmap] != nullptr)
+            {
+                sm_lightmap_buffer_pool.Deallocate(sm_static_lightmap_buffers[lmap]);
+                sm_static_lightmap_buffers[lmap] = nullptr;
+            }
+
+            if (sm_dynamic_lightmap_buffers[lmap] != nullptr)
+            {
+                sm_lightmap_buffer_pool.Deallocate(sm_dynamic_lightmap_buffers[lmap]);
+                sm_dynamic_lightmap_buffers[lmap] = nullptr;
+            }
+        }
+
+        sm_lightmap_count = 0;
+    }
+    else // Just update the registration number so the textures are not freed.
+    {
+        for (int lmap = 0; lmap < sm_lightmap_count; ++lmap)
+        {
+            if (sm_static_lightmaps[lmap] != nullptr)
+            {
+                auto * tex = const_cast<TextureImage *>(sm_static_lightmaps[lmap]);
+                tex->m_reg_num = sm_tex_store->RegistrationNum();
+            }
+
+            if (sm_dynamic_lightmaps[lmap] != nullptr)
+            {
+                auto * tex = const_cast<TextureImage *>(sm_dynamic_lightmaps[lmap]);
+                tex->m_reg_num = sm_tex_store->RegistrationNum();
+            }
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

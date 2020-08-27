@@ -52,6 +52,7 @@ class TextureImage final
 {
     friend class TextureStore;
     friend class ModelStore;
+    friend class LightmapManager;
 
 public:
 
@@ -203,7 +204,7 @@ public:
     const RenderDevice & Device() const { return *m_device; }
 
     // Registration sequence:
-    void BeginRegistration();
+    void BeginRegistration(const char * const map_name);
     void EndRegistration();
     std::uint32_t RegistrationNum() const { return m_registration_num; }
 

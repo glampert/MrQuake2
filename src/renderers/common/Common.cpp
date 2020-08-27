@@ -687,7 +687,7 @@ void Errorf(const char * fmt, ...)
 
     g_refimport.Con_Printf(PRINT_ALL, "[%s] FATAL ERROR: %s\n", g_refname, msg);
 
-    MessageBox(nullptr, msg, "Fatal Error", MB_OK);
+    MessageBox(nullptr, msg, "Fatal Error", MB_OK | MB_ICONERROR);
     std::abort();
 }
 
@@ -982,7 +982,6 @@ CvarWrapper r_disable_texturing;
 CvarWrapper r_world_ambient;
 CvarWrapper r_sky_use_pal_textures;
 CvarWrapper r_sky_force_full_draw;
-CvarWrapper r_lightmap_format;
 CvarWrapper r_lightmap_intensity;
 CvarWrapper r_debug_lightmaps;
 CvarWrapper r_show_lightmap_textures;
@@ -1031,7 +1030,6 @@ void Initialize()
     r_world_ambient = GameInterface::Cvar::Get("r_world_ambient", "1.2", CvarWrapper::kFlagArchive);
     r_sky_use_pal_textures = GameInterface::Cvar::Get("r_sky_use_pal_textures", "0", CvarWrapper::kFlagArchive);
     r_sky_force_full_draw = GameInterface::Cvar::Get("r_sky_force_full_draw", "0", 0);
-    r_lightmap_format = GameInterface::Cvar::Get("r_lightmap_format", "D", CvarWrapper::kFlagArchive);
     r_lightmap_intensity = GameInterface::Cvar::Get("r_lightmap_intensity", "3", CvarWrapper::kFlagArchive);
     r_debug_lightmaps = GameInterface::Cvar::Get("r_debug_lightmaps", "0", 0);
     r_show_lightmap_textures = GameInterface::Cvar::Get("r_show_lightmap_textures", "0", 0);

@@ -92,7 +92,7 @@ void DLLInterface::BeginRegistration(const char * const map_name)
     GameInterface::Printf("**** DLLInterface::BeginRegistration ****");
 
     sm_view_renderer.BeginRegistration();
-    sm_texture_store.BeginRegistration();
+    sm_texture_store.BeginRegistration(map_name);
     sm_model_store.BeginRegistration(map_name);
 
     MemTagsPrintAll();

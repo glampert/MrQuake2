@@ -698,7 +698,7 @@ void TextureStore::TouchResidentTextures()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void TextureStore::BeginRegistration()
+void TextureStore::BeginRegistration(const char * const map_name)
 {
     GameInterface::Printf("==== TextureStore::BeginRegistration ====");
     ++m_registration_num;
@@ -706,7 +706,7 @@ void TextureStore::BeginRegistration()
     // Reference them on every BeginRegistration so they will always have the most current timestamp.
     TouchResidentTextures();
 
-    LightmapManager::BeginRegistration();
+    LightmapManager::BeginRegistration(map_name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
