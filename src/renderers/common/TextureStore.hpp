@@ -224,14 +224,15 @@ public:
     auto end()   { return m_teximages_cache.end();   }
 
     // Resident textures:
-    const TextureImage * tex_scrap    = nullptr;
-    const TextureImage * tex_conchars = nullptr;
-    const TextureImage * tex_conback  = nullptr;
-    const TextureImage * tex_backtile = nullptr;
-    const TextureImage * tex_white2x2 = nullptr;
-    const TextureImage * tex_debug    = nullptr;
-    const TextureImage * tex_cinframe = nullptr;
-    const TextureImage * tex_particle = nullptr;
+    const TextureImage * tex_scrap        = nullptr;
+    const TextureImage * tex_conchars     = nullptr;
+    const TextureImage * tex_conback      = nullptr;
+    const TextureImage * tex_backtile     = nullptr;
+    const TextureImage * tex_white2x2     = nullptr;
+    const TextureImage * tex_debug        = nullptr;
+    const TextureImage * tex_cinframe     = nullptr;
+    const TextureImage * tex_particle_dot = nullptr;
+    const TextureImage * tex_particle_hd  = nullptr;
 
     // Global palette access.
     static ColorRGBA32 * CinematicPalette()          { return sm_cinematic_palette; }

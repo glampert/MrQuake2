@@ -314,14 +314,15 @@ void TextureStore::Shutdown()
 {
     LightmapManager::Shutdown();
 
-    tex_scrap    = nullptr;
-    tex_conchars = nullptr;
-    tex_conback  = nullptr;
-    tex_backtile = nullptr;
-    tex_white2x2 = nullptr;
-    tex_debug    = nullptr;
-    tex_cinframe = nullptr;
-    tex_particle = nullptr;
+    tex_scrap        = nullptr;
+    tex_conchars     = nullptr;
+    tex_conback      = nullptr;
+    tex_backtile     = nullptr;
+    tex_white2x2     = nullptr;
+    tex_debug        = nullptr;
+    tex_cinframe     = nullptr;
+    tex_particle_dot = nullptr;
+    tex_particle_hd  = nullptr;
 
     DestroyAllLoadedTextures();
     m_teximages_cache.shrink_to_fit();
@@ -655,58 +656,63 @@ void TextureStore::TouchResidentTextures()
     }
 
     // Little dot for particles (8x8 white/alpha texture)
-    if (tex_particle == nullptr)
+    if (tex_particle_dot == nullptr)
+    {
+        // Classic Quake2 dot texture from ref_gl
+        constexpr int Dims = 8;
+        const uint8_t dot_texture[Dims][Dims] = {
+            { 0, 0, 0, 0, 0, 0, 0, 0 },
+            { 0, 0, 1, 1, 0, 0, 0, 0 },
+            { 0, 1, 1, 1, 1, 0, 0, 0 },
+            { 0, 1, 1, 1, 1, 0, 0, 0 },
+            { 0, 0, 1, 1, 0, 0, 0, 0 },
+            { 0, 0, 0, 0, 0, 0, 0, 0 },
+            { 0, 0, 0, 0, 0, 0, 0, 0 },
+            { 0, 0, 0, 0, 0, 0, 0, 0 },
+        };
+
+        auto * pixels = new(MemTag::kTextures) ColorRGBA32[Dims * Dims];
+        for (int x = 0; x < Dims; ++x)
+        {
+            for (int y = 0; y < Dims; ++y)
+            {
+                pixels[x + (y * Dims)] = BytesToColor(255, 255, 255, dot_texture[x][y] * 255);
+            }
+        }
+
+        TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic, false, Dims, Dims, {}, {}, "pics/particle_dot.pcx");
+        m_teximages_cache.push_back(tex);
+        tex_particle_dot = tex;
+    }
+
+    if (tex_particle_hd == nullptr)
     {
         int w = 0, h = 0;
         ColorRGBA32 * pixels = nullptr;
 
-        if (Config::r_hd_particles.IsSet())
+        if (!PNGLoadFromFile("mrq2/particle_hd.png", &pixels, &w, &h))
         {
-            if (!PNGLoadFromFile("MrQ2/particle.png", &pixels, &w, &h))
-            {
-                GameInterface::Errorf("Failed to load high quality particle texture 'MrQ2/particle.png'");
-            }
+            GameInterface::Printf("WARNING: Failed to load high quality particle texture 'mrq2/particle_hd.png'");
+            tex_particle_hd = tex_particle_dot;
         }
-        else // Classic Quake2 dot texture
+        else
         {
-            constexpr int Dims = 8;
-            const uint8_t dot_texture[Dims][Dims] = {
-                { 0, 0, 0, 0, 0, 0, 0, 0 },
-                { 0, 0, 1, 1, 0, 0, 0, 0 },
-                { 0, 1, 1, 1, 1, 0, 0, 0 },
-                { 0, 1, 1, 1, 1, 0, 0, 0 },
-                { 0, 0, 1, 1, 0, 0, 0, 0 },
-                { 0, 0, 0, 0, 0, 0, 0, 0 },
-                { 0, 0, 0, 0, 0, 0, 0, 0 },
-                { 0, 0, 0, 0, 0, 0, 0, 0 },
-            };
-
-            w = h = Dims;
-            pixels = new(MemTag::kTextures) ColorRGBA32[Dims * Dims];
-
-            for (int x = 0; x < Dims; ++x)
-            {
-                for (int y = 0; y < Dims; ++y)
-                {
-                    pixels[x + (y * Dims)] = BytesToColor(255, 255, 255, dot_texture[x][y] * 255);
-                }
-            }
+            TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic, false, w, h, {}, {}, "pics/particle_hd.pcx");
+            m_teximages_cache.push_back(tex);
+            tex_particle_hd = tex;
         }
-
-        TextureImage * tex = CreateTexture(pixels, m_registration_num, TextureType::kPic, false, w, h, {}, {}, "pics/particle.pcx");
-        m_teximages_cache.push_back(tex);
-        tex_particle = tex;
     }
 
     // Update the registration count for these:
-    tex_scrap    = FindOrLoad("scrap",    TextureType::kPic);
-    tex_conchars = FindOrLoad("conchars", TextureType::kPic);
-    tex_conback  = FindOrLoad("conback",  TextureType::kPic);
-    tex_backtile = FindOrLoad("backtile", TextureType::kPic);
-    tex_white2x2 = FindOrLoad("white2x2", TextureType::kPic);
-    tex_debug    = FindOrLoad("debug",    TextureType::kPic);
-    tex_cinframe = FindOrLoad("cinframe", TextureType::kPic);
-    tex_particle = FindOrLoad("particle", TextureType::kPic);
+    tex_scrap        = FindOrLoad("scrap",        TextureType::kPic);
+    tex_conchars     = FindOrLoad("conchars",     TextureType::kPic);
+    tex_conback      = FindOrLoad("conback",      TextureType::kPic);
+    tex_backtile     = FindOrLoad("backtile",     TextureType::kPic);
+    tex_white2x2     = FindOrLoad("white2x2",     TextureType::kPic);
+    tex_debug        = FindOrLoad("debug",        TextureType::kPic);
+    tex_cinframe     = FindOrLoad("cinframe",     TextureType::kPic);
+    tex_particle_dot = FindOrLoad("particle_dot", TextureType::kPic);
+    tex_particle_hd  = FindOrLoad("particle_hd",  TextureType::kPic);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

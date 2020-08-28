@@ -1108,6 +1108,7 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
     OPTICK_EVENT();
 
     const bool high_quality_particles = Config::r_hd_particles.IsSet();
+    const particle_t * const particles = frame_data.view_def.particles;
 
     vec3_t up, right;
     Vec3Scale(frame_data.up_vec,    1.5f, up);
@@ -1115,71 +1116,71 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
 
     BeginBatchArgs args;
     args.model_matrix = RenderMatrix{ RenderMatrix::kIdentity };
-    args.diffuse_tex  = frame_data.tex_store.tex_particle;
+    args.diffuse_tex  = high_quality_particles ? frame_data.tex_store.tex_particle_hd : frame_data.tex_store.tex_particle_dot;
     args.lightmap_tex = nullptr;
     args.topology     = PrimitiveTopology::kTriangleList;
     args.depth_hack   = false;
 
     MiniImBatch batch = BeginBatch(args);
 
-    const particle_t * const particles = frame_data.view_def.particles;
-    for (int i = 0; i < num_particles; ++i)
+    // Need a quad (2 tris) for the HD particles.
+    const uint32_t num_verts = high_quality_particles ? (num_particles * 6) : (num_particles * 3);
+    DrawVertex3D * vertex_ptr = batch.Increment(num_verts);
+
+    if (high_quality_particles)
     {
-        const particle_t * p = &particles[i];
-
-        // hack a scale up to keep particles from disappearing
-        float scale = (p->origin[0] - frame_data.camera_origin[0]) * frame_data.forward_vec[0] +
-                      (p->origin[1] - frame_data.camera_origin[1]) * frame_data.forward_vec[1] +
-                      (p->origin[2] - frame_data.camera_origin[2]) * frame_data.forward_vec[2];
-
-        if (scale < 20.0f)
+        // Draw a quadrilateral for the higher quality particle
+        for (int i = 0; i < num_particles; ++i)
         {
-            scale = 1.0f;
-        }
-        else
-        {
-            scale = 1.0f + scale * 0.004f;
-        }
+            const particle_t * p = &particles[i];
 
-        const ColorRGBA32 color = TextureStore::ColorForIndex(p->color & 0xFF);
-        const std::uint8_t bR = (color & 0xFF);
-        const std::uint8_t bG = (color >> 8) & 0xFF;
-        const std::uint8_t bB = (color >> 16) & 0xFF;
+            // hack a scale up to keep particles from disappearing
+            float scale = (p->origin[0] - frame_data.camera_origin[0]) * frame_data.forward_vec[0] +
+                          (p->origin[1] - frame_data.camera_origin[1]) * frame_data.forward_vec[1] +
+                          (p->origin[2] - frame_data.camera_origin[2]) * frame_data.forward_vec[2];
 
-        const float fR = bR * (1.0f / 255.0f);
-        const float fG = bG * (1.0f / 255.0f);
-        const float fB = bB * (1.0f / 255.0f);
-        const float fA = p->alpha;
+            if (scale < 20.0f)
+                scale = 1.0f;
+            else
+                scale = 1.0f + scale * 0.004f;
 
-        DrawVertex3D v = {};
-        v.rgba[0] = fR;
-        v.rgba[1] = fG;
-        v.rgba[2] = fB;
-        v.rgba[3] = fA;
+            const ColorRGBA32 color = TextureStore::ColorForIndex(p->color & 0xFF);
+            const std::uint8_t bR = (color & 0xFF);
+            const std::uint8_t bG = (color >> 8) & 0xFF;
+            const std::uint8_t bB = (color >> 16) & 0xFF;
 
-        if (high_quality_particles)
-        {
+            const float fR = bR * (1.0f / 255.0f);
+            const float fG = bG * (1.0f / 255.0f);
+            const float fB = bB * (1.0f / 255.0f);
+            const float fA = p->alpha;
+
+            DrawVertex3D v = {};
+            v.rgba[0] = fR;
+            v.rgba[1] = fG;
+            v.rgba[2] = fB;
+            v.rgba[3] = fA;
+
             // First triangle:
             v.position[0] = p->origin[0];
             v.position[1] = p->origin[1];
             v.position[2] = p->origin[2];
             v.texture_uv[0] = 0.0f;
             v.texture_uv[1] = 0.0f;
-            batch.PushVertex(v);
+            *vertex_ptr++ = v;
 
             v.position[0] = p->origin[0] + up[0] * scale;
             v.position[1] = p->origin[1] + up[1] * scale;
             v.position[2] = p->origin[2] + up[2] * scale;
             v.texture_uv[0] = 0.0f;
             v.texture_uv[1] = 1.0f;
-            batch.PushVertex(v);
+            *vertex_ptr++ = v;
 
             v.position[0] = p->origin[0] + ((up[0] + right[0]) * scale);
             v.position[1] = p->origin[1] + ((up[1] + right[1]) * scale);
             v.position[2] = p->origin[2] + ((up[2] + right[2]) * scale);
             v.texture_uv[0] = 1.0f;
             v.texture_uv[1] = 1.0f;
-            batch.PushVertex(v);
+            *vertex_ptr++ = v;
 
             // Second triangle:
             v.position[0] = p->origin[0] + ((up[0] + right[0]) * scale);
@@ -1187,44 +1188,75 @@ void ViewRenderer::RenderParticles(const FrameData & frame_data)
             v.position[2] = p->origin[2] + ((up[2] + right[2]) * scale);
             v.texture_uv[0] = 1.0f;
             v.texture_uv[1] = 1.0f;
-            batch.PushVertex(v);
+            *vertex_ptr++ = v;
 
             v.position[0] = p->origin[0] + right[0] * scale;
             v.position[1] = p->origin[1] + right[1] * scale;
             v.position[2] = p->origin[2] + right[2] * scale;
             v.texture_uv[0] = 1.0f;
             v.texture_uv[1] = 0.0f;
-            batch.PushVertex(v);
+            *vertex_ptr++ = v;
 
             v.position[0] = p->origin[0];
             v.position[1] = p->origin[1];
             v.position[2] = p->origin[2];
             v.texture_uv[0] = 0.0f;
             v.texture_uv[1] = 0.0f;
-            batch.PushVertex(v);
+            *vertex_ptr++ = v;
         }
-        else // The classic Quake2 dot particle is rendered with just a single triangle
+    }
+    else // The classic Quake2 dot particle is rendered with just a single triangle
+    {
+        for (int i = 0; i < num_particles; ++i)
         {
+            const particle_t * p = &particles[i];
+
+            // hack a scale up to keep particles from disappearing
+            float scale = (p->origin[0] - frame_data.camera_origin[0]) * frame_data.forward_vec[0] +
+                          (p->origin[1] - frame_data.camera_origin[1]) * frame_data.forward_vec[1] +
+                          (p->origin[2] - frame_data.camera_origin[2]) * frame_data.forward_vec[2];
+
+            if (scale < 20.0f)
+                scale = 1.0f;
+            else
+                scale = 1.0f + scale * 0.004f;
+
+            const ColorRGBA32 color = TextureStore::ColorForIndex(p->color & 0xFF);
+            const std::uint8_t bR = (color & 0xFF);
+            const std::uint8_t bG = (color >> 8) & 0xFF;
+            const std::uint8_t bB = (color >> 16) & 0xFF;
+
+            const float fR = bR * (1.0f / 255.0f);
+            const float fG = bG * (1.0f / 255.0f);
+            const float fB = bB * (1.0f / 255.0f);
+            const float fA = p->alpha;
+
+            DrawVertex3D v = {};
+            v.rgba[0] = fR;
+            v.rgba[1] = fG;
+            v.rgba[2] = fB;
+            v.rgba[3] = fA;
+
             v.position[0] = p->origin[0];
             v.position[1] = p->origin[1];
             v.position[2] = p->origin[2];
             v.texture_uv[0] = 0.0625f;
             v.texture_uv[1] = 0.0625f;
-            batch.PushVertex(v);
+            *vertex_ptr++ = v;
 
             v.position[0] = p->origin[0] + up[0] * scale;
             v.position[1] = p->origin[1] + up[1] * scale;
             v.position[2] = p->origin[2] + up[2] * scale;
             v.texture_uv[0] = 1.0625f;
             v.texture_uv[1] = 0.0625f;
-            batch.PushVertex(v);
+            *vertex_ptr++ = v;
 
             v.position[0] = p->origin[0] + right[0] * scale;
             v.position[1] = p->origin[1] + right[1] * scale;
             v.position[2] = p->origin[2] + right[2] * scale;
             v.texture_uv[0] = 0.0625f;
             v.texture_uv[1] = 1.0625f;
-            batch.PushVertex(v);
+            *vertex_ptr++ = v;
         }
     }
 
