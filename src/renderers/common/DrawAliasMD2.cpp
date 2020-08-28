@@ -59,7 +59,7 @@ static void LerpEntityVerts(const LerpInputs & in, float * lerp)
     {
         for (int i = 0; i < num_verts; i++, v++, ov++, lerp += 3)
         {
-            const float * const normal = s_vertex_normals[in.frame_verts[i].lightnormalindex];
+            const float * const normal = s_vertex_normals[v->lightnormalindex];
             lerp[0] = in.move[0] + ov->v[0] * in.backv[0] + v->v[0] * in.frontv[0] + normal[0] * POWERSUIT_SCALE;
             lerp[1] = in.move[1] + ov->v[1] * in.backv[1] + v->v[1] * in.frontv[1] + normal[1] * POWERSUIT_SCALE;
             lerp[2] = in.move[2] + ov->v[2] * in.backv[2] + v->v[2] * in.frontv[2] + normal[2] * POWERSUIT_SCALE;
@@ -170,60 +170,45 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
     {
         // Get the vertex count and primitive type
         std::int32_t count = *order++;
-        if (!count)
+        if (count == 0)
         {
             break; // done
         }
 
-        bool doTriFanFirstVert;
-        if (count < 0)
+        if (count < 0) // TriangleFan emulation:
         {
             count = -count;
-            batch_args.topology = PrimitiveTopology::kTriangleFan;
-            doTriFanFirstVert   = true;
-        }
-        else
-        {
-            batch_args.topology = PrimitiveTopology::kTriangleStrip;
-            doTriFanFirstVert   = false;
-        }
+            MRQ2_ASSERT(count > 0);
 
-        MiniImBatch batch = BeginBatch(batch_args);
-        {
+            batch_args.topology = PrimitiveTopology::kTriangleFan;
+            MiniImBatch batch = BeginBatch(batch_args);
+
             if (entity.flags & (RF_SHELL_RED | RF_SHELL_GREEN | RF_SHELL_BLUE))
             {
-                do
+                for (int i = 0; i < count; ++i)
                 {
                     const std::size_t index_xyz = order[2];
                     MRQ2_ASSERT(index_xyz < ArrayLength(s_lerped_positions));
                     order += 3;
 
                     DrawVertex3D dv;
-                    dv.texture_uv[0] = 0.0f;
-                    dv.texture_uv[1] = 0.0f;
-                    dv.lightmap_uv[0] = 0.0f;
-                    dv.lightmap_uv[1] = 0.0f;
+                    Vec3Copy(s_lerped_positions[index_xyz], dv.position);
+                    Vec2Zero(dv.texture_uv);
+                    Vec2Zero(dv.lightmap_uv);
                     dv.rgba[0] = shade_light[0];
                     dv.rgba[1] = shade_light[1];
                     dv.rgba[2] = shade_light[2];
                     dv.rgba[3] = alpha;
-                    Vec3Copy(s_lerped_positions[index_xyz], dv.position);
 
-                    if (doTriFanFirstVert)
-                    {
+                    if (i == 0)
                         batch.SetTriangleFanFirstVertex(dv);
-                        doTriFanFirstVert = false;
-                    }
                     else
-                    {
                         batch.PushVertex(dv);
-                    }
-
-                } while (--count);
+                }
             }
             else
             {
-                do
+                for (int i = 0; i < count; ++i)
                 {
                     // Texture coordinates come from the draw list
                     const float u = reinterpret_cast<const float *>(order)[0];
@@ -237,30 +222,77 @@ void ViewRenderer::DrawAliasMD2FrameLerp(const entity_t & entity, const dmdl_t *
                     const float l = shade_dots[verts[index_xyz].lightnormalindex];
 
                     DrawVertex3D dv;
+                    Vec3Copy(s_lerped_positions[index_xyz], dv.position);
                     dv.texture_uv[0] = u;
                     dv.texture_uv[1] = v;
-                    dv.lightmap_uv[0] = 0.0f;
-                    dv.lightmap_uv[1] = 0.0f;
+                    Vec2Zero(dv.lightmap_uv);
                     dv.rgba[0] = l * shade_light[0];
                     dv.rgba[1] = l * shade_light[1];
                     dv.rgba[2] = l * shade_light[2];
                     dv.rgba[3] = alpha;
-                    Vec3Copy(s_lerped_positions[index_xyz], dv.position);
 
-                    if (doTriFanFirstVert)
-                    {
+                    if (i == 0)
                         batch.SetTriangleFanFirstVertex(dv);
-                        doTriFanFirstVert = false;
-                    }
                     else
-                    {
                         batch.PushVertex(dv);
-                    }
-
-                } while (--count);
+                }
             }
+
+            EndBatch(batch);
         }
-        EndBatch(batch);
+        else // TriangleStrip fast path:
+        {
+            batch_args.topology = PrimitiveTopology::kTriangleStrip;
+            MiniImBatch batch = BeginBatch(batch_args);
+
+            MRQ2_ASSERT(count > 0);
+            DrawVertex3D * vertex_ptr = batch.Increment(count);
+
+            if (entity.flags & (RF_SHELL_RED | RF_SHELL_GREEN | RF_SHELL_BLUE))
+            {
+                for (int i = 0; i < count; ++i, ++vertex_ptr)
+                {
+                    const std::size_t index_xyz = order[2];
+                    MRQ2_ASSERT(index_xyz < ArrayLength(s_lerped_positions));
+                    order += 3;
+
+                    Vec3Copy(s_lerped_positions[index_xyz], vertex_ptr->position);
+                    Vec2Zero(vertex_ptr->texture_uv);
+                    Vec2Zero(vertex_ptr->lightmap_uv);
+                    vertex_ptr->rgba[0] = shade_light[0];
+                    vertex_ptr->rgba[1] = shade_light[1];
+                    vertex_ptr->rgba[2] = shade_light[2];
+                    vertex_ptr->rgba[3] = alpha;
+                }
+            }
+            else
+            {
+                for (int i = 0; i < count; ++i, ++vertex_ptr)
+                {
+                    // Texture coordinates come from the draw list
+                    const float u = reinterpret_cast<const float *>(order)[0];
+                    const float v = reinterpret_cast<const float *>(order)[1];
+
+                    const std::size_t index_xyz = order[2];
+                    MRQ2_ASSERT(index_xyz < ArrayLength(s_lerped_positions));
+                    order += 3;
+
+                    // Normals and vertexes come from the frame list
+                    const float l = shade_dots[verts[index_xyz].lightnormalindex];
+
+                    Vec3Copy(s_lerped_positions[index_xyz], vertex_ptr->position);
+                    vertex_ptr->texture_uv[0] = u;
+                    vertex_ptr->texture_uv[1] = v;
+                    Vec2Zero(vertex_ptr->lightmap_uv);
+                    vertex_ptr->rgba[0] = l * shade_light[0];
+                    vertex_ptr->rgba[1] = l * shade_light[1];
+                    vertex_ptr->rgba[2] = l * shade_light[2];
+                    vertex_ptr->rgba[3] = alpha;
+                }
+            }
+
+            EndBatch(batch);
+        }
     }
 }
 
@@ -291,61 +323,70 @@ void ViewRenderer::DrawAliasMD2Shadow(const entity_t & entity, const dmdl_t * co
     {
         // get the vertex count and primitive type
         std::int32_t count = *order++;
-        if (!count)
+        if (count == 0)
         {
             break; // done
         }
 
-        bool doTriFanFirstVert;
-        if (count < 0)
+        if (count < 0) // TriangleFan emulation:
         {
             count = -count;
-            batch_args.topology = PrimitiveTopology::kTriangleFan;
-            doTriFanFirstVert   = true;
-        }
-        else
-        {
-            batch_args.topology = PrimitiveTopology::kTriangleStrip;
-            doTriFanFirstVert   = false;
-        }
+            MRQ2_ASSERT(count > 0);
 
-        MiniImBatch batch = BeginBatch(batch_args);
-        {
-            do
+            batch_args.topology = PrimitiveTopology::kTriangleFan;
+            MiniImBatch batch = BeginBatch(batch_args);
+
+            for (int i = 0; i < count; ++i)
             {
                 const std::size_t index_xyz = order[2];
                 MRQ2_ASSERT(index_xyz < ArrayLength(s_lerped_positions));
                 order += 3;
 
-                // Reuse s_lerped_positions[] from the previous DrawAliasMD2FrameLerp call.
-                vec3_t point;
-                Vec3Copy(s_lerped_positions[index_xyz], point);
-
-                point[0] -= shade_vector[0] * (point[2] + lheight);
-                point[1] -= shade_vector[1] * (point[2] + lheight);
-                point[2] = height;
-
                 DrawVertex3D dv = {};
-                Vec3Copy(point, dv.position);
-
-                dv.rgba[0] = 0.0f;
-                dv.rgba[1] = 0.0f;
-                dv.rgba[2] = 0.0f;
                 dv.rgba[3] = kShadowColorOpacity;
 
-                if (doTriFanFirstVert)
-                {
-                    batch.SetTriangleFanFirstVertex(dv);
-                    doTriFanFirstVert = false;
-                }
-                else
-                {
-                    batch.PushVertex(dv);
-                }
+                // Reuse s_lerped_positions[] from the previous DrawAliasMD2FrameLerp call.
+                Vec3Copy(s_lerped_positions[index_xyz], dv.position);
+                dv.position[0] -= shade_vector[0] * (dv.position[2] + lheight);
+                dv.position[1] -= shade_vector[1] * (dv.position[2] + lheight);
+                dv.position[2] = height;
 
-            } while (--count);
+                if (i == 0)
+                    batch.SetTriangleFanFirstVertex(dv);
+                else
+                    batch.PushVertex(dv);
+            }
+
+            EndBatch(batch);
         }
-        EndBatch(batch);
+        else // TriangleStrip fast path:
+        {
+            batch_args.topology = PrimitiveTopology::kTriangleStrip;
+            MiniImBatch batch = BeginBatch(batch_args);
+
+            MRQ2_ASSERT(count > 0);
+            DrawVertex3D * vertex_ptr = batch.Increment(count);
+
+            for (int i = 0; i < count; ++i)
+            {
+                const std::size_t index_xyz = order[2];
+                MRQ2_ASSERT(index_xyz < ArrayLength(s_lerped_positions));
+                order += 3;
+
+                DrawVertex3D dv = {};
+                dv.rgba[3] = kShadowColorOpacity;
+
+                // Reuse s_lerped_positions[] from the previous DrawAliasMD2FrameLerp call.
+                Vec3Copy(s_lerped_positions[index_xyz], dv.position);
+                dv.position[0] -= shade_vector[0] * (dv.position[2] + lheight);
+                dv.position[1] -= shade_vector[1] * (dv.position[2] + lheight);
+                dv.position[2] = height;
+
+                *vertex_ptr++ = dv;
+            }
+
+            EndBatch(batch);
+        }
     }
 }
 

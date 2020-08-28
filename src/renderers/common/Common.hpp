@@ -111,6 +111,11 @@ inline void VecSplatN(float (&vec)[N], const float val)
     }
 }
 
+inline void Vec2Zero(vec2_t v)
+{
+    v[0] = v[1] = 0.0f;
+}
+
 inline void Vec3Zero(vec3_t v)
 {
     v[0] = v[1] = v[2] = 0.0f;
