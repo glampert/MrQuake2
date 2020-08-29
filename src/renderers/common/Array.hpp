@@ -50,6 +50,37 @@ public:
         m_count = count;
     }
 
+    template<typename Pred>
+    void erase_if(Pred && predicate)
+    {
+        if (!empty())
+        {
+            auto first = begin();
+            auto new_end = std::remove_if(first, end(), predicate);
+            if (new_end != end())
+            {
+                auto new_count = size_type(new_end - first);
+                MRQ2_ASSERT(new_count <= m_capacity);
+                m_count = new_count;
+            }
+        }
+    }
+
+    void erase_swap(pointer erase_iter)
+    {
+        // move last element into erase_iter
+        if (!empty())
+        {
+            MRQ2_ASSERT(erase_iter >= begin() && erase_iter < end());
+            if (m_count > 1)
+            {
+                T & last = m_elements[m_count - 1];
+                *erase_iter = std::move(last);
+            }
+            --m_count;
+        }
+    }
+
     void clear()
     {
         m_count = 0;

@@ -6,7 +6,7 @@
 
 #include "ModelStructs.hpp"
 #include "Pool.hpp"
-#include <vector>
+#include "Array.hpp"
 
 namespace MrQ2
 {
@@ -35,7 +35,7 @@ public:
 
     std::uint32_t RegistrationNum() const { return m_registration_num; }
     ModelInstance * WorldModel() const { return m_world_model; }
-	ModelInstance * InlineModelAt(std::size_t index) const { MRQ2_ASSERT(index < m_inline_models.size()); return m_inline_models[index]; }
+	ModelInstance * InlineModelAt(std::uint32_t index) const { return m_inline_models[index]; }
 
     // Models cache:
     const ModelInstance * Find(const char * name, ModelType mt);       // Must be in cache, returns null otherwise
@@ -59,14 +59,13 @@ private:
 
 private:
 
-    std::uint32_t m_registration_num = 0;
+    ModelInstance * m_world_model{ nullptr }; // Cached pointer to currently loaded map
+    TextureStore *  m_tex_store{ nullptr };
+    std::uint32_t   m_registration_num{ 0 };
 
-    std::vector<ModelInstance *> m_models_cache;
-    std::vector<ModelInstance *> m_inline_models;
     Pool<ModelInstance, kModelPoolSize> m_models_pool{ MemTag::kWorldModel };
-
-    ModelInstance * m_world_model = nullptr; // Cached pointer to currently loaded map
-    TextureStore  * m_tex_store   = nullptr;
+    FixedSizeArray<ModelInstance *, kModelPoolSize> m_models_cache;
+    FixedSizeArray<ModelInstance *, kModelPoolSize> m_inline_models;
 };
 
 } // MrQ2

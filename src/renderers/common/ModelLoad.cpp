@@ -198,9 +198,10 @@ static void LoadTexInfo(TextureStore & tex_store, ModelInstance & mdl, const voi
 
     for (int i = 0; i < count; ++i, ++in, ++out)
     {
-        for (int j = 0; j < 8; ++j)
+        for (int j = 0; j < 4; ++j)
         {
             out->vecs[0][j] = in->vecs[0][j];
+            out->vecs[1][j] = in->vecs[1][j];
         }
 
         out->flags = in->flags;
@@ -628,10 +629,10 @@ static void BuildPolygonFromSurface(ModelInstance & mdl, ModelSurface & surf)
         }
 
         s = Vec3Dot(vec, surf.texinfo->vecs[0]) + surf.texinfo->vecs[0][3];
-        s /= surf.texinfo->teximage->Width();
+        s /= surf.texinfo->teximage->OriginalWidth();
 
         t = Vec3Dot(vec, surf.texinfo->vecs[1]) + surf.texinfo->vecs[1][3];
-        t /= surf.texinfo->teximage->Height();
+        t /= surf.texinfo->teximage->OriginalHeight();
 
         // Vertex position:
         Vec3Add(total, vec, total);

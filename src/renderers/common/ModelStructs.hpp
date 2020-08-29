@@ -337,6 +337,9 @@ public:
 
     ~ModelInstance()
     {
+        MemTagsTrackFree(vb.SizeInBytes(), MemTag::kVertIndexBuffer);
+        MemTagsTrackFree(ib.SizeInBytes(), MemTag::kVertIndexBuffer);
+
         vb.Shutdown();
         ib.Shutdown();
     }

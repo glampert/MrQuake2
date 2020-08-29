@@ -774,6 +774,16 @@ void FS::FreeFile(void * out_buf)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+bool FS::LoadFilePortion(const char * name, void * dest_buffer, const int num_bytes_to_read)
+{
+    MRQ2_ASSERT(name != nullptr);
+    MRQ2_ASSERT(dest_buffer != nullptr && num_bytes_to_read > 0);
+
+    return (0 != g_refimport.FS_LoadFilePortion(name, dest_buffer, num_bytes_to_read));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void FS::CreatePath(const char * path)
 {
     MRQ2_ASSERT(path != nullptr);
@@ -987,7 +997,9 @@ CvarWrapper r_debug_lightmaps;
 CvarWrapper r_show_lightmap_textures;
 CvarWrapper r_no_draw;
 CvarWrapper r_lightlevel;
-CvarWrapper r_hd_particles;
+CvarWrapper r_hd_particles; 
+CvarWrapper r_hd_textures; // Wall textures
+CvarWrapper r_hd_skins;    // MD2 skins
 
 // ViewRenderer configs
 CvarWrapper r_use_vertex_index_buffers;
@@ -1030,12 +1042,14 @@ void Initialize()
     r_world_ambient = GameInterface::Cvar::Get("r_world_ambient", "1.2", CvarWrapper::kFlagArchive);
     r_sky_use_pal_textures = GameInterface::Cvar::Get("r_sky_use_pal_textures", "0", CvarWrapper::kFlagArchive);
     r_sky_force_full_draw = GameInterface::Cvar::Get("r_sky_force_full_draw", "0", 0);
-    r_lightmap_intensity = GameInterface::Cvar::Get("r_lightmap_intensity", "3", CvarWrapper::kFlagArchive);
+    r_lightmap_intensity = GameInterface::Cvar::Get("r_lightmap_intensity", "2", CvarWrapper::kFlagArchive);
     r_debug_lightmaps = GameInterface::Cvar::Get("r_debug_lightmaps", "0", 0);
     r_show_lightmap_textures = GameInterface::Cvar::Get("r_show_lightmap_textures", "0", 0);
     r_no_draw = GameInterface::Cvar::Get("r_no_draw", "0", 0);
     r_lightlevel = GameInterface::Cvar::Get("r_lightlevel", "0", 0);
     r_hd_particles = GameInterface::Cvar::Get("r_hd_particles", "1", CvarWrapper::kFlagArchive);
+    r_hd_textures = GameInterface::Cvar::Get("r_hd_textures", "1", CvarWrapper::kFlagArchive);
+    r_hd_skins = GameInterface::Cvar::Get("r_hd_skins", "1", CvarWrapper::kFlagArchive);
 
     r_use_vertex_index_buffers = GameInterface::Cvar::Get("r_use_vertex_index_buffers", "1", CvarWrapper::kFlagArchive);
     r_force_null_entity_models = GameInterface::Cvar::Get("r_force_null_entity_models", "0", 0);
@@ -1046,7 +1060,7 @@ void Initialize()
     r_skip_draw_sky = GameInterface::Cvar::Get("r_skip_draw_sky", "0", 0);
     r_skip_draw_entities = GameInterface::Cvar::Get("r_skip_draw_entities", "0", 0);
     r_skip_brush_mods = GameInterface::Cvar::Get("r_skip_brush_mods", "0", 0);
-    r_intensity = GameInterface::Cvar::Get("r_intensity", "2", CvarWrapper::kFlagArchive);
+    r_intensity = GameInterface::Cvar::Get("r_intensity", "1.2", CvarWrapper::kFlagArchive);
     r_water_hack = GameInterface::Cvar::Get("r_water_hack", "0.5", CvarWrapper::kFlagArchive);
     r_draw_model_bounds = GameInterface::Cvar::Get("r_draw_model_bounds", "0", 0);
     r_draw_world_bounds = GameInterface::Cvar::Get("r_draw_world_bounds", "0", 0);

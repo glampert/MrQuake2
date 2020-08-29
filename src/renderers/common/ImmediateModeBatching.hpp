@@ -116,6 +116,8 @@ public:
 
         for (uint32_t b = 0; b < kNumBuffers; ++b)
         {
+            MemTagsTrackAlloc(m_vertex_buffers[b].SizeInBytes(), MemTag::kVertIndexBuffer);
+
             m_mapped_ptrs[b] = nullptr;
             m_vertex_buffers[b].Shutdown();
         }

@@ -542,6 +542,7 @@ namespace FS
 {
     int LoadFile(const char * name, void ** out_buf);
     void FreeFile(void * out_buf);
+    bool LoadFilePortion(const char * name, void * dest_buffer, const int num_bytes_to_read);
     void CreatePath(const char * path);
     const char * GameDir();
 
@@ -601,6 +602,8 @@ namespace Config
     extern CvarWrapper r_no_draw;
     extern CvarWrapper r_lightlevel;
     extern CvarWrapper r_hd_particles;
+    extern CvarWrapper r_hd_textures;
+    extern CvarWrapper r_hd_skins;
 
     // ViewRenderer configs
     extern CvarWrapper r_use_vertex_index_buffers;

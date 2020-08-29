@@ -5,7 +5,6 @@
 
 #include "TextureStore.hpp"
 #include "Lightmaps.hpp"
-#include <algorithm>
 #include <random>
 
 // Quake includes
@@ -89,6 +88,7 @@ static inline void * Stb_MemReAlloc(const void * old_ptr, const size_t old_size,
 #define STB_IMAGE_STATIC
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
+#define STBI_ONLY_JPEG
 #include "external/stb/stb_image.h"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -297,9 +297,6 @@ void TextureStore::Init(const RenderDevice & device)
     MRQ2_ASSERT(m_device == nullptr);
     m_device = &device;
 
-    m_teximages_cache.reserve(kTexturePoolSize);
-    MemTagsTrackAlloc(m_teximages_cache.capacity() * sizeof(TextureImage *), MemTag::kTextures);
-
     // Load the default resident textures now
     TouchResidentTextures();
 
@@ -325,7 +322,7 @@ void TextureStore::Shutdown()
     tex_particle_hd  = nullptr;
 
     DestroyAllLoadedTextures();
-    m_teximages_cache.shrink_to_fit();
+    m_teximages_cache.clear();
     m_teximages_pool.Drain();
     m_scrap.Shutdown();
 
@@ -411,7 +408,7 @@ TextureImage * TextureStore::CreateScrapTexture(const uint32_t size, const Color
 
     TextureImage * new_scrap = m_teximages_pool.Allocate();
     ::new(new_scrap) TextureImage{ pixels, m_registration_num, TextureType::kPic, /*scrap =*/true,
-                                   size, size, Vec2u16{0,0}, Vec2u16{ std::uint16_t(size), std::uint16_t(size) },
+                                   size, size, Vec2u16{}, Vec2u16{ std::uint16_t(size), std::uint16_t(size) },
                                    "pics/scrap.pcx" };
 
     constexpr uint32_t  num_mip_levels = 1;
@@ -753,10 +750,7 @@ void TextureStore::EndRegistration()
         return false;
     };
 
-    // "erase_if"
-    auto first = m_teximages_cache.begin();
-    auto last  = m_teximages_cache.end();
-    m_teximages_cache.erase(std::remove_if(first, last, RemovePred), last);
+    m_teximages_cache.erase_if(RemovePred);
 
     GameInterface::Printf("Freed %i unused textures (%i lightmaps).", num_textures_removed, num_lmaps_removed);
 }
@@ -871,8 +865,81 @@ const TextureImage * TextureStore::FindOrLoad(const char * const name, const Tex
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static const char * GetHDTextureName(const char * const original_name, const char * const new_ext)
+{
+    // E.g.:
+    // textures/test/num_0.wall
+    // changes to:
+    // mrq2/textures/test/num_0.tga
+
+    char tex_name_no_ext[512];
+    strcpy_s(tex_name_no_ext, original_name);
+
+    if (char * last_dot = std::strrchr(tex_name_no_ext, '.')) // remove extension
+    {
+        *last_dot = '\0';
+    }
+
+    static char s_hd_texture_name[512];
+    sprintf_s(s_hd_texture_name, "mrq2/%s.%s", tex_name_no_ext, new_ext);
+
+    return s_hd_texture_name;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+static inline bool GetPCXImageDimensions(const char * const name, int * original_w, int * original_h)
+{
+    pcx_t pcx_header = {};
+    if (GameInterface::FS::LoadFilePortion(name, &pcx_header, sizeof(pcx_header)))
+    {
+        *original_w = pcx_header.xmax + 1;
+        *original_h = pcx_header.ymax + 1;
+        return true;
+    }
+    return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+static inline bool GetWALImageDimensions(const char * const name, int * original_w, int * original_h)
+{
+    miptex_t wal_header = {};
+    if (GameInterface::FS::LoadFilePortion(name, &wal_header, sizeof(wal_header)))
+    {
+        *original_w = wal_header.width;
+        *original_h = wal_header.height;
+        return true;
+    }
+    return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 TextureImage * TextureStore::LoadPCXImpl(const char * const name, const TextureType tt)
 {
+    if (tt == TextureType::kSkin && Config::r_hd_skins.IsSet())
+    {
+        // First find the dimensions of the original low-res texture
+        int original_w, original_h;
+        if (GetPCXImageDimensions(name, &original_w, &original_h))
+        {
+            // .pcx changes to a .jpg
+            const char * const hd_texture_name = GetHDTextureName(name, "jpg");
+
+            ColorRGBA32 * pic32;
+            int width, height;
+            if (JPGLoadFromFile(hd_texture_name, &pic32, &width, &height))
+            {
+                auto * new_tex = CreateTexture(pic32, m_registration_num, TextureType::kSkin, /*from_scrap =*/false, width, height, {}, {}, name);
+                new_tex->SetHDOverrideOriginalSize(original_w, original_h);
+                return new_tex;
+            }
+        }
+
+        // fallback to the low-res classic texture.
+    }
+
     TextureImage * tex = nullptr;
     Color8 * pic8;
     int width, height;
@@ -918,13 +985,38 @@ TextureImage * TextureStore::LoadTGAImpl(const char * const name, const TextureT
     }
 
     // TGAs are always expanded to RGBA, so no extra conversion is needed.
-    return CreateTexture(pic32, m_registration_num, tt, /*from_scrap =*/false, width, height, {0,0}, {0,0}, name);
+    return CreateTexture(pic32, m_registration_num, tt, /*from_scrap =*/false, width, height, {}, {}, name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 TextureImage * TextureStore::LoadWALImpl(const char * const name)
 {
+    if (Config::r_hd_textures.IsSet())
+    {
+        // First find the dimensions of the original low-res texture
+        int original_w, original_h;
+        if (GetWALImageDimensions(name, &original_w, &original_h))
+        {
+            // .wall changes to a .tga
+            const char * const hd_texture_name = GetHDTextureName(name, "tga");
+
+            // Load the override
+            ColorRGBA32 * pic32;
+            int width, height;
+            if (TGALoadFromFile(hd_texture_name, &pic32, &width, &height))
+            {
+                auto * new_tex = CreateTexture(pic32, m_registration_num, TextureType::kWall, /*from_scrap =*/false, width, height, {}, {}, name);
+
+                // Remember the original image size because the world surfaces require it to correctly compute UVs.
+                new_tex->SetHDOverrideOriginalSize(original_w, original_h);
+                return new_tex;
+            }
+        }
+
+        // fallback to the low-res classic texture.
+    }
+
     GameInterface::FS::ScopedFile file{ name };
     if (!file.IsLoaded())
     {
@@ -1026,7 +1118,7 @@ TextureImage * TextureStore::Common8BitTexSetup(const Color8 * const pic8, const
     UnPalettize8To32(width, height, pic8, sm_global_palette, pic32);
 
     // Pass ownership of the pixel data
-    return CreateTexture(pic32, m_registration_num, tt, /*from_scrap =*/false, width, height, {0,0}, {0,0}, name);
+    return CreateTexture(pic32, m_registration_num, tt, /*from_scrap =*/false, width, height, {}, {}, name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1454,10 +1546,10 @@ bool TGALoadFromFile(const char * const filename, ColorRGBA32 ** pic, int * widt
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// PNG loader using STBI
+// PNG/JPEG loaders using STBI
 ///////////////////////////////////////////////////////////////////////////////
 
-bool PNGLoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height)
+static inline bool Stb_LoadFromFileCommon(const char * filename, ColorRGBA32 ** pic, int * width, int * height)
 {
     *pic    = nullptr;
     *width  = 0;
@@ -1466,7 +1558,7 @@ bool PNGLoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int
     GameInterface::FS::ScopedFile file{ filename };
     if (!file.IsLoaded())
     {
-        GameInterface::Printf("Bad PNG file '%s'", filename);
+        GameInterface::Printf("Can't open image file '%s'", filename);
         return false;
     }
 
@@ -1485,6 +1577,20 @@ bool PNGLoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int
     stbi_image_free(img_data);
 
     return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool PNGLoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height)
+{
+    return Stb_LoadFromFileCommon(filename, pic, width, height);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool JPGLoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height)
+{
+    return Stb_LoadFromFileCommon(filename, pic, width, height);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -208,6 +208,7 @@ typedef struct refimport_s
     // NULL can be passed for buf to just determine existance
     int (*FS_LoadFile)(const char * name, void ** buf);
     void (*FS_FreeFile)(void * buf);
+    int (*FS_LoadFilePortion)(const char * path, void * dest_buffer, int num_bytes_to_read);
 
     void (*FS_CreatePath)(char * path);
 

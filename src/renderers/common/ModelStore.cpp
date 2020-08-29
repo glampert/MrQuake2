@@ -5,7 +5,6 @@
 
 #include "ModelStore.hpp"
 #include "TextureStore.hpp"
-#include <algorithm>
 
 // Quake includes
 #include "common/q_common.h"
@@ -26,19 +25,13 @@ void ModelStore::Init(TextureStore & tex_store)
     MRQ2_ASSERT(m_tex_store == nullptr);
     m_tex_store = &tex_store;
 
-    m_models_cache.reserve(kModelPoolSize);
-    MemTagsTrackAlloc(m_models_cache.capacity() * sizeof(ModelInstance *), MemTag::kWorldModel);
-
-    m_inline_models.reserve(kModelPoolSize);
-    MemTagsTrackAlloc(m_inline_models.capacity() * sizeof(ModelInstance *), MemTag::kWorldModel);
-
     // First page in the pool will contain the inlines.
     for (int m = 0; m < kModelPoolSize; ++m)
     {
         char name[128]; // Give default names to the inline models
-        std::snprintf(name, sizeof(name), "inline_model_%i", m);
+        sprintf_s(name, "inline_model_%i", m);
 
-        auto * mdl = CreateModel(name, ModelType::kBrush, /* reg_num = */0U, /* inline_mdl = */true);
+        auto * mdl = CreateModel(name, ModelType::kBrush, /* reg_num = */0u, /* inline_mdl = */true);
         m_inline_models.push_back(mdl);
     }
 
@@ -50,8 +43,8 @@ void ModelStore::Init(TextureStore & tex_store)
 void ModelStore::Shutdown()
 {
     DestroyAllLoadedModels();
-    m_models_cache.shrink_to_fit();
-    m_inline_models.shrink_to_fit();
+    m_models_cache.clear();
+    m_inline_models.clear();
     m_models_pool.Drain();
     m_registration_num = 0;
     m_tex_store = nullptr;
@@ -123,10 +116,7 @@ void ModelStore::EndRegistration()
         return false;
     };
 
-    // "erase_if"
-    auto first = m_models_cache.begin();
-    auto last  = m_models_cache.end();
-    m_models_cache.erase(std::remove_if(first, last, RemovePred), last);
+    m_models_cache.erase_if(RemovePred);
 
     GameInterface::Printf("Freed %i unused models.", num_removed);
 }
@@ -196,7 +186,7 @@ const ModelInstance * ModelStore::FindOrLoad(const char * const name, const Mode
 void ModelStore::LoadWorldModel(const char * const map_name)
 {
     char fullname[1024];
-    std::snprintf(fullname, sizeof(fullname), "maps/%s.bsp", map_name);
+    sprintf_s(fullname, "maps/%s.bsp", map_name);
 
     // Free the previous map if we are loading a new one:
     if ((m_world_model != nullptr) && (std::strcmp(m_world_model->name.CStr(), fullname) != 0))
@@ -208,7 +198,7 @@ void ModelStore::LoadWorldModel(const char * const map_name)
 
         auto erase_iter = std::find(m_models_cache.begin(), m_models_cache.end(), m_world_model);
         MRQ2_ASSERT(erase_iter != m_models_cache.end());
-        m_models_cache.erase(erase_iter);
+        m_models_cache.erase_swap(erase_iter);
 
         DestroyModel(m_world_model);
         m_world_model = nullptr;
@@ -231,8 +221,6 @@ ModelInstance * ModelStore::FindInlineModel(const char * const name)
     {
        GameInterface::Errorf("Bad inline model number or null world model (%i)", idx);
     }
-
-    MRQ2_ASSERT(std::size_t(idx) < m_inline_models.size());
     return m_inline_models[idx];
 }
 
@@ -270,7 +258,28 @@ ModelInstance * ModelStore::LoadNewModel(const char * const name)
         LoadSpriteModel(*m_tex_store, *new_model, file.data_ptr, file.length);
         break;
     case IDALIASHEADER :
-        LoadAliasMD2Model(*m_tex_store, *new_model, file.data_ptr, file.length);
+        if (Config::r_hd_skins.IsSet())
+        {
+            // If we have higher definition overrides for MD2 model skins also check if
+            // there is a replacement model for it in the equivalent mrq2/ directory.
+
+            char hd_mdl_name[512];
+            sprintf_s(hd_mdl_name, "mrq2/%s", name);
+
+            GameInterface::FS::ScopedFile hd_mdl_file{ hd_mdl_name };
+            if (hd_mdl_file.IsLoaded())
+            {
+                LoadAliasMD2Model(*m_tex_store, *new_model, hd_mdl_file.data_ptr, hd_mdl_file.length);
+            }
+            else
+            {
+                LoadAliasMD2Model(*m_tex_store, *new_model, file.data_ptr, file.length);
+            }
+        }
+        else
+        {
+            LoadAliasMD2Model(*m_tex_store, *new_model, file.data_ptr, file.length);
+        }
         break;
     } // switch
 

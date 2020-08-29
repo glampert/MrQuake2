@@ -478,6 +478,39 @@ int FS_LoadFile(const char * path, void ** buffer)
 
 /*
 =============
+FS_LoadFilePortion
+
+LAMPERT:
+Add option to read just a specified number of bytes from a file.
+dest_buffer size must be >= num_bytes_to_read.
+Returns true|false.
+=============
+*/
+int FS_LoadFilePortion(const char * path, void * dest_buffer, int num_bytes_to_read)
+{
+    FILE * fp;
+    int file_len;
+
+    file_len = FS_FOpenFile(path, &fp);
+    if (fp == NULL)
+    {
+        return false;
+    }
+
+    if (file_len < num_bytes_to_read)
+    {
+        fclose(fp);
+        return false; // File is smaller than requested read size!
+    }
+
+    FS_Read(dest_buffer, num_bytes_to_read, fp);
+    fclose(fp);
+
+    return true;
+}
+
+/*
+=============
 FS_FreeFile
 =============
 */

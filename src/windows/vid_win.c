@@ -210,6 +210,7 @@ static void VID_LoadRendererDLL(const char * dll_name)
     ri.Cmd_Argv           = Cmd_Argv;
     ri.FS_LoadFile        = FS_LoadFile;
     ri.FS_FreeFile        = FS_FreeFile;
+    ri.FS_LoadFilePortion = FS_LoadFilePortion;
     ri.FS_CreatePath      = FS_CreatePath;
     ri.FS_Gamedir         = FS_Gamedir;
     ri.Cvar_Get           = Cvar_Get;

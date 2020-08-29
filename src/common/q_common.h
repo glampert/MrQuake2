@@ -676,15 +676,17 @@ char * FS_NextPath(char * prevpath);
 void FS_ExecAutoexec(void);
 
 int FS_FOpenFile(const char * filename, FILE ** file);
-void FS_FCloseFile(FILE * f);
-// note: this can't be called from another DLL, due to MS libc issues
+void FS_FCloseFile(FILE * f); // note: this can't be called from another DLL, due to MS libc issues
 
-int FS_LoadFile(const char * path, void ** buffer);
 // a null buffer will just return the file length without loading
 // a -1 length is not present
+int FS_LoadFile(const char * path, void ** buffer);
 
-void FS_Read(void * buffer, int len, FILE * f);
+// read specified number of bytes
+int FS_LoadFilePortion(const char * path, void * dest_buffer, int num_bytes_to_read);
+
 // properly handles partial reads
+void FS_Read(void * buffer, int len, FILE * f);
 
 void FS_FreeFile(void * buffer);
 void FS_CreatePath(char * path);

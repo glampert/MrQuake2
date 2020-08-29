@@ -220,13 +220,21 @@ static void BuildLightmap(std::uint8_t * dest, const int stride,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void SetSurfaceCachedLightingInfo(ModelSurface * surf, const lightstyle_t * lightstyles)
+static inline void SetSurfaceCachedLightingInfo(ModelSurface * surf, const lightstyle_t * lightstyles)
 {
     for (int lmap = 0; lmap < kMaxLightmaps && surf->styles[lmap] != 255; ++lmap)
     {
         MRQ2_ASSERT(surf->styles[lmap] < MAX_LIGHTSTYLES);
         surf->cached_light[lmap] = lightstyles[surf->styles[lmap]].white;
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+static inline void ClearTexture(LmImageBuffer * buff)
+{
+    // Clear to white
+    std::memset(buff, 0xFF, sizeof(LmImageBuffer));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -397,6 +405,9 @@ void LightmapManager::BeginBuildLightmaps()
     sm_static_lightmap_buffers[0]  = sm_lightmap_buffer_pool.Allocate();
     sm_dynamic_lightmap_buffers[0] = sm_lightmap_buffer_pool.Allocate();
 
+    ClearTexture(sm_static_lightmap_buffers[0]);
+    ClearTexture(sm_dynamic_lightmap_buffers[0]);
+
     ResetBlocks();
 }
 
@@ -493,6 +504,9 @@ void LightmapManager::NextLightmapTexture(const bool new_buffers)
     {
         sm_static_lightmap_buffers[sm_lightmap_count]  = sm_lightmap_buffer_pool.Allocate();
         sm_dynamic_lightmap_buffers[sm_lightmap_count] = sm_lightmap_buffer_pool.Allocate();
+
+        ClearTexture(sm_static_lightmap_buffers[sm_lightmap_count]);
+        ClearTexture(sm_dynamic_lightmap_buffers[sm_lightmap_count]);
     }
 }
 

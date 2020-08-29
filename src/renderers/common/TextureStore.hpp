@@ -6,8 +6,8 @@
 
 #include "Common.hpp"
 #include "Pool.hpp"
+#include "Array.hpp"
 #include "RenderInterface.hpp"
-#include <vector>
 
 namespace MrQ2
 {
@@ -67,7 +67,7 @@ public:
     {
         m_texture.Shutdown();
 
-        // Memory is owned by the TextureImage unless it is using the scrap atlas.
+        // Memory is owned by the TextureImage unless it is using the scrap atlas (or a lightmap atlas).
         if (!m_is_scrap_image)
         {
             if (m_mip_levels.base_pixels != nullptr)
@@ -88,8 +88,8 @@ public:
 
     // Scrap atlas
     bool IsScrapImage() const { return m_is_scrap_image; }
-    Vec2u16 ScrapUV0()  const { return m_scrap_uv0; }
-    Vec2u16 ScrapUV1()  const { return m_scrap_uv1; }
+    Vec2u16 ScrapUV0()  const { return m_scrap_coords.uv0; }
+    Vec2u16 ScrapUV1()  const { return m_scrap_coords.uv1; }
 
     // Draw by texture linked list used by the world renderer
     void SetDrawChainPtr(const ModelSurface * p) const { m_draw_chain = p; }
@@ -137,6 +137,58 @@ public:
         return m_mip_levels.dimensions[mip_level].y;
     }
 
+    int OriginalWidth() const
+    {
+        MRQ2_ASSERT(!m_is_scrap_image);
+        return m_original_dimensions.x;
+    }
+
+    int OriginalHeight() const
+    {
+        MRQ2_ASSERT(!m_is_scrap_image);
+        return m_original_dimensions.y;
+    }
+
+private:
+
+    // Initialize with a single mipmap level (level 0)
+    TextureImage(const ColorRGBA32 * const mip0_pixels, const uint32_t registration_number, const TextureType type, const bool scrap,
+                 const uint32_t mip0_width, const uint32_t mip0_height, const Vec2u16 scrap_uv0, const Vec2u16 scrap_uv1, const char * const tex_name)
+        : m_name{ tex_name }
+        , m_reg_num{ registration_number }
+        , m_type{ type }
+        , m_is_scrap_image{ scrap }
+    {
+        MRQ2_ASSERT(mip0_width  <= UINT16_MAX);
+        MRQ2_ASSERT(mip0_height <= UINT16_MAX);
+
+        m_mip_levels.num_levels      = 1;
+        m_mip_levels.base_memory     = (mip0_width * mip0_height * kBytesPerPixel);
+        m_mip_levels.base_pixels     = reinterpret_cast<const uint8_t *>(mip0_pixels); // NOTE: Takes ownership of the memory
+        m_mip_levels.dimensions[0].x = static_cast<uint16_t>(mip0_width);
+        m_mip_levels.dimensions[0].y = static_cast<uint16_t>(mip0_height);
+
+        if (m_is_scrap_image)
+        {
+            m_scrap_coords.uv0 = scrap_uv0;
+            m_scrap_coords.uv1 = scrap_uv1;
+        }
+        else
+        {
+            m_scrap_coords = {};
+            m_original_dimensions.x = static_cast<uint16_t>(mip0_width);
+            m_original_dimensions.y = static_cast<uint16_t>(mip0_height);
+        }
+    }
+
+    void SetHDOverrideOriginalSize(const uint32_t original_w, const uint32_t original_h)
+    {
+        MRQ2_ASSERT(!m_is_scrap_image);
+        m_is_hd_override = true;
+        m_original_dimensions.x = static_cast<uint16_t>(original_w);
+        m_original_dimensions.y = static_cast<uint16_t>(original_h);
+    }
+
     void GenerateMipMaps();
 
 private:
@@ -152,35 +204,24 @@ private:
         uint32_t        offsets_to_mip_pixels[kMaxMipLevels];
     };
 
-    const PathName               m_name;                  // Texture filename/unique id (must be the first field - game code assumes this).
-    MipLevels                    m_mip_levels{};          // Dimensions and offsets for each mipmap level. Always at least one.
-    mutable const ModelSurface * m_draw_chain{ nullptr }; // For sort-by-texture world drawing.
-    uint32_t                     m_reg_num{ 0 };          // Registration number, so we know if currently referenced by the level being played.
-    const TextureType            m_type;                  // Types of textures used by Quake.
-    const bool                   m_is_scrap_image;        // True if allocated from the scrap atlas.
-    const Vec2u16                m_scrap_uv0;             // Offsets into the scrap if this is allocate from the scrap, zero otherwise.
-    const Vec2u16                m_scrap_uv1;             // If not zero, this is a scrap image. In such case, use these instead of width & height.
-    Texture                      m_texture;               // Back-end renderer texture object.
-
-    // Initialize with a single mipmap level (level 0)
-    TextureImage(const ColorRGBA32 * const mip0_pixels, const uint32_t registration_number, const TextureType type, const bool scrap,
-                 const uint32_t mip0_width, const uint32_t mip0_height, const Vec2u16 scrap_uv0, const Vec2u16 scrap_uv1, const char * const tex_name)
-        : m_name{ tex_name }
-        , m_reg_num{ registration_number }
-        , m_type{ type }
-        , m_is_scrap_image{ scrap }
-        , m_scrap_uv0{ scrap_uv0 }
-        , m_scrap_uv1{ scrap_uv1 }
+    struct ScrapCoords
     {
-        MRQ2_ASSERT(mip0_width  <= UINT16_MAX);
-        MRQ2_ASSERT(mip0_height <= UINT16_MAX);
+        Vec2u16 uv0;
+        Vec2u16 uv1;
+    };
 
-        m_mip_levels.num_levels      = 1;
-        m_mip_levels.base_memory     = (mip0_width * mip0_height * kBytesPerPixel);
-        m_mip_levels.base_pixels     = reinterpret_cast<const uint8_t *>(mip0_pixels); // NOTE: Takes ownership of the memory
-        m_mip_levels.dimensions[0].x = static_cast<uint16_t>(mip0_width);
-        m_mip_levels.dimensions[0].y = static_cast<uint16_t>(mip0_height);
-    }
+    const PathName               m_name;                    // Texture filename/unique id (must be the first field - game code assumes this).
+    MipLevels                    m_mip_levels{};            // Dimensions and offsets for each mipmap level. Always at least one.
+    mutable const ModelSurface * m_draw_chain{ nullptr };   // For sort-by-texture world drawing.
+    uint32_t                     m_reg_num{ 0 };            // Registration number, so we know if currently referenced by the level being played.
+    const TextureType            m_type;                    // Types of textures used by Quake.
+    const bool                   m_is_scrap_image;          // True if allocated from the scrap atlas.
+    bool                         m_is_hd_override{ false }; // True if this texture was replaced by a higher quality override (m_original_dimensions contain the size of the original low-res image).
+    union {
+        Vec2u16                  m_original_dimensions;     // If not a scrap image reuse this to store the original mip0 width/height in case this image is an HD replacement.
+        ScrapCoords              m_scrap_coords;            // Offsets into the scrap if this is allocate from the scrap, zero otherwise.
+    };
+    Texture                      m_texture;                 // Back-end renderer low-level texture object.
 };
 
 /*
@@ -315,22 +356,23 @@ private:
         constexpr static int Size() { return kScrapSize; }
     };
 
+    const RenderDevice * m_device{ nullptr };
+
     // Scrap texture atlas to group small textures
     ScrapAtlas m_scrap;
     bool m_scrap_dirty{ false };
 
     // Loaded textures cache
     std::uint32_t m_registration_num{ 0 };
-    std::vector<TextureImage *> m_teximages_cache;
     Pool<TextureImage, kTexturePoolSize> m_teximages_pool{ MemTag::kTextures };
-
-    const RenderDevice * m_device{ nullptr };
+    FixedSizeArray<TextureImage *, kTexturePoolSize> m_teximages_cache;
 };
 
 // ============================================================================
 
 bool TGALoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height);
 bool PNGLoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height);
+bool JPGLoadFromFile(const char * filename, ColorRGBA32 ** pic, int * width, int * height);
 bool PCXLoadFromFile(const char * filename, Color8 ** pic, int * width, int * height, ColorRGBA32 * palette);
 
 bool TGASaveToFile(const char * filename, int width, int height, const ColorRGBA32 * pixels);
