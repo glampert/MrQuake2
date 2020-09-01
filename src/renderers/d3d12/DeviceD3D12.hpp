@@ -12,6 +12,7 @@ namespace MrQ2
 class DescriptorHeapD3D12;
 class UploadContextD3D12;
 class GraphicsContextD3D12;
+class SwapChainD3D12;
 
 class DeviceD3D12 final
 {
@@ -22,6 +23,7 @@ public:
     D12ComPtr<IDXGIAdapter3> adapter;
     D12ComPtr<ID3D12Device5> device;
 
+    SwapChainD3D12       * swap_chain{ nullptr };
     DescriptorHeapD3D12  * descriptor_heap{ nullptr };
     UploadContextD3D12   * upload_ctx{ nullptr };
     GraphicsContextD3D12 * graphics_ctx{ nullptr };
@@ -40,7 +42,7 @@ public:
     DeviceD3D12(const DeviceD3D12 &) = delete;
     DeviceD3D12 & operator=(const DeviceD3D12 &) = delete;
 
-    void Init(const bool debug, DescriptorHeapD3D12 & desc_heap, UploadContextD3D12 & up_ctx, GraphicsContextD3D12 & gfx_ctx);
+    void Init(const bool debug, DescriptorHeapD3D12 & desc_heap, UploadContextD3D12 & up_ctx, GraphicsContextD3D12 & gfx_ctx, SwapChainD3D12 & sc);
     void Shutdown();
 
     // Public to renderers/common

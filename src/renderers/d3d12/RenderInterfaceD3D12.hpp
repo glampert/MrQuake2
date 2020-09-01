@@ -38,7 +38,7 @@ public:
 
     int RenderWidth() const;
     int RenderHeight() const;
-    bool IsFrameStarted() const;
+    static bool IsFrameStarted();
     const DeviceD3D12 & Device() const;
 
 private:
@@ -50,7 +50,7 @@ private:
     DescriptorHeapD3D12         m_descriptor_heap;
     UploadContextD3D12          m_upload_ctx;
     GraphicsContextD3D12        m_graphics_ctx;
-    bool                        m_frame_started{ false };
+    static bool                 sm_frame_started;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -65,9 +65,9 @@ inline int RenderInterfaceD3D12::RenderHeight() const
     return m_render_targets.render_target_height;
 }
 
-inline bool RenderInterfaceD3D12::IsFrameStarted() const
+inline bool RenderInterfaceD3D12::IsFrameStarted()
 {
-    return m_frame_started;
+    return sm_frame_started;
 }
 
 inline const DeviceD3D12 & RenderInterfaceD3D12::Device() const

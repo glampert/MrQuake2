@@ -36,9 +36,26 @@ public:
     void Init(const DeviceD3D12 & device);
     void Shutdown();
 
-    void UploadTextureImmediate(const TextureUploadD3D12 & upload_info);
+    void UploadTexture(const TextureUploadD3D12 & upload_info);
+
+    // D3D12 internal
+    void CreateTexture(const TextureUploadD3D12 & upload_info);
+    void FlushTextureCreates();
+    void UpdateCompletedUploads();
 
 private:
+
+    struct UploadEntry
+    {
+        ID3D12Resource * upload_buffer;
+        ID3D12Fence *    cmd_list_executed_fence;
+        uint64_t         cmd_list_executed_value;
+    };
+
+    struct CreateEntry
+    {
+        ID3D12Resource * upload_buffer;
+    };
 
     D12ComPtr<ID3D12Fence>               m_fence;
     D12ComPtr<ID3D12CommandQueue>        m_command_queue;
@@ -47,6 +64,9 @@ private:
     HANDLE                               m_fence_event{ nullptr };
     uint64_t                             m_next_fence_value{ 1 };
     const DeviceD3D12 *                  m_device{ nullptr };
+    uint32_t                             m_num_uploads{ 0 };
+    UploadEntry                          m_uploads[8] = {};
+    FixedSizeArray<CreateEntry, 512>     m_creates;
 };
 
 } // MrQ2

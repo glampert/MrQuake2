@@ -7,7 +7,7 @@
 namespace MrQ2
 {
 
-void DeviceD3D12::Init(const bool debug, DescriptorHeapD3D12 & desc_heap, UploadContextD3D12 & up_ctx, GraphicsContextD3D12 & gfx_ctx)
+void DeviceD3D12::Init(const bool debug, DescriptorHeapD3D12 & desc_heap, UploadContextD3D12 & up_ctx, GraphicsContextD3D12 & gfx_ctx, SwapChainD3D12 & sc)
 {
     debug_validation = debug;
     uint32_t dxgi_factory_flags = 0;
@@ -109,6 +109,7 @@ void DeviceD3D12::Init(const bool debug, DescriptorHeapD3D12 & desc_heap, Upload
         GameInterface::Printf("D3D12 adapter and device created successfully.");
     }
 
+    swap_chain      = &sc;
     descriptor_heap = &desc_heap;
     upload_ctx      = &up_ctx;
     graphics_ctx    = &gfx_ctx;

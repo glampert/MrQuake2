@@ -74,17 +74,20 @@ void SwapChainD3D12::Shutdown()
     // Make sure all rendering operations are synchronized at this point before we can release the D3D resources.
     FullGpuSynch();
 
-    if (fence_event != nullptr)
+    if (frame_fence_event != nullptr)
     {
-        CloseHandle(fence_event);
+        CloseHandle(frame_fence_event);
     }
 
-    fence         = nullptr;
+    frame_fence   = nullptr;
     command_queue = nullptr;
     command_list  = nullptr;
 
     for (auto & alloc : command_allocators)
         alloc = nullptr;
+
+    for (auto & f : cmd_list_executed_fences)
+        f = nullptr;
 
     swap_chain = nullptr;
 }
@@ -152,22 +155,25 @@ void SwapChainD3D12::MoveToNextFrame()
 {
     // Schedule a Signal command in the queue
     MRQ2_ASSERT(frame_index < kD12NumFrameBuffers);
-    const uint64_t currentFenceValue = fence_values[frame_index];
-    command_queue->Signal(fence.Get(), currentFenceValue);
+    const uint64_t current_fence_value = frame_fence_values[frame_index];
+    command_queue->Signal(frame_fence.Get(), current_fence_value);
+
+    // Fences checked by the UploadContext
+    command_queue->Signal(cmd_list_executed_fences[frame_index].Get(), frame_count);
 
     // Update frame index
     frame_count++;
     frame_index = frame_count % kD12NumFrameBuffers;
 
     // If the next frame is not ready to be rendered yet, wait until it is
-    if (fence->GetCompletedValue() < fence_values[frame_index])
+    if (frame_fence->GetCompletedValue() < frame_fence_values[frame_index])
     {
-        fence->SetEventOnCompletion(fence_values[frame_index], fence_event);
-        WaitForSingleObjectEx(fence_event, INFINITE, FALSE);
+        frame_fence->SetEventOnCompletion(frame_fence_values[frame_index], frame_fence_event);
+        WaitForSingleObjectEx(frame_fence_event, INFINITE, FALSE);
     }
 
     // Set the fence value for next frame
-    fence_values[frame_index] = currentFenceValue + 1;
+    frame_fence_values[frame_index] = current_fence_value + 1;
 }
 
 void SwapChainD3D12::FullGpuSynch()
@@ -188,20 +194,26 @@ SwapChainD3D12::Backbuffer SwapChainD3D12::CurrentBackbuffer(const SwapChainRend
 
 void SwapChainD3D12::InitSyncFence(const DeviceD3D12 & device)
 {
-    if (FAILED(device.device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))))
+    if (FAILED(device.device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&frame_fence))))
     {
         GameInterface::Errorf("Failed to create SwapChain fence.");
     }
 
-    fence_values[frame_index]++;
+    frame_fence_values[frame_index]++;
 
-    fence_event = CreateEventEx(nullptr, "SwapChainFence", FALSE, EVENT_ALL_ACCESS);
-    if (fence_event == nullptr)
+    frame_fence_event = CreateEventEx(nullptr, "SwapChainFence", FALSE, EVENT_ALL_ACCESS);
+    if (frame_fence_event == nullptr)
     {
         GameInterface::Errorf("Failed to create SwapChain fence event.");
     }
 
     GameInterface::Printf("SwapChain frame sync fence created.");
+
+    // Fences for UploadContext synchronization
+    for (auto & f : cmd_list_executed_fences)
+    {
+        D12CHECK(device.device->CreateFence(~uint64_t(0), D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&f)));
+    }
 }
 
 void SwapChainD3D12::InitCmdList(const DeviceD3D12 & device)

@@ -33,7 +33,10 @@ private:
     DescriptorD3D12           m_sampler_descriptor{};
     const DeviceD3D12 *       m_device{ nullptr };
     bool                      m_shared_descriptors{ false };
-    wchar_t                   m_debug_name[64] = {};
+
+#ifndef NDEBUG
+    wchar_t m_debug_name[64] = {};
+#endif // NDEBUG
 
     static D3D12_FILTER FilterForTextureType(const TextureType type);
 };

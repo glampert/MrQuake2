@@ -21,7 +21,7 @@ void UploadContextD3D11::Shutdown()
     m_device = nullptr;
 }
 
-void UploadContextD3D11::UploadTextureImmediate(const TextureUploadD3D11 & upload_info)
+void UploadContextD3D11::UploadTexture(const TextureUploadD3D11 & upload_info)
 {
     MRQ2_ASSERT(m_device != nullptr);
     MRQ2_ASSERT(upload_info.texture->m_resource != nullptr);

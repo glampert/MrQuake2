@@ -3,9 +3,8 @@
 //
 
 #include "../common/TextureStore.hpp"
-#include "UploadContextD3D12.hpp"
-#include "TextureD3D12.hpp"
-#include "DeviceD3D12.hpp"
+#include "../common/OptickProfiler.hpp"
+#include "RenderInterfaceD3D12.hpp"
 
 namespace MrQ2
 {
@@ -31,7 +30,9 @@ void UploadContextD3D12::Init(const DeviceD3D12 & device)
     D12CHECK(device.device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&m_command_queue)));
     D12CHECK(device.device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_command_allocator)));
     D12CHECK(device.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator.Get(), nullptr, IID_PPV_ARGS(&m_command_list)));
+
     D12CHECK(m_command_list->Close());
+    D12CHECK(m_command_list->Reset(m_command_allocator.Get(), nullptr));
 
     D12SetDebugName(m_command_queue, L"UploadContextCmdQueue");
     D12SetDebugName(m_command_list,  L"UploadContextCmdList");
@@ -189,18 +190,19 @@ static uint64_t GetRequiredIntermediateSize(ID3D12Device * pDevice,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// CreateUploadBuffer()
+//  Allocates an upload buffer and adds the ResourceBarrier/CopyTextureRegion
+//  commands to the specified command list.
+///////////////////////////////////////////////////////////////////////////////
 
-void UploadContextD3D12::UploadTextureImmediate(const TextureUploadD3D12 & upload_info)
+static ID3D12Resource * CreateUploadBuffer(const TextureUploadD3D12 & upload_info, ID3D12Resource * tex_resource, ID3D12Device * device, ID3D12GraphicsCommandList * command_list)
 {
-    MRQ2_ASSERT(m_device != nullptr);
-    MRQ2_ASSERT(upload_info.texture->m_resource != nullptr);
     MRQ2_ASSERT(upload_info.mipmaps.mip_dimensions[0].x != 0);
     MRQ2_ASSERT(upload_info.mipmaps.mip_init_data[0] != nullptr);
     MRQ2_ASSERT(upload_info.mipmaps.num_mip_levels >= 1 && upload_info.mipmaps.num_mip_levels <= TextureImage::kMaxMipLevels);
 
-    auto * tex_resource = upload_info.texture->m_resource.Get();
-    const uint32_t num_mip_levels = upload_info.mipmaps.num_mip_levels;
-    const uint64_t destination_size = GetRequiredIntermediateSize(m_device->device.Get(), tex_resource, 0, num_mip_levels);
+    const uint32_t num_mip_levels    = upload_info.mipmaps.num_mip_levels;
+    const uint64_t destination_size  = GetRequiredIntermediateSize(device, tex_resource, 0, num_mip_levels);
 
     D3D12_RESOURCE_DESC res_desc     = {};
     res_desc.Dimension               = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -220,11 +222,9 @@ void UploadContextD3D12::UploadTextureImmediate(const TextureUploadD3D12 & uploa
     heap_props.CPUPageProperty       = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
     heap_props.MemoryPoolPreference  = D3D12_MEMORY_POOL_UNKNOWN;
 
-    D12ComPtr<ID3D12Resource> upload_buffer;
-    D12CHECK(m_device->device->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload_buffer)));
+    ID3D12Resource * upload_buffer = nullptr;
+    D12CHECK(device->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload_buffer)));
     D12SetDebugName(upload_buffer, L"TextureUploadBuffer");
-
-    D12CHECK(m_command_list->Reset(m_command_allocator.Get(), nullptr));
 
     D3D12_SUBRESOURCE_DATA sub_res_data[TextureImage::kMaxMipLevels] = {};
     for (uint32_t mip = 0; mip < num_mip_levels; ++mip)
@@ -244,10 +244,10 @@ void UploadContextD3D12::UploadTextureImmediate(const TextureUploadD3D12 & uploa
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
-        m_command_list->ResourceBarrier(1, &barrier);
+        command_list->ResourceBarrier(1, &barrier);
     }
 
-    UpdateSubresources<TextureImage::kMaxMipLevels>(m_device->device.Get(), m_command_list.Get(), tex_resource, upload_buffer.Get(), destination_size, 0, num_mip_levels, sub_res_data);
+    UpdateSubresources<TextureImage::kMaxMipLevels>(device, command_list, tex_resource, upload_buffer, destination_size, 0, num_mip_levels, sub_res_data);
 
     // Transition back to PIXEL_SHADER_RESOURCE.
     {
@@ -258,13 +258,83 @@ void UploadContextD3D12::UploadTextureImmediate(const TextureUploadD3D12 & uploa
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
         barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        m_command_list->ResourceBarrier(1, &barrier);
+        command_list->ResourceBarrier(1, &barrier);
     }
+
+    return upload_buffer;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void UploadContextD3D12::UploadTexture(const TextureUploadD3D12 & upload_info)
+{
+    OPTICK_EVENT();
+
+    MRQ2_ASSERT(m_device != nullptr);
+    MRQ2_ASSERT(upload_info.texture != nullptr);
+    MRQ2_ASSERT(upload_info.texture->m_resource != nullptr);
+    MRQ2_ASSERT(RenderInterfaceD3D12::IsFrameStarted()); // Must happen between a Begin/EndFrame
+
+    if (m_num_uploads == ArrayLength(m_uploads))
+    {
+        GameInterface::Errorf("Max number of pending D3D12 texture uploads reached!");
+    }
+
+    // Find a free entry
+    UploadEntry * free_entry = nullptr;
+    for (UploadEntry & entry : m_uploads)
+    {
+        if (entry.upload_buffer == nullptr)
+        {
+            free_entry = &entry;
+            break;
+        }
+    }
+
+    MRQ2_ASSERT(free_entry != nullptr);
+    ++m_num_uploads;
+
+    auto * swap_chain = m_device->swap_chain;
+    auto * gfx_command_list = swap_chain->command_list.Get();
+
+    free_entry->upload_buffer = CreateUploadBuffer(upload_info, upload_info.texture->m_resource.Get(), m_device->device.Get(), gfx_command_list);
+
+    free_entry->cmd_list_executed_fence = swap_chain->CurrentCmdListExecutedFence();
+    free_entry->cmd_list_executed_value = swap_chain->CurrentCmdListExecutedFenceValue();
+}
+
+void UploadContextD3D12::CreateTexture(const TextureUploadD3D12 & upload_info)
+{
+    OPTICK_EVENT();
+
+    MRQ2_ASSERT(m_device != nullptr);
+    MRQ2_ASSERT(upload_info.texture != nullptr);
+    MRQ2_ASSERT(upload_info.texture->m_resource != nullptr);
+    // NOTE: Not required to happen between Begin/EndFrame
+
+    if (m_creates.size() == m_creates.capacity())
+    {
+        // Flush any queued texture creates to make room
+        FlushTextureCreates();
+    }
+
+    ID3D12Resource * upload_buffer = CreateUploadBuffer(upload_info, upload_info.texture->m_resource.Get(), m_device->device.Get(), m_command_list.Get());
+    m_creates.push_back({ upload_buffer });
+}
+
+void UploadContextD3D12::FlushTextureCreates()
+{
+    if (m_creates.empty())
+    {
+        return;
+    }
+
+    OPTICK_EVENT();
 
     D12CHECK(m_command_list->Close());
 
-    ID3D12CommandList * cmd_lists[] = { m_command_list.Get() };
-    m_command_queue->ExecuteCommandLists(1, cmd_lists);
+    ID3D12CommandList * cmd_lists_to_execute[] = { m_command_list.Get() };
+    m_command_queue->ExecuteCommandLists(1, cmd_lists_to_execute);
 
     D12CHECK(m_command_queue->Signal(m_fence.Get(), m_next_fence_value));
     D12CHECK(m_fence->SetEventOnCompletion(m_next_fence_value, m_fence_event));
@@ -274,7 +344,48 @@ void UploadContextD3D12::UploadTextureImmediate(const TextureUploadD3D12 & uploa
         GameInterface::Errorf("WaitForSingleObjectEx failed! Error: %u", ::GetLastError());
     }
 
+    D12CHECK(m_command_list->Reset(m_command_allocator.Get(), nullptr));
     ++m_next_fence_value;
+
+    // We have synced the queue, all pending upload_buffers can now be freed
+    for (CreateEntry & entry : m_creates)
+    {
+        MRQ2_ASSERT(entry.upload_buffer != nullptr);
+        entry.upload_buffer->Release();
+        entry = {};
+    }
+
+    m_creates.clear();
+}
+
+void UploadContextD3D12::UpdateCompletedUploads()
+{
+    if (m_num_uploads == 0)
+    {
+        return;
+    }
+
+    OPTICK_EVENT();
+
+    // Garbage collect upload_buffers from completed uploads of previous frames
+    for (UploadEntry & entry : m_uploads)
+    {
+        if (entry.upload_buffer != nullptr)
+        {
+            if (entry.cmd_list_executed_fence->GetCompletedValue() == entry.cmd_list_executed_value)
+            {
+                entry.upload_buffer->Release();
+                entry = {};
+
+                --m_num_uploads;
+                MRQ2_ASSERT(m_num_uploads >= 0);
+                if (m_num_uploads == 0)
+                {
+                    break; // Freed all.
+                }
+            }
+        }
+    }
 }
 
 } // MrQ2

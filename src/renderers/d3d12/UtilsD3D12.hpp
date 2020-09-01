@@ -27,12 +27,6 @@ enum class PrimitiveTopologyD3D12 : uint8_t
     kCount
 };
 
-inline uint32_t D12Align(const uint32_t alignment, const uint32_t value)
-{
-    const uint32_t a = alignment - 1u;
-    return (value + a) & ~a;
-}
-
 template<typename D3D12ClassPtr>
 inline void D12SetDebugName(D3D12ClassPtr & obj_ptr, const wchar_t * const str)
 {

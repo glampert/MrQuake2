@@ -349,7 +349,7 @@ void TextureStore::UploadScrapIfNeeded()
         upload_info.mipmaps.num_mip_levels = num_mip_levels;
         upload_info.mipmaps.mip_init_data  = mip_init_data;
         upload_info.mipmaps.mip_dimensions = mip_dimensions;
-        m_device->UploadContext().UploadTextureImmediate(upload_info);
+        m_device->UploadContext().UploadTexture(upload_info);
 
         m_scrap_dirty = false;
     }

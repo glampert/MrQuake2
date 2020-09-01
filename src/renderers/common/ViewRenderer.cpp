@@ -482,10 +482,10 @@ void ViewRenderer::DoRenderView(FrameData & frame_data)
 
     FlushImmediateModeDrawCmds(frame_data);
 
+    SetLightLevel(frame_data);
+
     // Update dynamic lightmaps.
     LightmapManager::Update();
-
-    SetLightLevel(frame_data);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

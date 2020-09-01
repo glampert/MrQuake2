@@ -9,6 +9,8 @@
 namespace MrQ2
 {
 
+bool RenderInterfaceD3D12::sm_frame_started{ false };
+
 void RenderInterfaceD3D12::Init(HINSTANCE hInst, WNDPROC wndProc, const int width, const int height, const bool fullscreen, const bool debug)
 {
     GameInterface::Printf("**** RenderInterfaceD3D12::Init ****");
@@ -16,7 +18,7 @@ void RenderInterfaceD3D12::Init(HINSTANCE hInst, WNDPROC wndProc, const int widt
     // Window, device and swap-chain setup:
     const auto window_name = debug ? "MrQuake2 (D3D12 Debug)" : "MrQuake2 (D3D12)";
     m_window.Init(window_name, hInst, wndProc, width, height, fullscreen);
-    m_device.Init(debug, m_descriptor_heap, m_upload_ctx, m_graphics_ctx);
+    m_device.Init(debug, m_descriptor_heap, m_upload_ctx, m_graphics_ctx, m_swap_chain);
     m_swap_chain.Init(m_device, m_window.WindowHandle(), fullscreen, width, height);
 
     // Global renderer states setup:
@@ -55,8 +57,11 @@ void RenderInterfaceD3D12::Shutdown()
 
 void RenderInterfaceD3D12::BeginFrame(const float clear_color[4], const float clear_depth, const uint8_t clear_stencil)
 {
-    MRQ2_ASSERT(!m_frame_started);
-    m_frame_started = true;
+    MRQ2_ASSERT(!sm_frame_started);
+    sm_frame_started = true;
+
+    // Flush any textures created by the last level load.
+    m_upload_ctx.FlushTextureCreates();
 
     m_swap_chain.BeginFrame(m_render_targets);
     m_graphics_ctx.BeginFrame(clear_color, clear_depth, clear_stencil);
@@ -66,8 +71,14 @@ void RenderInterfaceD3D12::BeginFrame(const float clear_color[4], const float cl
 
 void RenderInterfaceD3D12::EndFrame()
 {
-    MRQ2_ASSERT(m_frame_started);
-    m_frame_started = false;
+    MRQ2_ASSERT(sm_frame_started);
+    sm_frame_started = false;
+
+    // Flush any textures created within this frame.
+    m_upload_ctx.FlushTextureCreates();
+
+    // Finish any texture uploads that were submitted this fame.
+    m_upload_ctx.UpdateCompletedUploads();
 
     m_graphics_ctx.EndFrame();
     m_swap_chain.EndFrame(m_render_targets);

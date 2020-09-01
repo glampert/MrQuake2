@@ -45,10 +45,12 @@ void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, cons
 
     D12CHECK(device.device->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource)));
 
+#ifndef NDEBUG
     size_t num_converted = 0;
     mbstowcs_s(&num_converted, m_debug_name, debug_name, ArrayLength(m_debug_name));
     MRQ2_ASSERT(num_converted != 0);
     D12SetDebugName(m_resource, m_debug_name);
+#endif // NDEBUG
 
     // Upload texture pixels:
     TextureUploadD3D12 upload_info{};
@@ -58,7 +60,7 @@ void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, cons
     upload_info.mipmaps.num_mip_levels = num_mip_levels;
     upload_info.mipmaps.mip_init_data  = mip_init_data;
     upload_info.mipmaps.mip_dimensions = mip_dimensions;
-    device.UploadContext().UploadTextureImmediate(upload_info);
+    device.UploadContext().CreateTexture(upload_info);
 
     // Create texture view:
     D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
@@ -105,7 +107,9 @@ void TextureD3D12::Init(const TextureD3D12 & other)
     m_device             = other.m_device;
     m_shared_descriptors = true;
 
+#ifndef NDEBUG
     wcscpy_s(m_debug_name, other.m_debug_name);
+#endif // NDEBUG
 }
 
 void TextureD3D12::Shutdown()

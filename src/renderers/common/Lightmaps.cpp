@@ -298,7 +298,7 @@ void LightmapManager::Update()
         upload_info.mipmaps.num_mip_levels = 1;
         upload_info.mipmaps.mip_init_data  = pixels;
         upload_info.mipmaps.mip_dimensions = &dimensions;
-        sm_tex_store->Device().UploadContext().UploadTextureImmediate(upload_info);
+        sm_tex_store->Device().UploadContext().UploadTexture(upload_info);
     };
 
     sm_dynamic_lightmap_updates = 0;

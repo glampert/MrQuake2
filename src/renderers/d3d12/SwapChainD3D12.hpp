@@ -15,15 +15,16 @@ class SwapChainD3D12 final
 {
 public:
 
-    HANDLE                               fence_event{ nullptr };
-    uint64_t                             fence_values[kD12NumFrameBuffers] = {};
+    HANDLE                               frame_fence_event{ nullptr };
+    uint64_t                             frame_fence_values[kD12NumFrameBuffers] = {};
     uint64_t                             frame_count{ 0 };
     uint32_t                             frame_index{ 0 };
     int32_t                              back_buffer_index{ -1 };
-    D12ComPtr<ID3D12Fence>               fence;
+    D12ComPtr<ID3D12Fence>               frame_fence;
     D12ComPtr<ID3D12CommandQueue>        command_queue;
     D12ComPtr<ID3D12GraphicsCommandList> command_list;
     D12ComPtr<ID3D12CommandAllocator>    command_allocators[kD12NumFrameBuffers];
+    D12ComPtr<ID3D12Fence>               cmd_list_executed_fences[kD12NumFrameBuffers];
     D12ComPtr<IDXGISwapChain4>           swap_chain;
 
     SwapChainD3D12() = default;
@@ -48,6 +49,8 @@ public:
     };
 
     Backbuffer CurrentBackbuffer(const SwapChainRenderTargetsD3D12 & render_targets) const;
+    ID3D12Fence * CurrentCmdListExecutedFence() const { return cmd_list_executed_fences[frame_index].Get(); }
+    uint64_t CurrentCmdListExecutedFenceValue() const { return frame_count; }
 
 private:
 

@@ -105,7 +105,6 @@ void DLLInterface::EndRegistration()
 
     sm_model_store.EndRegistration();
     sm_texture_store.EndRegistration();
-    sm_texture_store.UploadScrapIfNeeded();
     sm_view_renderer.EndRegistration();
 
     MemTagsPrintAll();
@@ -166,18 +165,17 @@ void DLLInterface::BeginFrame(float /*camera_separation*/)
     if (Config::r_no_draw.IsSet())
         return;
 
-    // In case new menu graphics have been added to the scrap atlas.
-    if (sm_texture_store.ScrapIsDirty())
-    {
-        sm_renderer.WaitForGpu();
-        sm_texture_store.UploadScrapIfNeeded();
-    }
-
     const float   clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // RGBA
     const float   clear_depth    = 1.0f;
     const uint8_t clear_stencil  = 0;
 
     sm_renderer.BeginFrame(clear_color, clear_depth, clear_stencil);
+
+    // In case new menu graphics have been added to the scrap atlas.
+    if (sm_texture_store.ScrapIsDirty())
+    {
+        sm_texture_store.UploadScrapIfNeeded();
+    }
 
     sm_per_frame_shader_consts.data.screen_dimensions[0] = static_cast<float>(sm_renderer.RenderWidth());
     sm_per_frame_shader_consts.data.screen_dimensions[1] = static_cast<float>(sm_renderer.RenderHeight());
@@ -571,10 +569,6 @@ void DLLInterface::DrawStretchRaw(const int x, const int y, int w, int h, const 
     h += 75; // FIXME HACK - Image scaling is probably broken.
              // Cinematics are not filling up the buffer as they should...
 
-    // For D3D12 we need to make sure any pending frames for the cinematic texture have been rendered before we attempt to modify it.
-    // Alternatively this texture could be triple-buffered.
-    sm_renderer.WaitForGpu();
-
     constexpr uint32_t  num_mip_levels = 1;
     const ColorRGBA32 * mip_init_data[num_mip_levels]  = { cinematic_tex->BasePixels() };
     const Vec2u16       mip_dimensions[num_mip_levels] = { cinematic_tex->MipMapDimensions(0) };
@@ -586,7 +580,7 @@ void DLLInterface::DrawStretchRaw(const int x, const int y, int w, int h, const 
     upload_info.mipmaps.num_mip_levels = num_mip_levels;
     upload_info.mipmaps.mip_init_data  = mip_init_data;
     upload_info.mipmaps.mip_dimensions = mip_dimensions;
-    sm_renderer.Device().UploadContext().UploadTextureImmediate(upload_info);
+    sm_renderer.Device().UploadContext().UploadTexture(upload_info);
 
     // Draw a fullscreen quadrilateral with the cinematic texture applied to it
     const ColorRGBA32 kColorWhite = 0xFFFFFFFF;

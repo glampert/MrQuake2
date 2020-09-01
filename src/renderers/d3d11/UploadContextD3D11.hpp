@@ -36,7 +36,7 @@ public:
     void Init(const DeviceD3D11 & device);
     void Shutdown();
 
-    void UploadTextureImmediate(const TextureUploadD3D11 & upload_info);
+    void UploadTexture(const TextureUploadD3D11 & upload_info);
 
 private:
 
