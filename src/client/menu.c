@@ -168,9 +168,11 @@ const char * Default_MenuKey(menuframework_s * m, int key)
 
     switch (key)
     {
+    case K_CONTROLLER_CIRCLE:
     case K_ESCAPE:
         M_PopMenu();
         return menu_out_sound;
+    case K_CONTROLLER_DPAD_UP:
     case K_KP_UPARROW:
     case K_UPARROW:
         if (m)
@@ -188,6 +190,7 @@ const char * Default_MenuKey(menuframework_s * m, int key)
             sound = menu_move_sound;
         }
         break;
+    case K_CONTROLLER_DPAD_DOWN:
     case K_KP_DOWNARROW:
     case K_DOWNARROW:
         if (m)
@@ -217,6 +220,7 @@ const char * Default_MenuKey(menuframework_s * m, int key)
     case K_MOUSE1:
     case K_MOUSE2:
     case K_MOUSE3:
+/*
     case K_JOY1:
     case K_JOY2:
     case K_JOY3:
@@ -253,7 +257,8 @@ const char * Default_MenuKey(menuframework_s * m, int key)
     case K_AUX30:
     case K_AUX31:
     case K_AUX32:
-
+*/
+    case K_CONTROLLER_X:
     case K_KP_ENTER:
     case K_ENTER:
         if (m)
@@ -446,22 +451,27 @@ const char * M_Main_Key(int key)
 
     switch (key)
     {
+    case K_CONTROLLER_CIRCLE:
+    case K_CONTROLLER_OPTIONS:
     case K_ESCAPE:
         M_PopMenu();
         break;
 
+    case K_CONTROLLER_DPAD_DOWN:
     case K_KP_DOWNARROW:
     case K_DOWNARROW:
         if (++m_main_cursor >= MAIN_ITEMS)
             m_main_cursor = 0;
         return sound;
 
+    case K_CONTROLLER_DPAD_UP:
     case K_KP_UPARROW:
     case K_UPARROW:
         if (--m_main_cursor < 0)
             m_main_cursor = MAIN_ITEMS - 1;
         return sound;
 
+    case K_CONTROLLER_X:
     case K_KP_ENTER:
     case K_ENTER:
         m_entersound = true;
@@ -1834,6 +1844,8 @@ const char * M_Credits_Key(int key)
 {
     switch (key)
     {
+    case K_CONTROLLER_OPTIONS:
+    case K_CONTROLLER_CIRCLE:
     case K_ESCAPE:
         if (creditsBuffer)
         {
@@ -3984,12 +3996,14 @@ const char * M_Quit_Key(int key)
 {
     switch (key)
     {
+    case K_CONTROLLER_CIRCLE:
     case K_ESCAPE:
     case 'n':
     case 'N':
         M_PopMenu();
         break;
 
+    case K_CONTROLLER_X:
     case 'Y':
     case 'y':
         cls.key_dest = key_console;

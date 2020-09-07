@@ -573,6 +573,32 @@ static PDWORD RawValuePointer(int axis)
 
 /*
 ===========
+JoyAxisDebugName
+===========
+*/
+static const char * JoyAxisDebugName(int axis)
+{
+    switch (axis)
+    {
+    case JOY_AXIS_X:
+        return "JOY_AXIS_X";
+    case JOY_AXIS_Y:
+        return "JOY_AXIS_Y";
+    case JOY_AXIS_Z:
+        return "JOY_AXIS_Z";
+    case JOY_AXIS_R:
+        return "JOY_AXIS_R";
+    case JOY_AXIS_U:
+        return "JOY_AXIS_U";
+    case JOY_AXIS_V:
+        return "JOY_AXIS_V";
+    default:
+        return "<unknown>";
+    }
+}
+
+/*
+===========
 Joy_AdvancedUpdate_f
 ===========
 */
@@ -595,10 +621,21 @@ void Joy_AdvancedUpdate_f(void)
     {
         // default joystick initialization
         // 2 axes only with joystick control
-        dwAxisMap[JOY_AXIS_X] = AxisTurn;
+        //dwAxisMap[JOY_AXIS_X] = AxisTurn;
         // dwControlMap[JOY_AXIS_X] = JOY_ABSOLUTE_AXIS;
-        dwAxisMap[JOY_AXIS_Y] = AxisForward;
+        //dwAxisMap[JOY_AXIS_Y] = AxisForward;
         // dwControlMap[JOY_AXIS_Y] = JOY_ABSOLUTE_AXIS;
+
+        // LAMPERT: New bindings for gamepad/controller input.
+        // Works on a DS4 or XBox controller.
+
+        // Look up/down, left/right: right analog stick
+        dwAxisMap[JOY_AXIS_Z] = AxisTurn;
+        dwAxisMap[JOY_AXIS_R] = AxisLook;
+
+        // Move forward/back, left/right strafe: left analog stick
+        dwAxisMap[JOY_AXIS_X] = AxisSide;
+        dwAxisMap[JOY_AXIS_Y] = AxisForward;
     }
     else
     {
@@ -784,10 +821,21 @@ void IN_JoyMove(usercmd_t * cmd)
         // convert range from -32768..32767 to -1..1
         fAxisValue /= 32768.0;
 
+        /*
+        // LAMPERT: DEBUG OUTPUT
+        static float lastFrameValues[JOY_MAX_AXES];
+        if (lastFrameValues[i] != fAxisValue)
+        {
+            Com_Printf("%s: %f\n", JoyAxisDebugName(i), fAxisValue);
+            lastFrameValues[i] = fAxisValue;
+        }
+        */
+
         switch (dwAxisMap[i])
         {
         case AxisForward:
-            if ((joy_advanced->value == 0.0) && mlooking)
+            // LAMPERT: commented mlooking block DS4 controller input patch.
+            /*if ((joy_advanced->value == 0.0) && mlooking)
             {
                 // user wants forward control to become look control
                 if (fabs(fAxisValue) > joy_pitchthreshold->value)
@@ -804,7 +852,7 @@ void IN_JoyMove(usercmd_t * cmd)
                     }
                 }
             }
-            else
+            else*/
             {
                 // user wants forward control to be forward control
                 if (fabs(fAxisValue) > joy_forwardthreshold->value)
@@ -817,7 +865,7 @@ void IN_JoyMove(usercmd_t * cmd)
         case AxisSide:
             if (fabs(fAxisValue) > joy_sidethreshold->value)
             {
-                cmd->sidemove += (fAxisValue * joy_sidesensitivity->value) * speed * cl_sidespeed->value;
+                cmd->sidemove -= (fAxisValue * joy_sidesensitivity->value) * speed * cl_sidespeed->value;
             }
             break;
 
@@ -855,7 +903,8 @@ void IN_JoyMove(usercmd_t * cmd)
             break;
 
         case AxisLook:
-            if (mlooking)
+            // LAMPERT: commented mlooking check for DS4 controller input patch.
+            //if (mlooking)
             {
                 if (fabs(fAxisValue) > joy_pitchthreshold->value)
                 {

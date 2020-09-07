@@ -132,6 +132,19 @@ extern "C" {
 #define K_AUX31 237
 #define K_AUX32 238
 
+//
+// Aliases for DS4 controller keys
+//
+#define K_CONTROLLER_R2        K_AUX8
+#define K_CONTROLLER_SQUARE    K_JOY1
+#define K_CONTROLLER_X         K_JOY2
+#define K_CONTROLLER_CIRCLE    K_JOY3
+#define K_CONTROLLER_TRIANGLE  K_JOY4
+#define K_CONTROLLER_DPAD_UP   K_AUX29
+#define K_CONTROLLER_DPAD_DOWN K_AUX31
+#define K_CONTROLLER_OPTIONS   K_AUX10
+#define K_CONTROLLER_L3        K_AUX11
+
 #define K_MWHEELDOWN 239
 #define K_MWHEELUP 240
 
