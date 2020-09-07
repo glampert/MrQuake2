@@ -40,6 +40,22 @@ void UploadContextD3D12::Init(const DeviceD3D12 & device)
 
 void UploadContextD3D12::Shutdown()
 {
+    for (CreateEntry & entry : m_creates)
+    {
+        if (entry.upload_buffer != nullptr)
+            entry.upload_buffer->Release();
+        entry = {};
+    }
+    m_creates.clear();
+
+    for (UploadEntry & entry : m_uploads)
+    {
+        if (entry.upload_buffer != nullptr)
+            entry.upload_buffer->Release();
+        entry = {};
+    }
+    m_num_uploads = 0;
+
     if (m_fence_event != nullptr)
     {
         CloseHandle(m_fence_event);
