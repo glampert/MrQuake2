@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RendererD3D12", "RendererD3
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RendererD3D11", "RendererD3D11\RendererD3D11.vcxproj", "{86562BCA-B997-440E-8F01-2DE32AD12AAB}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RendererVulkan", "RendererVulkan\RendererVulkan.vcxproj", "{553F85FF-28BB-4858-9754-E3318A84D0DD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -41,6 +43,14 @@ Global
 		{86562BCA-B997-440E-8F01-2DE32AD12AAB}.Release|x64.Build.0 = Release|x64
 		{86562BCA-B997-440E-8F01-2DE32AD12AAB}.Release|x86.ActiveCfg = Release|Win32
 		{86562BCA-B997-440E-8F01-2DE32AD12AAB}.Release|x86.Build.0 = Release|Win32
+		{553F85FF-28BB-4858-9754-E3318A84D0DD}.Debug|x64.ActiveCfg = Debug|x64
+		{553F85FF-28BB-4858-9754-E3318A84D0DD}.Debug|x64.Build.0 = Debug|x64
+		{553F85FF-28BB-4858-9754-E3318A84D0DD}.Debug|x86.ActiveCfg = Debug|Win32
+		{553F85FF-28BB-4858-9754-E3318A84D0DD}.Debug|x86.Build.0 = Debug|Win32
+		{553F85FF-28BB-4858-9754-E3318A84D0DD}.Release|x64.ActiveCfg = Release|x64
+		{553F85FF-28BB-4858-9754-E3318A84D0DD}.Release|x64.Build.0 = Release|x64
+		{553F85FF-28BB-4858-9754-E3318A84D0DD}.Release|x86.ActiveCfg = Release|Win32
+		{553F85FF-28BB-4858-9754-E3318A84D0DD}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

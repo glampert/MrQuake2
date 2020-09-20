@@ -19,6 +19,7 @@ renderdoc/
 vs2017/x64/
 vs2017/RendererD3D11/x64/
 vs2017/RendererD3D12/x64/
+vs2017/RendererVulkan/x64/
 bld/
 [Bb]in/
 [Oo]bj/
