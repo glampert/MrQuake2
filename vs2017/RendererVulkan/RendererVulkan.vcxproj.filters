@@ -7,6 +7,9 @@
     <Filter Include="Backend">
       <UniqueIdentifier>{c51f5b90-28dc-4a87-a766-e65a4f394d8b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Backend\Shaders">
+      <UniqueIdentifier>{e5a6618f-059a-4885-a638-5dd2dea309d4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\renderers\common\Array.hpp">
@@ -167,5 +170,16 @@
     <ClCompile Include="..\..\src\renderers\vulkan\UploadContextVK.cpp">
       <Filter>Backend</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw2D.fx">
+      <Filter>Backend\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw3D.fx">
+      <Filter>Backend\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\src\renderers\shaders\hlsl\DrawDebug.fx">
+      <Filter>Backend\Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

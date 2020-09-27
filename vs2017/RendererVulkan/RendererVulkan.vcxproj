@@ -74,6 +74,11 @@
     <ClCompile Include="..\..\src\renderers\vulkan\TextureVK.cpp" />
     <ClCompile Include="..\..\src\renderers\vulkan\UploadContextVK.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw2D.fx" />
+    <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw3D.fx" />
+    <FxCompile Include="..\..\src\renderers\shaders\hlsl\DrawDebug.fx" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{553F85FF-28BB-4858-9754-E3318A84D0DD}</ProjectGuid>
@@ -132,6 +137,7 @@
     <LibraryPath>$(ProjectDir)..\..\src\external\optick\lib\x64\debug;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\IntDir\$(ProjectName)\</IntDir>
+    <CustomBuildBeforeTargets>ClCompile</CustomBuildBeforeTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -145,6 +151,7 @@
     <LibraryPath>$(ProjectDir)..\..\src\external\optick\lib\x64\release;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\IntDir\$(ProjectName)\</IntDir>
+    <CustomBuildBeforeTargets>ClCompile</CustomBuildBeforeTargets>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -176,7 +183,16 @@
     </FxCompile>
     <FxCompile>
       <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(IntDir)\%(Filename).cso</ObjectFileOutput>
     </FxCompile>
+    <CustomBuildStep>
+      <Command>cmd /c "$(ProjectDir)BuildShaders.bat $(SolutionDir)..\src\renderers\shaders\hlsl\Draw2D.fx $(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw2D.spv $(SolutionDir)..\src\renderers\shaders\hlsl\Draw3D.fx $(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw3D.spv $(SolutionDir)..\src\renderers\shaders\hlsl\DrawDebug.fx $(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\DrawDebug.spv"</Command>
+      <Message>Compiling SPIR-V shaders</Message>
+      <Outputs>$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw2D.spv.vs;$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw2D.spv.ps;$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw3D.spv.vs;$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw3D.spv.ps;$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\DrawDebug.spv.vs;$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\DrawDebug.spv.ps;%(Outputs)</Outputs>
+      <Inputs>$(SolutionDir)..\src\renderers\shaders\hlsl\Draw2D.fx;$(SolutionDir)..\src\renderers\shaders\hlsl\Draw3D.fx;$(SolutionDir)..\src\renderers\shaders\hlsl\DrawDebug.fx;%(Inputs)</Inputs>
+      <TreatOutputAsContent>false</TreatOutputAsContent>
+      <RootFolder>$(ProjectDir)</RootFolder>
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -248,7 +264,16 @@
     </FxCompile>
     <FxCompile>
       <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(IntDir)\%(Filename).cso</ObjectFileOutput>
     </FxCompile>
+    <CustomBuildStep>
+      <Command>cmd /c "$(ProjectDir)BuildShaders.bat $(SolutionDir)..\src\renderers\shaders\hlsl\Draw2D.fx $(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw2D.spv $(SolutionDir)..\src\renderers\shaders\hlsl\Draw3D.fx $(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw3D.spv $(SolutionDir)..\src\renderers\shaders\hlsl\DrawDebug.fx $(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\DrawDebug.spv"</Command>
+      <Message>Compiling SPIR-V shaders</Message>
+      <Outputs>$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw2D.spv.vs;$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw2D.spv.ps;$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw3D.spv.vs;$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\Draw3D.spv.ps;$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\DrawDebug.spv.vs;$(SolutionDir)..\Bin\$(Platform)\$(Configuration)\SpirV\DrawDebug.spv.ps;%(Outputs)</Outputs>
+      <Inputs>$(SolutionDir)..\src\renderers\shaders\hlsl\Draw2D.fx;$(SolutionDir)..\src\renderers\shaders\hlsl\Draw3D.fx;$(SolutionDir)..\src\renderers\shaders\hlsl\DrawDebug.fx;%(Inputs)</Inputs>
+      <TreatOutputAsContent>false</TreatOutputAsContent>
+      <RootFolder>$(ProjectDir)</RootFolder>
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
