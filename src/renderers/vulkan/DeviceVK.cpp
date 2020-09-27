@@ -3,16 +3,15 @@
 //
 
 #include "DeviceVK.hpp"
-#include "SwapChainVK.hpp"
 
 namespace MrQ2
 {
 
 void DeviceVK::Init(const SwapChainVK & sc, const bool debug, UploadContextVK & up_ctx, GraphicsContextVK & gfx_ctx)
 {
-    m_upload_ctx     = &up_ctx;
-    m_graphics_ctx   = &gfx_ctx;
-    debug_validation = debug;
+    m_upload_ctx       = &up_ctx;
+    m_graphics_ctx     = &gfx_ctx;
+    m_debug_validation = debug;
 
     InitInstanceLayerProperties();
     InitInstance();
@@ -20,6 +19,12 @@ void DeviceVK::Init(const SwapChainVK & sc, const bool debug, UploadContextVK & 
 
 void DeviceVK::Shutdown()
 {
+    if (m_instance != nullptr)
+    {
+        vkDestroyInstance(m_instance, nullptr);
+        m_instance = nullptr;
+    }
+
     m_upload_ctx   = nullptr;
     m_graphics_ctx = nullptr;
     m_instance_layer_properties.clear();
@@ -90,32 +95,46 @@ void DeviceVK::InitInstanceExtensionProperties(LayerProperties & layer_props)
 
 void DeviceVK::InitInstance()
 {
-    std::uint32_t instance_layer_count;
     const char * const * instance_layer_names;
+    std::uint32_t instance_layer_count;
 
-    const char * const instance_layer_names_debug[] = {
-        "VK_LAYER_LUNARG_standard_validation",
-        "VK_LAYER_RENDERDOC_Capture",
-        "VK_LAYER_KHRONOS_validation",
-    };
-
-    const char * const instance_extension_names[] = {
-        "VK_KHR_surface",
-        "VK_KHR_win32_surface",
-    };
-
-    if (debug_validation)
+    if (m_debug_validation)
     {
-        GameInterface::Printf("Creating VK Instance with debug validation...");
-        instance_layer_names = instance_layer_names_debug;
-        instance_layer_count = ArrayLength(instance_layer_names_debug);
+        if (Config::r_renderdoc.IsSet())
+        {
+            GameInterface::Printf("Creating VK Instance with debug validation + RenderDoc.");
+
+            static const char * const s_instance_layer_names_debug_rdoc[] = {
+                "VK_LAYER_LUNARG_standard_validation",
+                "VK_LAYER_KHRONOS_validation",
+                "VK_LAYER_RENDERDOC_Capture"
+            };
+            instance_layer_names = s_instance_layer_names_debug_rdoc;
+            instance_layer_count = ArrayLength(s_instance_layer_names_debug_rdoc);
+        }
+        else
+        {
+            GameInterface::Printf("Creating VK Instance with debug validation.");
+
+            static const char * const s_instance_layer_names_debug[] = {
+                "VK_LAYER_LUNARG_standard_validation",
+                "VK_LAYER_KHRONOS_validation"
+            };
+            instance_layer_names = s_instance_layer_names_debug;
+            instance_layer_count = ArrayLength(s_instance_layer_names_debug);
+        }
     }
     else
     {
-        GameInterface::Printf("Creating VK Instance without validation (Release)...");
+        GameInterface::Printf("Creating VK Instance without validation (Release mode).");
         instance_layer_names = nullptr;
         instance_layer_count = 0;
     }
+
+    static const char * const s_instance_extension_names[] = {
+        "VK_KHR_surface",
+        "VK_KHR_win32_surface"
+    };
 
     VkApplicationInfo app_info  = {};
     app_info.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -131,11 +150,11 @@ void DeviceVK::InitInstance()
     inst_info.pApplicationInfo        = &app_info;
     inst_info.enabledLayerCount       = instance_layer_count;
     inst_info.ppEnabledLayerNames     = instance_layer_names;
-    inst_info.enabledExtensionCount   = ArrayLength(instance_extension_names);
-    inst_info.ppEnabledExtensionNames = instance_extension_names;
+    inst_info.enabledExtensionCount   = ArrayLength(s_instance_extension_names);
+    inst_info.ppEnabledExtensionNames = s_instance_extension_names;
 
     VULKAN_CHECK(vkCreateInstance(&inst_info, nullptr, &m_instance));
-    MRQ2_ASSERT(m_instance != VK_NULL_HANDLE);
+    MRQ2_ASSERT(m_instance != nullptr);
 
     GameInterface::Printf("VK Instance created.");
 }

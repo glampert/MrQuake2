@@ -52,7 +52,7 @@ public:
         (void)cb;
         (void)slot;
         (void)data;
-        // TODO
+        // TODO: probably use vkCmdPushConstants for this.
     }
 
     // Draw calls

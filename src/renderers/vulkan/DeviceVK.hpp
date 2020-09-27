@@ -17,9 +17,6 @@ class DeviceVK final
 {
 public:
 
-    // With Vulkan debug validation layer?
-    bool debug_validation{ false };
-
     DeviceVK() = default;
 
     // Disallow copy.
@@ -37,7 +34,10 @@ private:
 
     UploadContextVK *   m_upload_ctx{ nullptr };
     GraphicsContextVK * m_graphics_ctx{ nullptr };
-    VkInstance          m_instance{ VK_NULL_HANDLE };
+    VkInstance          m_instance{ nullptr };
+
+    // With Vulkan debug validation layers?
+    bool m_debug_validation{ false };
 
     // Layers and extensions available for the VK Instance.
     struct LayerProperties

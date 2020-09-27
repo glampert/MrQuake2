@@ -10,6 +10,8 @@
 #include "PipelineStateVK.hpp"
 #include "ShaderProgramVK.hpp"
 
+// https://computergraphics.stackexchange.com/questions/4422/directx-openglvulkan-concepts-mapping-chart
+
 namespace MrQ2
 {
 
