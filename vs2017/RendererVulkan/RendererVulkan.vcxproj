@@ -73,11 +73,15 @@
     <ClCompile Include="..\..\src\renderers\vulkan\SwapChainVK.cpp" />
     <ClCompile Include="..\..\src\renderers\vulkan\TextureVK.cpp" />
     <ClCompile Include="..\..\src\renderers\vulkan\UploadContextVK.cpp" />
+    <ClCompile Include="..\..\src\renderers\vulkan\UtilsVK.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw2D.fx" />
     <FxCompile Include="..\..\src\renderers\shaders\hlsl\Draw3D.fx" />
     <FxCompile Include="..\..\src\renderers\shaders\hlsl\DrawDebug.fx" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="BuildShaders.bat" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

@@ -35,10 +35,11 @@ public:
     void Init(const char * name, HINSTANCE hInst, WNDPROC wndProc, const int width, const int height, const bool fullscreen);
     void Shutdown();
 
-    int  Width()        const { return m_width; }
-    int  Height()       const { return m_height; }
-    bool IsFullScreen() const { return m_fullscreen; }
-    HWND WindowHandle() const { return m_hWnd; }
+    int  Width()            const { return m_width; }
+    int  Height()           const { return m_height; }
+    bool IsFullScreen()     const { return m_fullscreen; }
+    HWND WindowHandle()     const { return m_hWnd; }
+    HINSTANCE AppInstance() const { return m_hInst; }
 
     // Static helpers
     static std::string ErrorToString(HRESULT hr);

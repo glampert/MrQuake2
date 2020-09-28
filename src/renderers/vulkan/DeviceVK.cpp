@@ -2,12 +2,19 @@
 // DeviceVK.cpp
 //
 
+// To enable vkCreateWin32SurfaceKHR extensions.
+// Defined here before the include so vulkan.h exposes the structure.
+#if !defined(VK_USE_PLATFORM_WIN32_KHR)
+	#define VK_USE_PLATFORM_WIN32_KHR 1
+#endif // !VK_USE_PLATFORM_WIN32_KHR
+
 #include "DeviceVK.hpp"
+#include "../common/Win32Window.hpp"
 
 namespace MrQ2
 {
 
-void DeviceVK::Init(const SwapChainVK & sc, const bool debug, UploadContextVK & up_ctx, GraphicsContextVK & gfx_ctx)
+void DeviceVK::Init(Win32Window & window, UploadContextVK & up_ctx, GraphicsContextVK & gfx_ctx, const bool debug)
 {
     m_upload_ctx       = &up_ctx;
     m_graphics_ctx     = &gfx_ctx;
@@ -15,10 +22,25 @@ void DeviceVK::Init(const SwapChainVK & sc, const bool debug, UploadContextVK & 
 
     InitInstanceLayerProperties();
     InitInstance();
+    EnumerateDevices();
+    InitSwapChainExtensions(window);
+    InitDevice();
 }
 
 void DeviceVK::Shutdown()
 {
+    if (m_device != nullptr)
+    {
+        vkDestroyDevice(m_device, nullptr);
+        m_device = nullptr;
+    }
+
+    if (m_render_surface != nullptr)
+    {
+        vkDestroySurfaceKHR(m_instance, m_render_surface, nullptr);
+        m_render_surface = nullptr;
+    }
+
     if (m_instance != nullptr)
     {
         vkDestroyInstance(m_instance, nullptr);
@@ -27,7 +49,10 @@ void DeviceVK::Shutdown()
 
     m_upload_ctx   = nullptr;
     m_graphics_ctx = nullptr;
+
     m_instance_layer_properties.clear();
+    m_physical_devices.clear();
+    m_queue_family_properties.clear();
 }
 
 void DeviceVK::InitInstanceLayerProperties()
@@ -157,6 +182,167 @@ void DeviceVK::InitInstance()
     MRQ2_ASSERT(m_instance != nullptr);
 
     GameInterface::Printf("VK Instance created.");
+}
+
+void DeviceVK::EnumerateDevices()
+{
+    std::uint32_t num_devices = 0;
+    VULKAN_CHECK(vkEnumeratePhysicalDevices(m_instance, &num_devices, nullptr));
+    MRQ2_ASSERT(num_devices >= 1);
+
+    m_physical_devices.resize(num_devices);
+    VULKAN_CHECK(vkEnumeratePhysicalDevices(m_instance, &num_devices, m_physical_devices.data()));
+    MRQ2_ASSERT(num_devices >= 1);
+
+    std::uint32_t num_queue_families = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(m_physical_devices[0], &num_queue_families, nullptr);
+    MRQ2_ASSERT(num_queue_families >= 1);
+
+    m_queue_family_properties.resize(num_queue_families);
+    vkGetPhysicalDeviceQueueFamilyProperties(m_physical_devices[0], &num_queue_families, m_queue_family_properties.data());
+    MRQ2_ASSERT(num_queue_families >= 1);
+
+    // NOTE: For now we only care about GPU 0 - no support for multi-GPU systems.
+    vkGetPhysicalDeviceFeatures(m_physical_devices[0], &m_device_info.features);
+    vkGetPhysicalDeviceProperties(m_physical_devices[0], &m_device_info.properties);
+    vkGetPhysicalDeviceMemoryProperties(m_physical_devices[0], &m_device_info.memoryProperties);
+
+    GameInterface::Printf("Found %u physical GPUs. Using GPU [0]...", num_devices);
+    GameInterface::Printf("GPU 0 has %u queues", num_queue_families);
+    GameInterface::Printf("GPU 0 name: %s", m_device_info.properties.deviceName);
+}
+
+void DeviceVK::InitSwapChainExtensions(Win32Window & window)
+{
+    MRQ2_ASSERT(!m_queue_family_properties.empty());
+    MRQ2_ASSERT(!m_physical_devices.empty());
+
+    // Construct the surface description:
+    VkWin32SurfaceCreateInfoKHR surface_create_info = {};
+    surface_create_info.sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+    surface_create_info.hinstance = window.AppInstance();
+    surface_create_info.hwnd      = window.WindowHandle();
+
+    VULKAN_CHECK(vkCreateWin32SurfaceKHR(m_instance, &surface_create_info, nullptr, &m_render_surface));
+    MRQ2_ASSERT(m_render_surface != nullptr);
+
+    // Iterate over each queue to learn whether it supports presenting:
+    std::vector<VkBool32> queues_supporting_present(m_queue_family_properties.size(), VK_FALSE);
+    for (std::uint32_t q = 0; q < m_queue_family_properties.size(); ++q)
+    {
+        VULKAN_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(m_physical_devices[0], q, m_render_surface, &queues_supporting_present[q]));
+    }
+
+    // Search for a graphics and a present queue in the array of queue
+    // families, try to find one that supports both:
+    for (std::uint32_t q = 0; q < m_queue_family_properties.size(); ++q)
+    {
+        GameInterface::Printf("Queue %u flags: %#x", q, m_queue_family_properties[q].queueFlags);
+
+        if ((m_queue_family_properties[q].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)
+        {
+            if (m_graphics_queue.family_index == -1)
+            {
+                m_graphics_queue.family_index = static_cast<std::int32_t>(q);
+            }
+
+            if (queues_supporting_present[q] == VK_TRUE)
+            {
+                m_present_queue.family_index  = static_cast<std::int32_t>(q);
+                m_graphics_queue.family_index = static_cast<std::int32_t>(q);
+                break;
+            }
+        }
+    }
+
+    // If didn't find a queue that supports both graphics and present,
+    // then find a separate present queue.
+    if (m_present_queue.family_index == -1)
+    {
+        for (std::uint32_t q = 0; q < m_queue_family_properties.size(); ++q)
+        {
+            if (queues_supporting_present[q] == VK_TRUE)
+            {
+                m_present_queue.family_index = static_cast<std::int32_t>(q);
+                break;
+            }
+        }
+    }
+
+    // Error if could not find queues that support graphics and present.
+    if (m_present_queue.family_index == -1 || m_graphics_queue.family_index == -1)
+    {
+        GameInterface::Errorf("Could not find a VK queue for graphics and present!");
+    }
+
+    // Get the list of VkFormats that are supported:
+    std::uint32_t num_formats_supported = 0;
+    VULKAN_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(m_physical_devices[0], m_render_surface, &num_formats_supported, nullptr));
+    MRQ2_ASSERT(num_formats_supported >= 1);
+
+    std::vector<VkSurfaceFormatKHR> surface_formats(num_formats_supported);
+    VULKAN_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(m_physical_devices[0], m_render_surface, &num_formats_supported, surface_formats.data()));
+    MRQ2_ASSERT(num_formats_supported >= 1);
+
+    GameInterface::Printf("GPU 0 Present Queue family index: %i", m_present_queue.family_index);
+    GameInterface::Printf("GPU 0 Graphics Queue family index: %i", m_graphics_queue.family_index);
+    GameInterface::Printf("VK render surface formats supported: %u", num_formats_supported);
+
+    // If the format list includes just one entry of VK_FORMAT_UNDEFINED,
+    // the surface has no preferred format. Otherwise, at least one
+    // supported format will be returned.
+    if (num_formats_supported == 1 && surface_formats[0].format == VK_FORMAT_UNDEFINED)
+    {
+        m_render_surface_format = VK_FORMAT_B8G8R8A8_UNORM;
+    }
+    else
+    {
+        m_render_surface_format = surface_formats[0].format;
+    }
+}
+
+void DeviceVK::InitDevice()
+{
+    static const char * const s_device_extension_names[] = {
+        "VK_KHR_swapchain"
+    };
+
+    // Dummy priorities - don't care atm
+    const float queue_priorities[] = { 0.0f, 0.0f };
+
+    VkDeviceQueueCreateInfo queue_create_info = {};
+    queue_create_info.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queue_create_info.queueCount       = 1;
+    queue_create_info.pQueuePriorities = queue_priorities;
+    queue_create_info.queueFamilyIndex = m_graphics_queue.family_index;
+
+    VkDeviceCreateInfo device_create_info      = {};
+    device_create_info.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    device_create_info.queueCreateInfoCount    = 1;
+    device_create_info.pQueueCreateInfos       = &queue_create_info;
+    device_create_info.enabledExtensionCount   = ArrayLength(s_device_extension_names);
+    device_create_info.ppEnabledExtensionNames = s_device_extension_names;
+    device_create_info.pEnabledFeatures        = &m_device_info.features;
+
+    VULKAN_CHECK(vkCreateDevice(m_physical_devices[0], &device_create_info, nullptr, &m_device));
+    MRQ2_ASSERT(m_device != nullptr);
+
+    GameInterface::Printf("VK Device created for GPU 0.");
+
+    // Get the GPU queue handles:
+    vkGetDeviceQueue(m_device, m_graphics_queue.family_index, 0, &m_graphics_queue.queue_handle);
+    MRQ2_ASSERT(m_graphics_queue.queue_handle != nullptr);
+
+    if (m_graphics_queue.family_index == m_present_queue.family_index)
+    {
+        m_present_queue.queue_handle = m_graphics_queue.queue_handle;
+        GameInterface::Printf("Graphics and present queues are the same.");
+    }
+    else
+    {
+        vkGetDeviceQueue(m_device, m_present_queue.family_index, 0, &m_present_queue.queue_handle);
+        MRQ2_ASSERT(m_present_queue.queue_handle != nullptr);
+    }
 }
 
 } // namespace MrQ2
