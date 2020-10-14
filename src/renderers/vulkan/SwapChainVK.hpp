@@ -15,11 +15,13 @@ class SwapChainVK final
 {
 public:
 
+    const DeviceVK * device_vk{ nullptr };
     std::uint32_t    buffer_index{ 0 };
     std::uint32_t    buffer_count{ 0 };
     VkExtent2D       swap_chain_extents{};
     VkSwapchainKHR   swap_chain_handle{ nullptr };
-    const DeviceVK * device_vk{ nullptr };
+    VkSemaphore      image_available_semaphore{ nullptr };
+    VkSemaphore      render_finished_semaphore{ nullptr };
 
     SwapChainVK() = default;
 
@@ -36,9 +38,11 @@ class SwapChainRenderTargetsVK final
 {
 public:
 
+    const DeviceVK * device_vk{ nullptr };
+    RenderPassVK     main_render_pass;
+
     int render_target_width{ 0 };
     int render_target_height{ 0 };
-    const DeviceVK * device_vk{ nullptr };
 
     struct DepthBuffer
     {
@@ -62,6 +66,12 @@ public:
 
     void Init(const SwapChainVK & sc);
     void Shutdown();
+
+private:
+
+    void InitDepthBuffer();
+    void InitRenderPass();
+    void InitFramebuffers();
 };
 
 } // MrQ2

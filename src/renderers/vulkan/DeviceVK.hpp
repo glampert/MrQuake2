@@ -37,6 +37,7 @@ public:
     VkFormat         RenderSurfaceFormat() const { return m_render_surface_format; }
     const auto &     GraphicsQueue()       const { return m_graphics_queue; }
     const auto &     PresentQueue()        const { return m_present_queue; }
+    const auto &     DeviceInfo()          const { return m_device_info; }
 
 private:
 
@@ -46,7 +47,7 @@ private:
         std::vector<VkExtensionProperties> extensions;
     };
 
-    struct DeviceInfo
+    struct DeviceHWInfo
     {
         VkPhysicalDeviceFeatures features{};
         VkPhysicalDeviceProperties properties{};
@@ -85,7 +86,7 @@ private:
     std::vector<LayerProperties>         m_instance_layer_properties; // Layers and extensions available for the VK Instance.
     std::vector<VkPhysicalDevice>        m_physical_devices;          // Info about the physical GPUs. We only care about GPU0 for now.
     std::vector<VkQueueFamilyProperties> m_queue_family_properties;   // Info about the graphics, compute and present queues available in the GPU.
-    DeviceInfo                           m_device_info;
+    DeviceHWInfo                         m_device_info;
 };
 
 } // MrQ2

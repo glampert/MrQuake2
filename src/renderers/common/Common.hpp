@@ -102,6 +102,14 @@ inline void * AlignPtr(const void * value, const std::size_t alignment)
     return reinterpret_cast<void *>((reinterpret_cast<std::uintptr_t>(value) + (alignment - 1)) & ~(alignment - 1));
 }
 
+// Clamp the input value between min and max (inclusive range).
+template<typename T>
+inline void Clamp(T * inOutVal, const T minVal, const T maxVal)
+{
+    if      ((*inOutVal) < minVal) { (*inOutVal) = minVal; }
+    else if ((*inOutVal) > maxVal) { (*inOutVal) = maxVal; }
+}
+
 template<int N>
 inline void VecSplatN(float (&vec)[N], const float val)
 {

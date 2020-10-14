@@ -125,7 +125,7 @@ void SwapChainVK::Init(const DeviceVK & device, std::uint32_t width, std::uint32
     VULKAN_CHECK(vkGetSwapchainImagesKHR(device.Handle(), swap_chain_handle, &buffer_count, nullptr));
     MRQ2_ASSERT(buffer_count >= 1);
 
-    std::vector<VkImage> swap_chain_images(buffer_count, VK_NULL_HANDLE);
+    std::vector<VkImage> swap_chain_images(buffer_count, VkImage(nullptr));
     VULKAN_CHECK(vkGetSwapchainImagesKHR(device.Handle(), swap_chain_handle, &buffer_count, swap_chain_images.data()));
     MRQ2_ASSERT(buffer_count >= 1);
 
@@ -153,12 +153,37 @@ void SwapChainVK::Init(const DeviceVK & device, std::uint32_t width, std::uint32
     }
 
     GameInterface::Printf("Swap chain created with %u image buffers.", buffer_count);
+
+    // Frame semaphores
+    {
+        VkSemaphoreCreateInfo sema_create_info{};
+        sema_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        VULKAN_CHECK(vkCreateSemaphore(device.Handle(), &sema_create_info, nullptr, &image_available_semaphore));
+        VULKAN_CHECK(vkCreateSemaphore(device.Handle(), &sema_create_info, nullptr, &render_finished_semaphore));
+
+        GameInterface::Printf("Frame semaphores initialized.");
+    }
 }
 
 void SwapChainVK::Shutdown()
 {
     if (device_vk == nullptr)
+    {
         return;
+    }
+
+    if (image_available_semaphore != nullptr)
+    {
+        vkDestroySemaphore(device_vk->Handle(), image_available_semaphore, nullptr);
+        image_available_semaphore = nullptr;
+    }
+
+    if (render_finished_semaphore != nullptr)
+    {
+        vkDestroySemaphore(device_vk->Handle(), render_finished_semaphore, nullptr);
+        render_finished_semaphore = nullptr;
+    }
 
     if (swap_chain_handle != nullptr)
     {
@@ -171,6 +196,7 @@ void SwapChainVK::Shutdown()
 
 void SwapChainVK::Present()
 {
+    // TODO
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -179,24 +205,137 @@ void SwapChainVK::Present()
 
 void SwapChainRenderTargetsVK::Init(const SwapChainVK & sc)
 {
-    MRQ2_ASSERT(sc.swap_chain_handle != nullptr);
+    MRQ2_ASSERT(sc.swap_chain_handle != nullptr && sc.device_vk != nullptr);
     MRQ2_ASSERT(sc.swap_chain_extents.width != 0 && sc.swap_chain_extents.height != 0);
 
     render_target_width  = static_cast<int>(sc.swap_chain_extents.width);
     render_target_height = static_cast<int>(sc.swap_chain_extents.height);
     device_vk = sc.device_vk;
 
-    // TODO: need a cmdbuffer and a render pass!
+    InitDepthBuffer();
+    InitRenderPass();
+    InitFramebuffers();
+}
+
+void SwapChainRenderTargetsVK::InitDepthBuffer()
+{
+    // We'll need a temporary command buffer to set up the depth render target.
+    CommandBufferVK cmdBuffer;
+    cmdBuffer.Init(*device_vk);
+    cmdBuffer.BeginRecording();
+
+    VkImageCreateInfo image_create_info{};
+    const VkFormat kDepthBufferFormat = VK_FORMAT_D24_UNORM_S8_UINT; // 32 bits depth buffer format
+
+    VkFormatProperties fmt_props{};
+    vkGetPhysicalDeviceFormatProperties(device_vk->PhysDevice(), kDepthBufferFormat, &fmt_props);
+
+    if (fmt_props.linearTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+    {
+        image_create_info.tiling = VK_IMAGE_TILING_LINEAR;
+    }
+    else if (fmt_props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+    {
+        image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    }
+    else
+    {
+        // TODO: Try other depth formats if this fails?
+        GameInterface::Errorf("Depth format VK_FORMAT_D24_UNORM_S8_UINT not supported!");
+    }
+
+    image_create_info.sType                    = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_create_info.imageType                = VK_IMAGE_TYPE_2D;
+    image_create_info.format                   = kDepthBufferFormat;
+    image_create_info.extent.width             = render_target_width;
+    image_create_info.extent.height            = render_target_height;
+    image_create_info.extent.depth             = 1;
+    image_create_info.mipLevels                = 1;
+    image_create_info.arrayLayers              = 1;
+    image_create_info.samples                  = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.initialLayout            = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_create_info.queueFamilyIndexCount    = 0;
+    image_create_info.pQueueFamilyIndices      = nullptr;
+    image_create_info.sharingMode              = VK_SHARING_MODE_EXCLUSIVE;
+    image_create_info.usage                    = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    image_create_info.flags                    = 0;
+
+    VkImageViewCreateInfo view_info{};
+    view_info.sType                            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.image                            = nullptr;
+    view_info.format                           = kDepthBufferFormat;
+    view_info.components.r                     = VK_COMPONENT_SWIZZLE_R;
+    view_info.components.g                     = VK_COMPONENT_SWIZZLE_G;
+    view_info.components.b                     = VK_COMPONENT_SWIZZLE_B;
+    view_info.components.a                     = VK_COMPONENT_SWIZZLE_A;
+    view_info.subresourceRange.aspectMask      = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    view_info.subresourceRange.baseMipLevel    = 0;
+    view_info.subresourceRange.levelCount      = 1;
+    view_info.subresourceRange.baseArrayLayer  = 0;
+    view_info.subresourceRange.layerCount      = 1;
+    view_info.viewType                         = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.flags                            = 0;
+
+    VkMemoryAllocateInfo mem_alloc_info{};
+    mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+
+    VkDevice device = device_vk->Handle();
+
+    VULKAN_CHECK(vkCreateImage(device, &image_create_info, nullptr, &depth.image));
+    MRQ2_ASSERT(depth.image != nullptr);
+
+	VkMemoryRequirements mem_reqs{};
+    vkGetImageMemoryRequirements(device, depth.image, &mem_reqs);
+    mem_alloc_info.allocationSize = mem_reqs.size;
+
+    // Use the memory properties to determine the type of memory required:
+    mem_alloc_info.memoryTypeIndex = VulkanMemoryTypeFromProperties(*device_vk, mem_reqs.memoryTypeBits, /*requirementsMask=*/0);
+    MRQ2_ASSERT(mem_alloc_info.memoryTypeIndex < UINT32_MAX);
+
+    // Allocate the memory:
+    VULKAN_CHECK(vkAllocateMemory(device, &mem_alloc_info, nullptr, &depth.memory));
+    MRQ2_ASSERT(depth.memory != nullptr);
+
+    // Bind memory:
+    VULKAN_CHECK(vkBindImageMemory(device, depth.image, depth.memory, 0));
+
+    // Set the image layout to depth stencil optimal:
+    VulkanChangeImageLayout(cmdBuffer, depth.image, view_info.subresourceRange.aspectMask, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+    // And finally create the image view.
+    view_info.image = depth.image;
+    VULKAN_CHECK(vkCreateImageView(device, &view_info, nullptr, &depth.view));
+    MRQ2_ASSERT(depth.view != nullptr);
+
+    cmdBuffer.EndRecording();
+    cmdBuffer.Submit();
+    cmdBuffer.WaitComplete();
+
+    GameInterface::Printf("Depth buffer created.");
+}
+
+void SwapChainRenderTargetsVK::InitRenderPass()
+{
+    // TODO
+}
+
+void SwapChainRenderTargetsVK::InitFramebuffers()
+{
+    // TODO
 }
 
 void SwapChainRenderTargetsVK::Shutdown()
 {
     if (device_vk == nullptr)
+    {
         return;
+    }
+
+    main_render_pass.Shutdown();
 
     // Clean up the swap-chain image views and FBs.
     // The swap-chain images themselves are owned by the swap-chain.
-    for (auto & buff : fb)
+    for (FrameBuffer & buff : fb)
     {
         if (buff.view != nullptr)
         {
