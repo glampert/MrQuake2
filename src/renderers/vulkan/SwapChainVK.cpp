@@ -122,16 +122,26 @@ void SwapChainVK::Init(const DeviceVK & device, uint32_t width, uint32_t height,
     VULKAN_CHECK(vkCreateSwapchainKHR(device.Handle(), &swap_chain_create_info, nullptr, &m_swap_chain_handle));
     MRQ2_ASSERT(m_swap_chain_handle != nullptr);
 
-    VULKAN_CHECK(vkGetSwapchainImagesKHR(device.Handle(), m_swap_chain_handle, &m_buffer_count, nullptr));
-    MRQ2_ASSERT(m_buffer_count >= 1);
+    VULKAN_CHECK(vkGetSwapchainImagesKHR(device.Handle(), m_swap_chain_handle, &m_frame_buffer_count, nullptr));
+    MRQ2_ASSERT(m_frame_buffer_count >= 1);
 
-    std::vector<VkImage> swap_chain_images(m_buffer_count, VkImage(nullptr));
-    VULKAN_CHECK(vkGetSwapchainImagesKHR(device.Handle(), m_swap_chain_handle, &m_buffer_count, swap_chain_images.data()));
-    MRQ2_ASSERT(m_buffer_count >= 1);
+    std::vector<VkImage> swap_chain_images(m_frame_buffer_count, VkImage(nullptr));
+    VULKAN_CHECK(vkGetSwapchainImagesKHR(device.Handle(), m_swap_chain_handle, &m_frame_buffer_count, swap_chain_images.data()));
+    MRQ2_ASSERT(m_frame_buffer_count >= 1);
+
+    m_current_cmd_buffer_index = 0;
+    GameInterface::Printf("Frame command buffers created.");
+
+    // Temp cmd buffer to transition the swapchain images.
+    CommandBufferVK temp_cmd_buffer;
+    temp_cmd_buffer.Init(device);
+    temp_cmd_buffer.BeginRecording();
 
     // Create views for the swap chain framebuffer images:
-    for (uint32_t i = 0; i < m_buffer_count; ++i)
+    for (uint32_t i = 0; i < m_frame_buffer_count; ++i)
     {
+        VulkanChangeImageLayout(temp_cmd_buffer, swap_chain_images[i], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
         VkImageViewCreateInfo view_create_info           = {};
         view_create_info.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         view_create_info.format                          = device.RenderSurfaceFormat();
@@ -151,21 +161,30 @@ void SwapChainVK::Init(const DeviceVK & device, uint32_t width, uint32_t height,
         rts.m_fb[i].image = swap_chain_images[i];
         VULKAN_CHECK(vkCreateImageView(device.Handle(), &view_create_info, nullptr, &rts.m_fb[i].view));
     }
+    rts.m_frame_buffer_count = m_frame_buffer_count;
 
-    GameInterface::Printf("Swap chain created with %u image buffers.", m_buffer_count);
+    temp_cmd_buffer.EndRecording();
+    temp_cmd_buffer.Submit();
+    temp_cmd_buffer.WaitComplete();
+
+    GameInterface::Printf("Swap chain created with %u image buffers.", m_frame_buffer_count);
 
     // Frame semaphores
+    VkSemaphoreCreateInfo sema_create_info{};
+    sema_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VULKAN_CHECK(vkCreateSemaphore(device.Handle(), &sema_create_info, nullptr, &m_image_available_semaphore));
+    VULKAN_CHECK(vkCreateSemaphore(device.Handle(), &sema_create_info, nullptr, &m_render_finished_semaphore));
+
+    MRQ2_ASSERT(m_image_available_semaphore != nullptr);
+    MRQ2_ASSERT(m_render_finished_semaphore != nullptr);
+
+    GameInterface::Printf("Frame semaphores created.");
+
+    // Frame command buffers
+    for (CommandBufferVK & buffer : m_cmd_buffers)
     {
-        VkSemaphoreCreateInfo sema_create_info{};
-        sema_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-        VULKAN_CHECK(vkCreateSemaphore(device.Handle(), &sema_create_info, nullptr, &m_image_available_semaphore));
-        VULKAN_CHECK(vkCreateSemaphore(device.Handle(), &sema_create_info, nullptr, &m_render_finished_semaphore));
-
-        MRQ2_ASSERT(m_image_available_semaphore != nullptr);
-        MRQ2_ASSERT(m_render_finished_semaphore != nullptr);
-
-        GameInterface::Printf("Frame semaphores initialized.");
+        buffer.Init(device, VK_FENCE_CREATE_SIGNALED_BIT);
     }
 }
 
@@ -174,6 +193,11 @@ void SwapChainVK::Shutdown()
     if (m_device_vk == nullptr)
     {
         return;
+    }
+
+    for (CommandBufferVK & buffer : m_cmd_buffers)
+    {
+        buffer.Shutdown();
     }
 
     if (m_image_available_semaphore != nullptr)
@@ -197,9 +221,58 @@ void SwapChainVK::Shutdown()
     m_device_vk = nullptr;
 }
 
-void SwapChainVK::Present()
+void SwapChainVK::BeginFrame()
 {
-    // TODO
+    constexpr uint64_t kInfiniteWaitTimeout = UINT64_MAX;
+
+    VULKAN_CHECK(vkAcquireNextImageKHR(m_device_vk->Handle(),
+                                       m_swap_chain_handle,
+                                       kInfiniteWaitTimeout,
+                                       m_image_available_semaphore,
+                                       nullptr,
+                                       &m_frame_buffer_index));
+
+    CommandBufferVK & cmd_buffer = CurrentCmdBuffer();
+    cmd_buffer.WaitComplete();
+    cmd_buffer.Reset();
+    cmd_buffer.BeginRecording();
+}
+
+void SwapChainVK::EndFrame()
+{
+    const VkSemaphore wait_semaphores[]      = { m_image_available_semaphore };
+    const VkSemaphore signal_semaphores[]    = { m_render_finished_semaphore };
+    const VkSwapchainKHR swap_chains[]       = { m_swap_chain_handle };
+    const VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+    CommandBufferVK & cmd_buffer = CurrentCmdBuffer();
+    VkCommandBuffer submit_buffer = cmd_buffer.Handle();
+    cmd_buffer.EndRecording();
+
+    VkQueue present_queue = m_device_vk->PresentQueue().queue_handle;
+
+    VkSubmitInfo submit_info{};
+    submit_info.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.waitSemaphoreCount   = ArrayLength(wait_semaphores);
+    submit_info.pWaitSemaphores      = wait_semaphores;
+    submit_info.pWaitDstStageMask    = wait_stages;
+    submit_info.commandBufferCount   = 1;
+    submit_info.pCommandBuffers      = &submit_buffer;
+    submit_info.signalSemaphoreCount = ArrayLength(signal_semaphores);
+    submit_info.pSignalSemaphores    = signal_semaphores;
+    cmd_buffer.Submit(submit_info);
+
+    VkPresentInfoKHR present_info{};
+    present_info.sType               = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.waitSemaphoreCount  = ArrayLength(signal_semaphores);
+    present_info.pWaitSemaphores     = signal_semaphores;
+    present_info.swapchainCount      = ArrayLength(swap_chains);
+    present_info.pSwapchains         = swap_chains;
+    present_info.pImageIndices       = &m_frame_buffer_index;
+    VULKAN_CHECK(vkQueuePresentKHR(present_queue, &present_info));
+
+    // Next command buffer in the chain
+    m_current_cmd_buffer_index = (m_current_cmd_buffer_index + 1) % kVkNumFrameBuffers;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -223,9 +296,9 @@ void SwapChainRenderTargetsVK::Init(const DeviceVK & device, const SwapChainVK &
 void SwapChainRenderTargetsVK::InitDepthBuffer()
 {
     // We'll need a temporary command buffer to set up the depth render target.
-    CommandBufferVK cmdBuffer;
-    cmdBuffer.Init(*m_device_vk);
-    cmdBuffer.BeginRecording();
+    CommandBufferVK temp_cmd_buffer;
+    temp_cmd_buffer.Init(*m_device_vk);
+    temp_cmd_buffer.BeginRecording();
 
     VkImageCreateInfo image_create_info{};
     const VkFormat kDepthBufferFormat = VK_FORMAT_D24_UNORM_S8_UINT; // 32 bits depth buffer format
@@ -303,28 +376,109 @@ void SwapChainRenderTargetsVK::InitDepthBuffer()
     VULKAN_CHECK(vkBindImageMemory(device, m_depth.image, m_depth.memory, 0));
 
     // Set the image layout to depth stencil optimal:
-    VulkanChangeImageLayout(cmdBuffer, m_depth.image, view_info.subresourceRange.aspectMask, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    VulkanChangeImageLayout(temp_cmd_buffer, m_depth.image, view_info.subresourceRange.aspectMask, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     // And finally create the image view.
     view_info.image = m_depth.image;
     VULKAN_CHECK(vkCreateImageView(device, &view_info, nullptr, &m_depth.view));
     MRQ2_ASSERT(m_depth.view != nullptr);
 
-    cmdBuffer.EndRecording();
-    cmdBuffer.Submit();
-    cmdBuffer.WaitComplete();
+    temp_cmd_buffer.EndRecording();
+    temp_cmd_buffer.Submit();
+    temp_cmd_buffer.WaitComplete();
 
     GameInterface::Printf("Depth buffer created.");
 }
 
 void SwapChainRenderTargetsVK::InitRenderPass()
 {
-    // TODO
+    VkAttachmentReference color_reference{};
+    color_reference.attachment = 0;
+    color_reference.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depth_reference{};
+    depth_reference.attachment = 1;
+    depth_reference.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    // Need attachments for render target (fb) and depth buffer
+    VkAttachmentDescription attachments[2] = {};
+
+    // fb
+    attachments[0].format           = m_device_vk->RenderSurfaceFormat();
+    attachments[0].samples          = VK_SAMPLE_COUNT_1_BIT;
+    attachments[0].loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[0].storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[0].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[0].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[0].initialLayout    = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[0].finalLayout      = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    attachments[0].flags            = 0;
+
+    // depth
+    attachments[1].format           = VK_FORMAT_D24_UNORM_S8_UINT;
+    attachments[1].samples          = VK_SAMPLE_COUNT_1_BIT;
+    attachments[1].loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[1].storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[1].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_LOAD;
+    attachments[1].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[1].initialLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    attachments[1].finalLayout      = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    attachments[1].flags            = 0;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount    = 1;
+    subpass.pColorAttachments       = &color_reference;
+    subpass.pDepthStencilAttachment = &depth_reference;
+
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass           = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass           = 0;
+    dependency.srcStageMask         = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask        = 0;
+    dependency.dstStageMask         = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask        = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo render_pass_create_info{};
+    render_pass_create_info.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    render_pass_create_info.attachmentCount = ArrayLength(attachments);
+    render_pass_create_info.pAttachments    = attachments;
+    render_pass_create_info.subpassCount    = 1;
+    render_pass_create_info.pSubpasses      = &subpass;
+    render_pass_create_info.dependencyCount = 1;
+    render_pass_create_info.pDependencies   = &dependency;
+
+    m_main_render_pass.Init(*m_device_vk, render_pass_create_info);
+    GameInterface::Printf("Main RenderPass created.");
 }
 
 void SwapChainRenderTargetsVK::InitFramebuffers()
 {
-    // TODO
+    MRQ2_ASSERT(m_depth.view != nullptr);                // Depth buffer created first,
+    MRQ2_ASSERT(m_main_render_pass.Handle() != nullptr); // and render pass also needed
+
+    VkImageView attachments[2] = {};
+    attachments[1] = m_depth.view;
+
+    VkFramebufferCreateInfo fb_create_info{};
+    fb_create_info.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    fb_create_info.renderPass      = m_main_render_pass.Handle();
+    fb_create_info.attachmentCount = ArrayLength(attachments); // Include the depth buffer
+    fb_create_info.pAttachments    = attachments;
+    fb_create_info.width           = m_render_target_width;
+    fb_create_info.height          = m_render_target_height;
+    fb_create_info.layers          = 1;
+
+    MRQ2_ASSERT(m_frame_buffer_count != 0);
+    for (uint32_t i = 0; i < m_frame_buffer_count; ++i)
+    {
+        attachments[0] = m_fb[i].view;
+
+        VULKAN_CHECK(vkCreateFramebuffer(m_device_vk->Handle(), &fb_create_info, nullptr, &m_fb[i].framebuffer_handle));
+        MRQ2_ASSERT(m_fb[i].framebuffer_handle != nullptr);
+    }
+
+    GameInterface::Printf("Swap-chain Framebuffers created.");
 }
 
 void SwapChainRenderTargetsVK::Shutdown()

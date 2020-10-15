@@ -27,7 +27,7 @@ public:
     GraphicsContextVK(const GraphicsContextVK &) = delete;
     GraphicsContextVK & operator=(const GraphicsContextVK &) = delete;
 
-    void Init(const DeviceVK & device, const SwapChainVK & swap_chain, const SwapChainRenderTargetsVK & render_targets);
+    void Init(const DeviceVK & device, SwapChainVK & swap_chain, const SwapChainRenderTargetsVK & render_targets);
     void Shutdown();
 
     // Frame start/end
@@ -64,6 +64,12 @@ public:
     void PopMarker();
 
 private:
+
+    const DeviceVK *                 m_device_vk{ nullptr };
+    SwapChainVK *                    m_swap_chain{ nullptr };
+    const SwapChainRenderTargetsVK * m_render_targets{ nullptr };
+    CommandBufferVK *                m_command_buffer{ nullptr };
+    VkCommandBuffer                  m_command_buffer_handle{ nullptr }; // Cached from m_command_buffer
 };
 
 //

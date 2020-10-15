@@ -40,6 +40,7 @@ void RenderInterfaceVK::BeginFrame(const float clear_color[4], const float clear
     MRQ2_ASSERT(!m_frame_started);
     m_frame_started = true;
 
+    m_swap_chain.BeginFrame();
     m_graphics_ctx.BeginFrame(clear_color, clear_depth, clear_stencil);
     m_graphics_ctx.SetViewport(0, 0, RenderWidth(), RenderHeight());
     m_graphics_ctx.SetScissorRect(0, 0, RenderWidth(), RenderHeight());
@@ -51,7 +52,7 @@ void RenderInterfaceVK::EndFrame()
     m_frame_started = false;
 
     m_graphics_ctx.EndFrame();
-    m_swap_chain.Present();
+    m_swap_chain.EndFrame();
 }
 
 void RenderInterfaceVK::WaitForGpu()

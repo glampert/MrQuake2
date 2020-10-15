@@ -155,13 +155,13 @@ void VulkanChangeImageLayout(CommandBufferVK & cmdBuff, VkImage image, const VkI
 // FenceVK
 ///////////////////////////////////////////////////////////////////////////////
 
-void FenceVK::Init(const DeviceVK & device)
+void FenceVK::Init(const DeviceVK & device, const VkFenceCreateFlags flags)
 {
     MRQ2_ASSERT(m_fence_handle == nullptr); // Prevent double init
 
     VkFenceCreateInfo fence_create_info{};
     fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fence_create_info.flags = 0;
+    fence_create_info.flags = flags;
 
     VULKAN_CHECK(vkCreateFence(device.Handle(), &fence_create_info, nullptr, &m_fence_handle));
     MRQ2_ASSERT(m_fence_handle != nullptr);
@@ -188,15 +188,10 @@ void FenceVK::Reset()
 
 void FenceVK::Wait()
 {
-    constexpr uint64_t kInfiniteFenceWaitTimeout = UINT64_MAX;
+    constexpr uint64_t kInfiniteWaitTimeout = UINT64_MAX;
 
     MRQ2_ASSERT(m_fence_handle != nullptr);
-    const VkResult res = vkWaitForFences(m_device_vk->Handle(), 1, &m_fence_handle, VK_TRUE, kInfiniteFenceWaitTimeout);
-
-    if (res != VK_SUCCESS)
-    {
-        GameInterface::Errorf("vkWaitForFences() failed with error (%#x): %s", res, VulkanResultToString(res));
-    }
+    VULKAN_CHECK(vkWaitForFences(m_device_vk->Handle(), 1, &m_fence_handle, VK_TRUE, kInfiniteWaitTimeout));
 }
 
 bool FenceVK::IsSignaled() const
@@ -258,7 +253,7 @@ void CommandBufferPoolVK::Reset()
 // CommandBufferVK
 ///////////////////////////////////////////////////////////////////////////////
 
-void CommandBufferVK::Init(const DeviceVK & device)
+void CommandBufferVK::Init(const DeviceVK & device, const VkFenceCreateFlags fence_create_flags)
 {
     MRQ2_ASSERT(m_cmd_buffer_handle == nullptr); // Prevent double init
 
@@ -266,13 +261,13 @@ void CommandBufferVK::Init(const DeviceVK & device)
     m_cmd_pool.Init(device);
 
     // Fence
-    m_fence.Init(device);
+    m_fence.Init(device, fence_create_flags);
 
     // Command buffer
     VkCommandBufferAllocateInfo cmd_buffer_alloc_info{};
-    cmd_buffer_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmd_buffer_alloc_info.commandPool = m_cmd_pool.Handle();
-    cmd_buffer_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmd_buffer_alloc_info.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmd_buffer_alloc_info.commandPool        = m_cmd_pool.Handle();
+    cmd_buffer_alloc_info.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmd_buffer_alloc_info.commandBufferCount = 1;
 
     VULKAN_CHECK(vkAllocateCommandBuffers(device.Handle(), &cmd_buffer_alloc_info, &m_cmd_buffer_handle));
@@ -299,6 +294,10 @@ void CommandBufferVK::Reset()
 {
     MRQ2_ASSERT(m_cmd_buffer_handle != nullptr);
     VULKAN_CHECK(vkResetCommandBuffer(m_cmd_buffer_handle, 0));
+
+    m_fence.Reset();
+    m_cmd_pool.Reset();
+
     m_state_flags = kNoFlags;
 }
 
@@ -326,13 +325,17 @@ void CommandBufferVK::EndRecording()
 
 void CommandBufferVK::Submit()
 {
+    VkSubmitInfo submit_info{};
+    submit_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers    = &m_cmd_buffer_handle;
+    Submit(submit_info);
+}
+
+void CommandBufferVK::Submit(const VkSubmitInfo & submit_info)
+{
     MRQ2_ASSERT(m_cmd_buffer_handle != nullptr);
     MRQ2_ASSERT(IsInSubmissionState());
-
-    VkSubmitInfo submit_info{};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_cmd_buffer_handle;
 
     VkQueue gfx_queue = m_device_vk->GraphicsQueue().queue_handle;
     VULKAN_CHECK(vkQueueSubmit(gfx_queue, 1, &submit_info, m_fence.Handle()));
@@ -340,7 +343,7 @@ void CommandBufferVK::Submit()
 
 void CommandBufferVK::WaitComplete()
 {
-    MRQ2_ASSERT(IsInSubmissionState());
+    MRQ2_ASSERT(!IsInRecordingState());
     m_fence.Wait();
 }
 

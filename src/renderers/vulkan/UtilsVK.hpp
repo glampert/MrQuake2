@@ -62,7 +62,7 @@ public:
     FenceVK(const FenceVK &) = delete;
     FenceVK & operator=(const FenceVK &) = delete;
 
-    void Init(const DeviceVK & device);
+    void Init(const DeviceVK & device, const VkFenceCreateFlags flags = 0);
     void Shutdown();
     void Reset();
 
@@ -109,7 +109,7 @@ public:
     CommandBufferVK(const CommandBufferVK &) = delete;
     CommandBufferVK & operator=(const CommandBufferVK &) = delete;
 
-    void Init(const DeviceVK & device);
+    void Init(const DeviceVK & device, const VkFenceCreateFlags fence_create_flags = 0);
     void Shutdown();
     void Reset();
 
@@ -122,6 +122,7 @@ public:
 
     // Submit/execute previously recorded buffer without waiting.
     void Submit();
+    void Submit(const VkSubmitInfo & submit_info);
 
     // Wait on a fence blocking until all commands in the buffer have executed.
     void WaitComplete();
