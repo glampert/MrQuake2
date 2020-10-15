@@ -15,7 +15,7 @@ static const char D3D12ShadersPath[] = "src\\renderers\\shaders\\hlsl";
 
 bool ShaderProgramD3D12::LoadFromFile(const DeviceD3D12 & device, const VertexInputLayoutD3D12 & input_layout, const char * filename)
 {
-    return LoadFromFile(device, input_layout, filename, "VS_main", "PS_main", device.debug_validation);
+    return LoadFromFile(device, input_layout, filename, "VS_main", "PS_main", device.DebugValidationEnabled());
 }
 
 bool ShaderProgramD3D12::LoadFromFile(const DeviceD3D12 & device, const VertexInputLayoutD3D12 & input_layout,

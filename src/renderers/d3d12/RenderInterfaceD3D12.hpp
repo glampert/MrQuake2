@@ -57,12 +57,12 @@ private:
 
 inline int RenderInterfaceD3D12::RenderWidth() const
 {
-    return m_render_targets.render_target_width;
+    return m_render_targets.RenderTargetWidth();
 }
 
 inline int RenderInterfaceD3D12::RenderHeight() const
 {
-    return m_render_targets.render_target_height;
+    return m_render_targets.RenderTargetHeight();
 }
 
 inline bool RenderInterfaceD3D12::IsFrameStarted()

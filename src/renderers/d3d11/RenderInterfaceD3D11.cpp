@@ -29,7 +29,7 @@ void RenderInterfaceD3D11::Shutdown()
 {
     GameInterface::Printf("**** RenderInterfaceD3D11::Shutdown ****");
 
-    const bool debug_check_leaks = m_device.debug_validation;
+    const bool debug_check_leaks = m_device.DebugValidationEnabled();
 
     m_graphics_ctx.Shutdown();
     m_upload_ctx.Shutdown();

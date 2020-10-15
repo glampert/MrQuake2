@@ -160,7 +160,7 @@ void PipelineStateD3D11::Finalize() const
             ds_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
         }
 
-        D11CHECK(m_device->device->CreateDepthStencilState(&ds_desc, m_ds_state.GetAddressOf()));
+        D11CHECK(m_device->Device()->CreateDepthStencilState(&ds_desc, m_ds_state.GetAddressOf()));
     }
 
     // Rasterizer state object:
@@ -178,7 +178,7 @@ void PipelineStateD3D11::Finalize() const
         rs_desc.MultisampleEnable     = false;
         rs_desc.AntialiasedLineEnable = false;
 
-        D11CHECK(m_device->device->CreateRasterizerState(&rs_desc, m_rasterizer_state.GetAddressOf()));
+        D11CHECK(m_device->Device()->CreateRasterizerState(&rs_desc, m_rasterizer_state.GetAddressOf()));
     }
 
     // Blend state object
@@ -209,7 +209,7 @@ void PipelineStateD3D11::Finalize() const
             bs_desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
         }
 
-        D11CHECK(m_device->device->CreateBlendState(&bs_desc, m_blend_state.GetAddressOf()));
+        D11CHECK(m_device->Device()->CreateBlendState(&bs_desc, m_blend_state.GetAddressOf()));
     }
 
     m_flags |= kFinalized;

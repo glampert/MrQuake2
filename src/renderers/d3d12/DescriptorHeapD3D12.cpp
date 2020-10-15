@@ -27,12 +27,12 @@ void DescriptorHeapD3D12::Init(const DeviceD3D12 & device)
         heap_desc.Flags          = d3d_flags[i];
         heap_desc.NodeMask       = 1;
 
-        D12CHECK(device.device->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&heap.descriptor_heap)));
+        D12CHECK(device.Device()->CreateDescriptorHeap(&heap_desc, IID_PPV_ARGS(&heap.descriptor_heap)));
         D12SetDebugName(heap.descriptor_heap, debug_names[i]);
 
         heap.cpu_heap_start   = heap.descriptor_heap->GetCPUDescriptorHandleForHeapStart();
         heap.gpu_heap_start   = heap.descriptor_heap->GetGPUDescriptorHandleForHeapStart();
-        heap.descriptor_size  = device.device->GetDescriptorHandleIncrementSize(d3d_types[i]);
+        heap.descriptor_size  = device.Device()->GetDescriptorHandleIncrementSize(d3d_types[i]);
         heap.descriptor_count = descriptor_counts[i];
         heap.descriptors_used = 0;
         heap.free_list        = free_lists[i];

@@ -15,7 +15,7 @@ namespace MrQ2
 void BufferD3D11::InitBufferInternal(const DeviceD3D11 & device, const D3D11_BUFFER_DESC & buffer_desc)
 {
     MRQ2_ASSERT(m_device == nullptr); // Shutdown first
-    D11CHECK(device.device->CreateBuffer(&buffer_desc, nullptr, m_resource.GetAddressOf()));
+    D11CHECK(device.Device()->CreateBuffer(&buffer_desc, nullptr, m_resource.GetAddressOf()));
     m_device = &device;
 }
 
@@ -30,7 +30,7 @@ void * BufferD3D11::Map()
     MRQ2_ASSERT(m_device != nullptr);
 
     D3D11_MAPPED_SUBRESOURCE mapping_info = {};
-    D11CHECK(m_device->context->Map(m_resource.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapping_info));
+    D11CHECK(m_device->DeviceContext()->Map(m_resource.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapping_info));
     MRQ2_ASSERT(mapping_info.pData != nullptr);
 
     return mapping_info.pData;
@@ -39,7 +39,7 @@ void * BufferD3D11::Map()
 void BufferD3D11::Unmap()
 {
     MRQ2_ASSERT(m_device != nullptr);
-    m_device->context->Unmap(m_resource.Get(), 0);
+    m_device->DeviceContext()->Unmap(m_resource.Get(), 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

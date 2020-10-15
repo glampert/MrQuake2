@@ -58,7 +58,7 @@ void TextureD3D11::Init(const DeviceD3D11 & device, const TextureType type, cons
         res_data[mip].SysMemPitch = mip_dimensions[mip].x * TextureImage::kBytesPerPixel;
     }
 
-    auto * device11 = device.device;
+    auto * device11 = device.Device();
     D11CHECK(device11->CreateTexture2D(&tex2d_desc, res_data, m_resource.GetAddressOf()));
     D11CHECK(device11->CreateShaderResourceView(m_resource.Get(), nullptr, m_srv.GetAddressOf()));
     D11CHECK(device11->CreateSamplerState(&sampler_desc, m_sampler.GetAddressOf()));

@@ -202,7 +202,7 @@ void PipelineStateD3D12::Finalize() const
         }
 
         MRQ2_ASSERT(m_device != nullptr);
-        D12CHECK(m_device->device->CreateGraphicsPipelineState(&m_pso_desc, IID_PPV_ARGS(&m_state)));
+        D12CHECK(m_device->Device()->CreateGraphicsPipelineState(&m_pso_desc, IID_PPV_ARGS(&m_state)));
         MRQ2_ASSERT(m_state != nullptr);
     }
 }

@@ -16,12 +16,12 @@ namespace MrQ2
 void GraphicsContextD3D11::Init(const DeviceD3D11 & device, const SwapChainD3D11 & swap_chain, const SwapChainRenderTargetsD3D11 & render_targets)
 {
     MRQ2_ASSERT(m_device == nullptr);
-    MRQ2_ASSERT(device.context != nullptr);
+    MRQ2_ASSERT(device.DeviceContext() != nullptr);
 
     m_device         = &device;
     m_swap_chain     = &swap_chain;
     m_render_targets = &render_targets;
-    m_context        = device.context;
+    m_context        = device.DeviceContext();
 
     m_current_viewport.MinDepth = 0.0f;
     m_current_viewport.MaxDepth = 1.0f;
@@ -53,8 +53,8 @@ void GraphicsContextD3D11::Shutdown()
 
 void GraphicsContextD3D11::BeginFrame(const float clear_color[4], const float clear_depth, const uint8_t clear_stencil)
 {
-    m_context->ClearRenderTargetView(m_render_targets->framebuffer_rtv.Get(), clear_color);
-    m_context->ClearDepthStencilView(m_render_targets->depth_stencil_view.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, clear_depth, clear_stencil);
+    m_context->ClearRenderTargetView(m_render_targets->m_framebuffer_rtv.Get(), clear_color);
+    m_context->ClearDepthStencilView(m_render_targets->m_depth_stencil_view.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, clear_depth, clear_stencil);
 }
 
 void GraphicsContextD3D11::EndFrame()

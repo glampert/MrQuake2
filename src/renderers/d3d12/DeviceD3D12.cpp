@@ -9,11 +9,11 @@ namespace MrQ2
 
 void DeviceD3D12::Init(const bool debug, DescriptorHeapD3D12 & desc_heap, UploadContextD3D12 & up_ctx, GraphicsContextD3D12 & gfx_ctx, SwapChainD3D12 & sc)
 {
-    debug_validation = debug;
+    m_debug_validation = debug;
     uint32_t dxgi_factory_flags = 0;
 
     // Debug layer
-    if (debug_validation)
+    if (m_debug_validation)
     {
         D12ComPtr<ID3D12Debug1> debug_interface;
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug_interface))))
@@ -29,14 +29,14 @@ void DeviceD3D12::Init(const bool debug, DescriptorHeapD3D12 & desc_heap, Upload
     }
 
     // Factory
-    if (FAILED(CreateDXGIFactory2(dxgi_factory_flags, IID_PPV_ARGS(&factory))))
+    if (FAILED(CreateDXGIFactory2(dxgi_factory_flags, IID_PPV_ARGS(&m_factory))))
     {
         GameInterface::Errorf("Failed to create a D3D12 device factory.");
     }
 
     // Enumerate all available adapters and create the device
     D12ComPtr<IDXGIAdapter3> temp_adapter;
-    for (uint32_t i = 0; factory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&temp_adapter)) != DXGI_ERROR_NOT_FOUND; ++i)
+    for (uint32_t i = 0; m_factory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&temp_adapter)) != DXGI_ERROR_NOT_FOUND; ++i)
     {
         D12ComPtr<ID3D12Device5> temp_device;
         DXGI_ADAPTER_DESC1 dapter_desc = {};
@@ -57,20 +57,20 @@ void DeviceD3D12::Init(const bool debug, DescriptorHeapD3D12 & desc_heap, Upload
 
             if (SUCCEEDED(hr) && is_rtx_card && (features.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0))
             {
-                this->supports_rtx = true;
+                this->m_supports_rtx = true;
             }
 
-            this->device  = temp_device;
-            this->adapter = temp_adapter;
+            this->m_device  = temp_device;
+            this->m_adapter = temp_adapter;
 
-            this->dedicated_video_memory  = dapter_desc.DedicatedVideoMemory;
-            this->dedicated_system_memory = dapter_desc.DedicatedSystemMemory;
-            this->shared_system_memory    = dapter_desc.SharedSystemMemory;
+            this->m_dedicated_video_memory  = dapter_desc.DedicatedVideoMemory;
+            this->m_dedicated_system_memory = dapter_desc.DedicatedSystemMemory;
+            this->m_shared_system_memory    = dapter_desc.SharedSystemMemory;
 
-            this->adapter_info = std::string{ gpu_name.begin(), gpu_name.end() };
-            GameInterface::Printf("DXGI Adapter: %s", this->adapter_info.c_str());
+            this->m_adapter_info = std::string{ gpu_name.begin(), gpu_name.end() };
+            GameInterface::Printf("DXGI Adapter: %s", this->m_adapter_info.c_str());
 
-            if (debug_validation)
+            if (m_debug_validation)
             {
                 D12ComPtr<ID3D12InfoQueue> info_queue;
                 if (SUCCEEDED(temp_device->QueryInterface(IID_PPV_ARGS(&info_queue))))
@@ -100,7 +100,7 @@ void DeviceD3D12::Init(const bool debug, DescriptorHeapD3D12 & desc_heap, Upload
         }
     }
 
-    if (this->device == nullptr || this->adapter == nullptr)
+    if (this->m_device == nullptr || this->m_adapter == nullptr)
     {
         GameInterface::Errorf("Failed to create a suitable D3D12 device or adapter!");
     }
@@ -109,22 +109,22 @@ void DeviceD3D12::Init(const bool debug, DescriptorHeapD3D12 & desc_heap, Upload
         GameInterface::Printf("D3D12 adapter and device created successfully.");
     }
 
-    swap_chain      = &sc;
-    descriptor_heap = &desc_heap;
-    upload_ctx      = &up_ctx;
-    graphics_ctx    = &gfx_ctx;
+    m_swap_chain      = &sc;
+    m_descriptor_heap = &desc_heap;
+    m_upload_ctx      = &up_ctx;
+    m_graphics_ctx    = &gfx_ctx;
 }
 
 void DeviceD3D12::Shutdown()
 {
-    device  = nullptr;
-    adapter = nullptr;
-    factory = nullptr;
-    adapter_info.clear();
+    m_device  = nullptr;
+    m_adapter = nullptr;
+    m_factory = nullptr;
+    m_adapter_info.clear();
 
-    descriptor_heap = nullptr;
-    upload_ctx      = nullptr;
-    graphics_ctx    = nullptr;
+    m_descriptor_heap = nullptr;
+    m_upload_ctx      = nullptr;
+    m_graphics_ctx    = nullptr;
 }
 
 } // MrQ2

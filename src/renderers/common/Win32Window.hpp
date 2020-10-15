@@ -27,6 +27,7 @@ class Win32Window
 public:
 
     Win32Window() = default;
+    ~Win32Window() { Shutdown(); }
 
     // Disallow copy.
     Win32Window(const Win32Window &) = delete;

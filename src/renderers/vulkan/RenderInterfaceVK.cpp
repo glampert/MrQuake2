@@ -18,7 +18,7 @@ void RenderInterfaceVK::Init(HINSTANCE hInst, WNDPROC wndProc, const int width, 
     m_swap_chain.Init(m_device, width, height, m_render_targets);
 
     // Global renderer states setup:
-    m_render_targets.Init(m_swap_chain);
+    m_render_targets.Init(m_device, m_swap_chain);
     m_upload_ctx.Init(m_device);
     m_graphics_ctx.Init(m_device, m_swap_chain, m_render_targets);
 }

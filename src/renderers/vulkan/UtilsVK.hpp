@@ -9,6 +9,7 @@
 namespace MrQ2
 {
 
+// Internal helper types
 class DeviceVK;
 class FenceVK;
 class CommandBufferPoolVK;

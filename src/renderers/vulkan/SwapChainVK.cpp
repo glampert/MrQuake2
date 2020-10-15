@@ -12,15 +12,15 @@ namespace MrQ2
 // SwapChainVK
 ///////////////////////////////////////////////////////////////////////////////
 
-void SwapChainVK::Init(const DeviceVK & device, std::uint32_t width, std::uint32_t height, SwapChainRenderTargetsVK & rts)
+void SwapChainVK::Init(const DeviceVK & device, uint32_t width, uint32_t height, SwapChainRenderTargetsVK & rts)
 {
     MRQ2_ASSERT(width != 0 && height != 0);
-    this->device_vk = &device;
+    m_device_vk = &device;
 
     VkSurfaceCapabilitiesKHR surface_capabilities{};
     VULKAN_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device.PhysDevice(), device.RenderSurface(), &surface_capabilities));
 
-    std::uint32_t present_mode_count = 0; // Get the count:
+    uint32_t present_mode_count = 0; // Get the count:
     VULKAN_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(device.PhysDevice(), device.RenderSurface(), &present_mode_count, nullptr));
     MRQ2_ASSERT(present_mode_count >= 1);
 
@@ -33,29 +33,29 @@ void SwapChainVK::Init(const DeviceVK & device, std::uint32_t width, std::uint32
     {
         // If the surface size is undefined, size is set to the
         // the window size, but clamped to min/max extents supported.
-        swap_chain_extents.width  = width;
-        swap_chain_extents.height = height;
+        m_swap_chain_extents.width  = width;
+        m_swap_chain_extents.height = height;
 
-        Clamp(&swap_chain_extents.width,  surface_capabilities.minImageExtent.width,  surface_capabilities.maxImageExtent.width);
-        Clamp(&swap_chain_extents.height, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height);
+        Clamp(&m_swap_chain_extents.width,  surface_capabilities.minImageExtent.width,  surface_capabilities.maxImageExtent.width);
+        Clamp(&m_swap_chain_extents.height, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height);
 
-        width  = swap_chain_extents.width;
-        height = swap_chain_extents.height;
+        width  = m_swap_chain_extents.width;
+        height = m_swap_chain_extents.height;
     }
     else
     {
         // If the surface size is defined, the swap chain size must match.
-        swap_chain_extents = surface_capabilities.currentExtent;
+        m_swap_chain_extents = surface_capabilities.currentExtent;
     }
 
-    GameInterface::Printf("Swap chain extents = {%u,%u}", swap_chain_extents.width, swap_chain_extents.height);
+    GameInterface::Printf("Swap chain extents = {%u,%u}", m_swap_chain_extents.width, m_swap_chain_extents.height);
 
     // If mailbox mode is available, use it, as is the lowest-latency non-
     // tearing mode. If not, try IMMEDIATE which will usually be available,
     // and is the fastest (though it tears). If not, fall back to FIFO which is
     // always available.
     VkPresentModeKHR swap_chain_present_mode = VK_PRESENT_MODE_FIFO_KHR;
-    for (std::uint32_t i = 0; i < present_mode_count; ++i)
+    for (uint32_t i = 0; i < present_mode_count; ++i)
     {
         if (present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
         {
@@ -69,7 +69,7 @@ void SwapChainVK::Init(const DeviceVK & device, std::uint32_t width, std::uint32
         }
     }
 
-    std::uint32_t num_desired_swap_chain_images = kVkNumFrameBuffers;
+    uint32_t num_desired_swap_chain_images = kVkNumFrameBuffers;
     if (surface_capabilities.maxImageCount > 0 && num_desired_swap_chain_images > surface_capabilities.maxImageCount)
     {
         num_desired_swap_chain_images = surface_capabilities.maxImageCount;
@@ -91,8 +91,8 @@ void SwapChainVK::Init(const DeviceVK & device, std::uint32_t width, std::uint32
     swap_chain_create_info.surface                  = device.RenderSurface();
     swap_chain_create_info.minImageCount            = num_desired_swap_chain_images;
     swap_chain_create_info.imageFormat              = device.RenderSurfaceFormat();
-    swap_chain_create_info.imageExtent.width        = swap_chain_extents.width;
-    swap_chain_create_info.imageExtent.height       = swap_chain_extents.height;
+    swap_chain_create_info.imageExtent.width        = m_swap_chain_extents.width;
+    swap_chain_create_info.imageExtent.height       = m_swap_chain_extents.height;
     swap_chain_create_info.preTransform             = pre_transform_flags;
     swap_chain_create_info.compositeAlpha           = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     swap_chain_create_info.imageArrayLayers         = 1;
@@ -103,9 +103,9 @@ void SwapChainVK::Init(const DeviceVK & device, std::uint32_t width, std::uint32
     swap_chain_create_info.imageUsage               = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     swap_chain_create_info.imageSharingMode         = VK_SHARING_MODE_EXCLUSIVE;
 
-    const std::uint32_t queue_family_indices[] = {
-        static_cast<std::uint32_t>(device.GraphicsQueue().family_index),
-        static_cast<std::uint32_t>(device.PresentQueue().family_index)
+    const uint32_t queue_family_indices[] = {
+        static_cast<uint32_t>(device.GraphicsQueue().family_index),
+        static_cast<uint32_t>(device.PresentQueue().family_index)
     };
 
     if (device.GraphicsQueue().family_index != device.PresentQueue().family_index)
@@ -119,18 +119,18 @@ void SwapChainVK::Init(const DeviceVK & device, std::uint32_t width, std::uint32
         swap_chain_create_info.pQueueFamilyIndices   = queue_family_indices;
     }
 
-    VULKAN_CHECK(vkCreateSwapchainKHR(device.Handle(), &swap_chain_create_info, nullptr, &swap_chain_handle));
-    MRQ2_ASSERT(swap_chain_handle != nullptr);
+    VULKAN_CHECK(vkCreateSwapchainKHR(device.Handle(), &swap_chain_create_info, nullptr, &m_swap_chain_handle));
+    MRQ2_ASSERT(m_swap_chain_handle != nullptr);
 
-    VULKAN_CHECK(vkGetSwapchainImagesKHR(device.Handle(), swap_chain_handle, &buffer_count, nullptr));
-    MRQ2_ASSERT(buffer_count >= 1);
+    VULKAN_CHECK(vkGetSwapchainImagesKHR(device.Handle(), m_swap_chain_handle, &m_buffer_count, nullptr));
+    MRQ2_ASSERT(m_buffer_count >= 1);
 
-    std::vector<VkImage> swap_chain_images(buffer_count, VkImage(nullptr));
-    VULKAN_CHECK(vkGetSwapchainImagesKHR(device.Handle(), swap_chain_handle, &buffer_count, swap_chain_images.data()));
-    MRQ2_ASSERT(buffer_count >= 1);
+    std::vector<VkImage> swap_chain_images(m_buffer_count, VkImage(nullptr));
+    VULKAN_CHECK(vkGetSwapchainImagesKHR(device.Handle(), m_swap_chain_handle, &m_buffer_count, swap_chain_images.data()));
+    MRQ2_ASSERT(m_buffer_count >= 1);
 
     // Create views for the swap chain framebuffer images:
-    for (std::uint32_t i = 0; i < buffer_count; ++i)
+    for (uint32_t i = 0; i < m_buffer_count; ++i)
     {
         VkImageViewCreateInfo view_create_info           = {};
         view_create_info.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -148,19 +148,22 @@ void SwapChainVK::Init(const DeviceVK & device, std::uint32_t width, std::uint32
         view_create_info.flags                           = 0;
         view_create_info.image                           = swap_chain_images[i];
 
-        rts.fb[i].image = swap_chain_images[i];
-        VULKAN_CHECK(vkCreateImageView(device.Handle(), &view_create_info, nullptr, &rts.fb[i].view));
+        rts.m_fb[i].image = swap_chain_images[i];
+        VULKAN_CHECK(vkCreateImageView(device.Handle(), &view_create_info, nullptr, &rts.m_fb[i].view));
     }
 
-    GameInterface::Printf("Swap chain created with %u image buffers.", buffer_count);
+    GameInterface::Printf("Swap chain created with %u image buffers.", m_buffer_count);
 
     // Frame semaphores
     {
         VkSemaphoreCreateInfo sema_create_info{};
         sema_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-        VULKAN_CHECK(vkCreateSemaphore(device.Handle(), &sema_create_info, nullptr, &image_available_semaphore));
-        VULKAN_CHECK(vkCreateSemaphore(device.Handle(), &sema_create_info, nullptr, &render_finished_semaphore));
+        VULKAN_CHECK(vkCreateSemaphore(device.Handle(), &sema_create_info, nullptr, &m_image_available_semaphore));
+        VULKAN_CHECK(vkCreateSemaphore(device.Handle(), &sema_create_info, nullptr, &m_render_finished_semaphore));
+
+        MRQ2_ASSERT(m_image_available_semaphore != nullptr);
+        MRQ2_ASSERT(m_render_finished_semaphore != nullptr);
 
         GameInterface::Printf("Frame semaphores initialized.");
     }
@@ -168,30 +171,30 @@ void SwapChainVK::Init(const DeviceVK & device, std::uint32_t width, std::uint32
 
 void SwapChainVK::Shutdown()
 {
-    if (device_vk == nullptr)
+    if (m_device_vk == nullptr)
     {
         return;
     }
 
-    if (image_available_semaphore != nullptr)
+    if (m_image_available_semaphore != nullptr)
     {
-        vkDestroySemaphore(device_vk->Handle(), image_available_semaphore, nullptr);
-        image_available_semaphore = nullptr;
+        vkDestroySemaphore(m_device_vk->Handle(), m_image_available_semaphore, nullptr);
+        m_image_available_semaphore = nullptr;
     }
 
-    if (render_finished_semaphore != nullptr)
+    if (m_render_finished_semaphore != nullptr)
     {
-        vkDestroySemaphore(device_vk->Handle(), render_finished_semaphore, nullptr);
-        render_finished_semaphore = nullptr;
+        vkDestroySemaphore(m_device_vk->Handle(), m_render_finished_semaphore, nullptr);
+        m_render_finished_semaphore = nullptr;
     }
 
-    if (swap_chain_handle != nullptr)
+    if (m_swap_chain_handle != nullptr)
     {
-        vkDestroySwapchainKHR(device_vk->Handle(), swap_chain_handle, nullptr);
-        swap_chain_handle = nullptr;
+        vkDestroySwapchainKHR(m_device_vk->Handle(), m_swap_chain_handle, nullptr);
+        m_swap_chain_handle = nullptr;
     }
 
-    device_vk = nullptr;
+    m_device_vk = nullptr;
 }
 
 void SwapChainVK::Present()
@@ -203,14 +206,14 @@ void SwapChainVK::Present()
 // SwapChainRenderTargetsVK
 ///////////////////////////////////////////////////////////////////////////////
 
-void SwapChainRenderTargetsVK::Init(const SwapChainVK & sc)
+void SwapChainRenderTargetsVK::Init(const DeviceVK & device, const SwapChainVK & sc)
 {
-    MRQ2_ASSERT(sc.swap_chain_handle != nullptr && sc.device_vk != nullptr);
-    MRQ2_ASSERT(sc.swap_chain_extents.width != 0 && sc.swap_chain_extents.height != 0);
+    MRQ2_ASSERT(sc.Handle() != nullptr);
+    MRQ2_ASSERT(sc.Extents().width != 0 && sc.Extents().height != 0);
 
-    render_target_width  = static_cast<int>(sc.swap_chain_extents.width);
-    render_target_height = static_cast<int>(sc.swap_chain_extents.height);
-    device_vk = sc.device_vk;
+    m_render_target_width  = static_cast<int>(sc.Extents().width);
+    m_render_target_height = static_cast<int>(sc.Extents().height);
+    m_device_vk = &device;
 
     InitDepthBuffer();
     InitRenderPass();
@@ -221,14 +224,14 @@ void SwapChainRenderTargetsVK::InitDepthBuffer()
 {
     // We'll need a temporary command buffer to set up the depth render target.
     CommandBufferVK cmdBuffer;
-    cmdBuffer.Init(*device_vk);
+    cmdBuffer.Init(*m_device_vk);
     cmdBuffer.BeginRecording();
 
     VkImageCreateInfo image_create_info{};
     const VkFormat kDepthBufferFormat = VK_FORMAT_D24_UNORM_S8_UINT; // 32 bits depth buffer format
 
     VkFormatProperties fmt_props{};
-    vkGetPhysicalDeviceFormatProperties(device_vk->PhysDevice(), kDepthBufferFormat, &fmt_props);
+    vkGetPhysicalDeviceFormatProperties(m_device_vk->PhysDevice(), kDepthBufferFormat, &fmt_props);
 
     if (fmt_props.linearTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
     {
@@ -247,8 +250,8 @@ void SwapChainRenderTargetsVK::InitDepthBuffer()
     image_create_info.sType                    = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_create_info.imageType                = VK_IMAGE_TYPE_2D;
     image_create_info.format                   = kDepthBufferFormat;
-    image_create_info.extent.width             = render_target_width;
-    image_create_info.extent.height            = render_target_height;
+    image_create_info.extent.width             = m_render_target_width;
+    image_create_info.extent.height            = m_render_target_height;
     image_create_info.extent.depth             = 1;
     image_create_info.mipLevels                = 1;
     image_create_info.arrayLayers              = 1;
@@ -279,33 +282,33 @@ void SwapChainRenderTargetsVK::InitDepthBuffer()
     VkMemoryAllocateInfo mem_alloc_info{};
     mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 
-    VkDevice device = device_vk->Handle();
+    VkDevice device = m_device_vk->Handle();
 
-    VULKAN_CHECK(vkCreateImage(device, &image_create_info, nullptr, &depth.image));
-    MRQ2_ASSERT(depth.image != nullptr);
+    VULKAN_CHECK(vkCreateImage(device, &image_create_info, nullptr, &m_depth.image));
+    MRQ2_ASSERT(m_depth.image != nullptr);
 
 	VkMemoryRequirements mem_reqs{};
-    vkGetImageMemoryRequirements(device, depth.image, &mem_reqs);
+    vkGetImageMemoryRequirements(device, m_depth.image, &mem_reqs);
     mem_alloc_info.allocationSize = mem_reqs.size;
 
     // Use the memory properties to determine the type of memory required:
-    mem_alloc_info.memoryTypeIndex = VulkanMemoryTypeFromProperties(*device_vk, mem_reqs.memoryTypeBits, /*requirementsMask=*/0);
+    mem_alloc_info.memoryTypeIndex = VulkanMemoryTypeFromProperties(*m_device_vk, mem_reqs.memoryTypeBits, /*requirementsMask=*/0);
     MRQ2_ASSERT(mem_alloc_info.memoryTypeIndex < UINT32_MAX);
 
     // Allocate the memory:
-    VULKAN_CHECK(vkAllocateMemory(device, &mem_alloc_info, nullptr, &depth.memory));
-    MRQ2_ASSERT(depth.memory != nullptr);
+    VULKAN_CHECK(vkAllocateMemory(device, &mem_alloc_info, nullptr, &m_depth.memory));
+    MRQ2_ASSERT(m_depth.memory != nullptr);
 
     // Bind memory:
-    VULKAN_CHECK(vkBindImageMemory(device, depth.image, depth.memory, 0));
+    VULKAN_CHECK(vkBindImageMemory(device, m_depth.image, m_depth.memory, 0));
 
     // Set the image layout to depth stencil optimal:
-    VulkanChangeImageLayout(cmdBuffer, depth.image, view_info.subresourceRange.aspectMask, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    VulkanChangeImageLayout(cmdBuffer, m_depth.image, view_info.subresourceRange.aspectMask, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     // And finally create the image view.
-    view_info.image = depth.image;
-    VULKAN_CHECK(vkCreateImageView(device, &view_info, nullptr, &depth.view));
-    MRQ2_ASSERT(depth.view != nullptr);
+    view_info.image = m_depth.image;
+    VULKAN_CHECK(vkCreateImageView(device, &view_info, nullptr, &m_depth.view));
+    MRQ2_ASSERT(m_depth.view != nullptr);
 
     cmdBuffer.EndRecording();
     cmdBuffer.Submit();
@@ -326,46 +329,46 @@ void SwapChainRenderTargetsVK::InitFramebuffers()
 
 void SwapChainRenderTargetsVK::Shutdown()
 {
-    if (device_vk == nullptr)
+    if (m_device_vk == nullptr)
     {
         return;
     }
 
-    main_render_pass.Shutdown();
+    m_main_render_pass.Shutdown();
 
     // Clean up the swap-chain image views and FBs.
     // The swap-chain images themselves are owned by the swap-chain.
-    for (FrameBuffer & buff : fb)
+    for (FrameBuffer & buff : m_fb)
     {
         if (buff.view != nullptr)
         {
-            vkDestroyImageView(device_vk->Handle(), buff.view, nullptr);
+            vkDestroyImageView(m_device_vk->Handle(), buff.view, nullptr);
         }
         if (buff.framebuffer_handle != nullptr)
         {
-            vkDestroyFramebuffer(device_vk->Handle(), buff.framebuffer_handle, nullptr);
+            vkDestroyFramebuffer(m_device_vk->Handle(), buff.framebuffer_handle, nullptr);
         }
         buff = {};
     }
 
     // The depth buffer owns the views and also the image memory.
-    if (depth.view != nullptr)
+    if (m_depth.view != nullptr)
     {
-        vkDestroyImageView(device_vk->Handle(), depth.view, nullptr);
-        depth.view = nullptr;
+        vkDestroyImageView(m_device_vk->Handle(), m_depth.view, nullptr);
+        m_depth.view = nullptr;
     }
-    if (depth.image != nullptr)
+    if (m_depth.image != nullptr)
     {
-        vkDestroyImage(device_vk->Handle(), depth.image, nullptr);
-        depth.image = nullptr;
+        vkDestroyImage(m_device_vk->Handle(), m_depth.image, nullptr);
+        m_depth.image = nullptr;
     }
-    if (depth.memory != nullptr)
+    if (m_depth.memory != nullptr)
     {
-        vkFreeMemory(device_vk->Handle(), depth.memory, nullptr);
-        depth.memory = nullptr;
+        vkFreeMemory(m_device_vk->Handle(), m_depth.memory, nullptr);
+        m_depth.memory = nullptr;
     }
 
-    device_vk = nullptr;
+    m_device_vk = nullptr;
 }
 
 } // MrQ2

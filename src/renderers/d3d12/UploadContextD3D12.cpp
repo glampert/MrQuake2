@@ -14,7 +14,7 @@ void UploadContextD3D12::Init(const DeviceD3D12 & device)
     MRQ2_ASSERT(m_device == nullptr);
     m_device = &device;
 
-    D12CHECK(device.device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+    D12CHECK(device.Device()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
 
     m_fence_event = CreateEventEx(nullptr, "UploadContextFence", FALSE, EVENT_ALL_ACCESS);
     if (m_fence_event == nullptr)
@@ -27,9 +27,9 @@ void UploadContextD3D12::Init(const DeviceD3D12 & device)
     queue_desc.Flags    = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queue_desc.NodeMask = 1;
 
-    D12CHECK(device.device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&m_command_queue)));
-    D12CHECK(device.device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_command_allocator)));
-    D12CHECK(device.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator.Get(), nullptr, IID_PPV_ARGS(&m_command_list)));
+    D12CHECK(device.m_device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&m_command_queue)));
+    D12CHECK(device.m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_command_allocator)));
+    D12CHECK(device.m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator.Get(), nullptr, IID_PPV_ARGS(&m_command_list)));
 
     D12CHECK(m_command_list->Close());
     D12CHECK(m_command_list->Reset(m_command_allocator.Get(), nullptr));
@@ -310,10 +310,10 @@ void UploadContextD3D12::UploadTexture(const TextureUploadD3D12 & upload_info)
     MRQ2_ASSERT(free_entry != nullptr);
     ++m_num_uploads;
 
-    auto * swap_chain = m_device->swap_chain;
-    auto * gfx_command_list = swap_chain->command_list.Get();
+    auto * swap_chain = m_device->m_swap_chain;
+    auto * gfx_command_list = swap_chain->CmdList();
 
-    free_entry->upload_buffer = CreateUploadBuffer(upload_info, upload_info.texture->m_resource.Get(), m_device->device.Get(), gfx_command_list);
+    free_entry->upload_buffer = CreateUploadBuffer(upload_info, upload_info.texture->m_resource.Get(), m_device->m_device.Get(), gfx_command_list);
 
     free_entry->cmd_list_executed_fence = swap_chain->CurrentCmdListExecutedFence();
     free_entry->cmd_list_executed_value = swap_chain->CurrentCmdListExecutedFenceValue();
@@ -334,7 +334,7 @@ void UploadContextD3D12::CreateTexture(const TextureUploadD3D12 & upload_info)
         FlushTextureCreates();
     }
 
-    ID3D12Resource * upload_buffer = CreateUploadBuffer(upload_info, upload_info.texture->m_resource.Get(), m_device->device.Get(), m_command_list.Get());
+    ID3D12Resource * upload_buffer = CreateUploadBuffer(upload_info, upload_info.texture->m_resource.Get(), m_device->m_device.Get(), m_command_list.Get());
     m_creates.push_back({ upload_buffer });
 }
 

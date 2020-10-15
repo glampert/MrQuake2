@@ -26,7 +26,7 @@ void RootSignatureD3D12::Init(const DeviceD3D12 & device, const D3D12_VERSIONED_
     MRQ2_ASSERT(blob != nullptr);
     MRQ2_ASSERT(root_sig == nullptr);
 
-    hr = device.device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&root_sig));
+    hr = device.Device()->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&root_sig));
     if (FAILED(hr))
     {
         GameInterface::Errorf("Failed to create D3D12 RootSignature!");

@@ -56,12 +56,12 @@ private:
 
 inline int RenderInterfaceVK::RenderWidth() const
 {
-    return m_render_targets.render_target_width;
+    return m_render_targets.RenderTargetWidth();
 }
 
 inline int RenderInterfaceVK::RenderHeight() const
 {
-    return m_render_targets.render_target_height;
+    return m_render_targets.RenderTargetHeight();
 }
 
 inline bool RenderInterfaceVK::IsFrameStarted() const

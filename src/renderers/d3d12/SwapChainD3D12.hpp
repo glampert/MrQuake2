@@ -15,18 +15,6 @@ class SwapChainD3D12 final
 {
 public:
 
-    HANDLE                               frame_fence_event{ nullptr };
-    uint64_t                             frame_fence_values[kD12NumFrameBuffers] = {};
-    uint64_t                             frame_count{ 0 };
-    uint32_t                             frame_index{ 0 };
-    int32_t                              back_buffer_index{ -1 };
-    D12ComPtr<ID3D12Fence>               frame_fence;
-    D12ComPtr<ID3D12CommandQueue>        command_queue;
-    D12ComPtr<ID3D12GraphicsCommandList> command_list;
-    D12ComPtr<ID3D12CommandAllocator>    command_allocators[kD12NumFrameBuffers];
-    D12ComPtr<ID3D12Fence>               cmd_list_executed_fences[kD12NumFrameBuffers];
-    D12ComPtr<IDXGISwapChain4>           swap_chain;
-
     SwapChainD3D12() = default;
 
     // Disallow copy.
@@ -49,29 +37,36 @@ public:
     };
 
     Backbuffer CurrentBackbuffer(const SwapChainRenderTargetsD3D12 & render_targets) const;
-    ID3D12Fence * CurrentCmdListExecutedFence() const { return cmd_list_executed_fences[frame_index].Get(); }
-    uint64_t CurrentCmdListExecutedFenceValue() const { return frame_count; }
+    ID3D12Fence * CurrentCmdListExecutedFence() const { return m_cmd_list_executed_fences[m_frame_index].Get(); }
+    uint64_t CurrentCmdListExecutedFenceValue() const { return m_frame_count; }
+
+    IDXGISwapChain4 * SwapChain() const { return m_swap_chain.Get(); }
+    ID3D12GraphicsCommandList * CmdList() const { return m_command_list.Get(); }
 
 private:
 
     void InitSyncFence(const DeviceD3D12 & device);
     void InitCmdList(const DeviceD3D12 & device);
+
+    HANDLE                               m_frame_fence_event{ nullptr };
+    uint64_t                             m_frame_fence_values[kD12NumFrameBuffers] = {};
+    uint64_t                             m_frame_count{ 0 };
+    uint32_t                             m_frame_index{ 0 };
+    int32_t                              m_back_buffer_index{ -1 };
+    D12ComPtr<ID3D12Fence>               m_frame_fence;
+    D12ComPtr<ID3D12CommandQueue>        m_command_queue;
+    D12ComPtr<ID3D12GraphicsCommandList> m_command_list;
+    D12ComPtr<ID3D12CommandAllocator>    m_command_allocators[kD12NumFrameBuffers];
+    D12ComPtr<ID3D12Fence>               m_cmd_list_executed_fences[kD12NumFrameBuffers];
+    D12ComPtr<IDXGISwapChain4>           m_swap_chain;
 };
 
 class SwapChainRenderTargetsD3D12 final
 {
+    friend class SwapChainD3D12;
+    friend class GraphicsContextD3D12;
+
 public:
-
-    int render_target_width{ 0 };
-    int render_target_height{ 0 };
-
-    // Framebuffer render targets
-    D12ComPtr<ID3D12Resource> render_target_resources[kD12NumFrameBuffers];
-    DescriptorD3D12           render_target_descriptors[kD12NumFrameBuffers] = {};
-
-    // Depth buffer
-    D12ComPtr<ID3D12Resource> depth_render_target;
-    DescriptorD3D12           depth_render_target_descriptor{};
 
     SwapChainRenderTargetsD3D12() = default;
 
@@ -81,6 +76,22 @@ public:
 
     void Init(const DeviceD3D12 & device, const SwapChainD3D12 & swap_chain, DescriptorHeapD3D12 & descriptor_heap, const int width, const int height);
     void Shutdown();
+
+    int RenderTargetWidth()  const { return m_render_target_width;  }
+    int RenderTargetHeight() const { return m_render_target_height; }
+
+private:
+
+    int m_render_target_width{ 0 };
+    int m_render_target_height{ 0 };
+
+    // Framebuffer render targets
+    D12ComPtr<ID3D12Resource> m_render_target_resources[kD12NumFrameBuffers];
+    DescriptorD3D12           m_render_target_descriptors[kD12NumFrameBuffers] = {};
+
+    // Depth buffer
+    D12ComPtr<ID3D12Resource> m_depth_render_target;
+    DescriptorD3D12           m_depth_render_target_descriptor{};
 };
 
 } // MrQ2

@@ -38,7 +38,7 @@ bool BufferD3D12::InitUntypedBuffer(const DeviceD3D12 & device, const uint32_t s
 
     const D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_GENERIC_READ;
 
-    if (FAILED(device.device->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &res_desc, states, nullptr, IID_PPV_ARGS(&m_resource))))
+    if (FAILED(device.Device()->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &res_desc, states, nullptr, IID_PPV_ARGS(&m_resource))))
     {
         GameInterface::Printf("WARNING: CreateCommittedResource failed for new buffer resource!");
         return false;

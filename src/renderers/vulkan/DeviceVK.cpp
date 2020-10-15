@@ -29,22 +29,22 @@ void DeviceVK::Init(Win32Window & window, UploadContextVK & up_ctx, GraphicsCont
 
 void DeviceVK::Shutdown()
 {
-    if (m_device != nullptr)
+    if (m_device_handle != nullptr)
     {
-        vkDestroyDevice(m_device, nullptr);
-        m_device = nullptr;
+        vkDestroyDevice(m_device_handle, nullptr);
+        m_device_handle = nullptr;
     }
 
     if (m_render_surface != nullptr)
     {
-        vkDestroySurfaceKHR(m_instance, m_render_surface, nullptr);
+        vkDestroySurfaceKHR(m_instance_handle, m_render_surface, nullptr);
         m_render_surface = nullptr;
     }
 
-    if (m_instance != nullptr)
+    if (m_instance_handle != nullptr)
     {
-        vkDestroyInstance(m_instance, nullptr);
-        m_instance = nullptr;
+        vkDestroyInstance(m_instance_handle, nullptr);
+        m_instance_handle = nullptr;
     }
 
     m_upload_ctx   = nullptr;
@@ -178,8 +178,8 @@ void DeviceVK::InitInstance()
     inst_info.enabledExtensionCount   = ArrayLength(s_instance_extension_names);
     inst_info.ppEnabledExtensionNames = s_instance_extension_names;
 
-    VULKAN_CHECK(vkCreateInstance(&inst_info, nullptr, &m_instance));
-    MRQ2_ASSERT(m_instance != nullptr);
+    VULKAN_CHECK(vkCreateInstance(&inst_info, nullptr, &m_instance_handle));
+    MRQ2_ASSERT(m_instance_handle != nullptr);
 
     GameInterface::Printf("VK Instance created.");
 }
@@ -187,11 +187,11 @@ void DeviceVK::InitInstance()
 void DeviceVK::EnumerateDevices()
 {
     std::uint32_t num_devices = 0;
-    VULKAN_CHECK(vkEnumeratePhysicalDevices(m_instance, &num_devices, nullptr));
+    VULKAN_CHECK(vkEnumeratePhysicalDevices(m_instance_handle, &num_devices, nullptr));
     MRQ2_ASSERT(num_devices >= 1);
 
     m_physical_devices.resize(num_devices);
-    VULKAN_CHECK(vkEnumeratePhysicalDevices(m_instance, &num_devices, m_physical_devices.data()));
+    VULKAN_CHECK(vkEnumeratePhysicalDevices(m_instance_handle, &num_devices, m_physical_devices.data()));
     MRQ2_ASSERT(num_devices >= 1);
 
     std::uint32_t num_queue_families = 0;
@@ -223,7 +223,7 @@ void DeviceVK::InitSwapChainExtensions(Win32Window & window)
     surface_create_info.hinstance = window.AppInstance();
     surface_create_info.hwnd      = window.WindowHandle();
 
-    VULKAN_CHECK(vkCreateWin32SurfaceKHR(m_instance, &surface_create_info, nullptr, &m_render_surface));
+    VULKAN_CHECK(vkCreateWin32SurfaceKHR(m_instance_handle, &surface_create_info, nullptr, &m_render_surface));
     MRQ2_ASSERT(m_render_surface != nullptr);
 
     // Iterate over each queue to learn whether it supports presenting:
@@ -324,13 +324,13 @@ void DeviceVK::InitDevice()
     device_create_info.ppEnabledExtensionNames = s_device_extension_names;
     device_create_info.pEnabledFeatures        = &m_device_info.features;
 
-    VULKAN_CHECK(vkCreateDevice(m_physical_devices[0], &device_create_info, nullptr, &m_device));
-    MRQ2_ASSERT(m_device != nullptr);
+    VULKAN_CHECK(vkCreateDevice(m_physical_devices[0], &device_create_info, nullptr, &m_device_handle));
+    MRQ2_ASSERT(m_device_handle != nullptr);
 
     GameInterface::Printf("VK Device created for GPU 0.");
 
     // Get the GPU queue handles:
-    vkGetDeviceQueue(m_device, m_graphics_queue.family_index, 0, &m_graphics_queue.queue_handle);
+    vkGetDeviceQueue(m_device_handle, m_graphics_queue.family_index, 0, &m_graphics_queue.queue_handle);
     MRQ2_ASSERT(m_graphics_queue.queue_handle != nullptr);
 
     if (m_graphics_queue.family_index == m_present_queue.family_index)
@@ -340,7 +340,7 @@ void DeviceVK::InitDevice()
     }
     else
     {
-        vkGetDeviceQueue(m_device, m_present_queue.family_index, 0, &m_present_queue.queue_handle);
+        vkGetDeviceQueue(m_device_handle, m_present_queue.family_index, 0, &m_present_queue.queue_handle);
         MRQ2_ASSERT(m_present_queue.queue_handle != nullptr);
     }
 }

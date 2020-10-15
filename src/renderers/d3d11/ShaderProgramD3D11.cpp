@@ -15,7 +15,7 @@ static const char D3D11ShadersPath[] = "src\\renderers\\shaders\\hlsl";
 
 bool ShaderProgramD3D11::LoadFromFile(const DeviceD3D11 & device, const VertexInputLayoutD3D11 & input_layout, const char * filename)
 {
-    return LoadFromFile(device, input_layout, filename, "VS_main", "PS_main", device.debug_validation);
+    return LoadFromFile(device, input_layout, filename, "VS_main", "PS_main", device.DebugValidationEnabled());
 }
 
 bool ShaderProgramD3D11::LoadFromFile(const DeviceD3D11 & device, const VertexInputLayoutD3D11 & input_layout,
@@ -76,7 +76,7 @@ bool ShaderProgramD3D11::LoadFromFile(const DeviceD3D11 & device, const VertexIn
         ++num_elements;
     }
 
-    auto * device11 = device.device;
+    auto * device11 = device.Device();
 
     // Create the vertex shader:
     HRESULT hr = device11->CreateVertexShader(shader_bytecode.vs_blob->GetBufferPointer(),

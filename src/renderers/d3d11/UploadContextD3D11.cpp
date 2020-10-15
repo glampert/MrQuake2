@@ -36,7 +36,7 @@ void UploadContextD3D11::UploadTexture(const TextureUploadD3D11 & upload_info)
         const uint32_t row_pitch = upload_info.mipmaps.mip_dimensions[mip].x * TextureImage::kBytesPerPixel;
         const void * const data  = upload_info.mipmaps.mip_init_data[mip];
 
-        m_device->context->UpdateSubresource(texture_resource, mip, nullptr, data, row_pitch, 0);
+        m_device->DeviceContext()->UpdateSubresource(texture_resource, mip, nullptr, data, row_pitch, 0);
     }
 }
 

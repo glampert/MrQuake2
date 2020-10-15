@@ -33,7 +33,7 @@ void RenderInterfaceD3D12::Shutdown()
 {
     GameInterface::Printf("**** RenderInterfaceD3D12::Shutdown ****");
 
-    const bool debug_check_leaks = m_device.debug_validation;
+    const bool debug_check_leaks = m_device.DebugValidationEnabled();
 
     RootSignatureD3D12::sm_global.Shutdown();
     m_graphics_ctx.Shutdown();

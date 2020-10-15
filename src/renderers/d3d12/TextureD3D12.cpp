@@ -20,8 +20,8 @@ void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, cons
     MRQ2_ASSERT(m_device == nullptr); // Shutdown first
     (void)is_scrap; // unused
 
-    m_srv_descriptor     = device.descriptor_heap->AllocateDescriptor(DescriptorD3D12::kSRV);
-    m_sampler_descriptor = device.descriptor_heap->AllocateDescriptor(DescriptorD3D12::kSampler);
+    m_srv_descriptor     = device.DescriptorHeap().AllocateDescriptor(DescriptorD3D12::kSRV);
+    m_sampler_descriptor = device.DescriptorHeap().AllocateDescriptor(DescriptorD3D12::kSampler);
     m_shared_descriptors = false;
 
     // Texture resource:
@@ -43,7 +43,7 @@ void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, cons
     res_desc.Layout                  = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     res_desc.Flags                   = D3D12_RESOURCE_FLAG_NONE;
 
-    D12CHECK(device.device->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource)));
+    D12CHECK(device.Device()->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource)));
 
 #ifndef NDEBUG
     size_t num_converted = 0;
@@ -69,7 +69,7 @@ void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, cons
     srv_desc.Texture2D.MipLevels             = num_mip_levels;
     srv_desc.Texture2D.MostDetailedMip       = 0;
     srv_desc.Shader4ComponentMapping         = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    device.device->CreateShaderResourceView(m_resource.Get(), &srv_desc, m_srv_descriptor.cpu_handle);
+    device.Device()->CreateShaderResourceView(m_resource.Get(), &srv_desc, m_srv_descriptor.cpu_handle);
 
     int max_anisotropy = Config::r_max_anisotropy.AsInt();
 
@@ -90,7 +90,7 @@ void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, cons
     sampler_desc.MipLODBias          = 0.0f;
     sampler_desc.MinLOD              = 0.0f;
     sampler_desc.MaxLOD              = D3D12_FLOAT32_MAX;
-    device.device->CreateSampler(&sampler_desc, m_sampler_descriptor.cpu_handle);
+    device.Device()->CreateSampler(&sampler_desc, m_sampler_descriptor.cpu_handle);
 
     m_device = &device;
 }
@@ -118,8 +118,8 @@ void TextureD3D12::Shutdown()
     {
         if (!m_shared_descriptors)
         {
-            m_device->descriptor_heap->FreeDescriptor(m_srv_descriptor);
-            m_device->descriptor_heap->FreeDescriptor(m_sampler_descriptor);
+            m_device->DescriptorHeap().FreeDescriptor(m_srv_descriptor);
+            m_device->DescriptorHeap().FreeDescriptor(m_sampler_descriptor);
         }
 
         m_resource           = nullptr;

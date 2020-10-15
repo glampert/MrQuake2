@@ -20,7 +20,7 @@ void GraphicsContextD3D12::Init(const DeviceD3D12 & device, const SwapChainD3D12
     m_device         = &device;
     m_swap_chain     = &swap_chain;
     m_render_targets = &render_targets;
-    m_command_list   = swap_chain.command_list.Get();
+    m_command_list   = swap_chain.CmdList();
 
     m_current_viewport.MinDepth = 0.0f;
     m_current_viewport.MaxDepth = 1.0f;
@@ -42,14 +42,14 @@ void GraphicsContextD3D12::BeginFrame(const float clear_color[4], const float cl
 
     m_command_list->ClearRenderTargetView(back_buffer.descriptor.cpu_handle, clear_color, 0, nullptr);
 
-    m_command_list->ClearDepthStencilView(m_render_targets->depth_render_target_descriptor.cpu_handle,
+    m_command_list->ClearDepthStencilView(m_render_targets->m_depth_render_target_descriptor.cpu_handle,
                                           D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,
                                           clear_depth, clear_stencil, 0, nullptr);
 
     // Set all the shader visible destructor heaps:
     ID3D12DescriptorHeap * descriptor_heaps[] = {
-        *m_device->descriptor_heap->GetHeapAddr(DescriptorD3D12::kSRV),
-        *m_device->descriptor_heap->GetHeapAddr(DescriptorD3D12::kSampler)
+        *m_device->DescriptorHeap().GetHeapAddr(DescriptorD3D12::kSRV),
+        *m_device->DescriptorHeap().GetHeapAddr(DescriptorD3D12::kSampler)
     };
     m_command_list->SetDescriptorHeaps(ArrayLength(descriptor_heaps), descriptor_heaps);
 }

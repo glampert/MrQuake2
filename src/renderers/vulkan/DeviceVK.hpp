@@ -18,6 +18,7 @@ class DeviceVK final
 public:
 
     DeviceVK() = default;
+    ~DeviceVK() { Shutdown(); }
 
     // Disallow copy.
     DeviceVK(const DeviceVK &) = delete;
@@ -31,7 +32,7 @@ public:
     GraphicsContextVK & GraphicsContext()  const { return *m_graphics_ctx; }
 
     // VK public handles
-    VkDevice         Handle()              const { return m_device; }
+    VkDevice         Handle()              const { return m_device_handle; }
     VkPhysicalDevice PhysDevice()          const { return m_physical_devices[0]; }
     VkSurfaceKHR     RenderSurface()       const { return m_render_surface; }
     VkFormat         RenderSurfaceFormat() const { return m_render_surface_format; }
@@ -72,8 +73,8 @@ private:
     UploadContextVK *   m_upload_ctx{ nullptr };
     GraphicsContextVK * m_graphics_ctx{ nullptr };
 
-    VkInstance   m_instance{ nullptr };
-    VkDevice     m_device{ nullptr };
+    VkInstance   m_instance_handle{ nullptr };
+    VkDevice     m_device_handle{ nullptr };
     VkSurfaceKHR m_render_surface{ nullptr };                    // Render target surface for the rendering window (screen framebuffer).
     VkFormat     m_render_surface_format{ VK_FORMAT_UNDEFINED }; // Texture format of the rendering surface (the framebuffer).
     bool         m_debug_validation{ false };                    // With Vulkan debug validation layers?
