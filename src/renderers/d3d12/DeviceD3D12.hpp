@@ -28,7 +28,7 @@ public:
     DeviceD3D12(const DeviceD3D12 &) = delete;
     DeviceD3D12 & operator=(const DeviceD3D12 &) = delete;
 
-    void Init(const bool debug, DescriptorHeapD3D12 & desc_heap, UploadContextD3D12 & up_ctx, GraphicsContextD3D12 & gfx_ctx, SwapChainD3D12 & sc);
+    void Init(DescriptorHeapD3D12 & desc_heap, UploadContextD3D12 & up_ctx, GraphicsContextD3D12 & gfx_ctx, SwapChainD3D12 & sc, const bool debug);
     void Shutdown();
 
     bool DebugValidationEnabled() const { return m_debug_validation; }

@@ -18,7 +18,7 @@ void RenderInterfaceD3D12::Init(HINSTANCE hInst, WNDPROC wndProc, const int widt
     // Window, device and swap-chain setup:
     const auto window_name = debug ? "MrQuake2 (D3D12 Debug)" : "MrQuake2 (D3D12)";
     m_window.Init(window_name, hInst, wndProc, width, height, fullscreen);
-    m_device.Init(debug, m_descriptor_heap, m_upload_ctx, m_graphics_ctx, m_swap_chain);
+    m_device.Init(m_descriptor_heap, m_upload_ctx, m_graphics_ctx, m_swap_chain, debug);
     m_swap_chain.Init(m_device, m_window.WindowHandle(), fullscreen, width, height);
 
     // Global renderer states setup:

@@ -29,6 +29,7 @@ public:
 
 protected:
 
+    ~BufferD3D12() = default;
     bool InitUntypedBuffer(const DeviceD3D12 & device, const uint32_t size_in_bytes);
 
     D12ComPtr<ID3D12Resource> m_resource;

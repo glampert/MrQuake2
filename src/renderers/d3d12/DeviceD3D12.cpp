@@ -7,7 +7,7 @@
 namespace MrQ2
 {
 
-void DeviceD3D12::Init(const bool debug, DescriptorHeapD3D12 & desc_heap, UploadContextD3D12 & up_ctx, GraphicsContextD3D12 & gfx_ctx, SwapChainD3D12 & sc)
+void DeviceD3D12::Init(DescriptorHeapD3D12 & desc_heap, UploadContextD3D12 & up_ctx, GraphicsContextD3D12 & gfx_ctx, SwapChainD3D12 & sc, const bool debug)
 {
     m_debug_validation = debug;
     uint32_t dxgi_factory_flags = 0;

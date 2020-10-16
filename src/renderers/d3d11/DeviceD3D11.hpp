@@ -22,7 +22,7 @@ public:
     DeviceD3D11(const DeviceD3D11 &) = delete;
     DeviceD3D11 & operator=(const DeviceD3D11 &) = delete;
 
-    void Init(const SwapChainD3D11 & sc, const bool debug, UploadContextD3D11 & up_ctx, GraphicsContextD3D11 & gfx_ctx);
+    void Init(const SwapChainD3D11 & sc, UploadContextD3D11 & up_ctx, GraphicsContextD3D11 & gfx_ctx, const bool debug);
     void Shutdown();
 
     uint32_t MultisampleQualityLevel(const DXGI_FORMAT fmt) const;

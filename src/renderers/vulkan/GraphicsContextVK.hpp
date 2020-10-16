@@ -70,6 +70,10 @@ private:
     const SwapChainRenderTargetsVK * m_render_targets{ nullptr };
     CommandBufferVK *                m_command_buffer{ nullptr };
     VkCommandBuffer                  m_command_buffer_handle{ nullptr }; // Cached from m_command_buffer
+
+    // Cached states:
+    VkBuffer                         m_current_vb{ nullptr };
+    VkBuffer                         m_current_ib{ nullptr };
 };
 
 //

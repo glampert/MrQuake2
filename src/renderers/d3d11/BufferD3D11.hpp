@@ -29,6 +29,7 @@ public:
 
 protected:
 
+    ~BufferD3D11() = default;
     void InitBufferInternal(const DeviceD3D11 & device, const D3D11_BUFFER_DESC & buffer_desc);
 
     const DeviceD3D11 *     m_device{ nullptr };

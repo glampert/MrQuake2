@@ -40,10 +40,10 @@ void GraphicsContextVK::BeginFrame(const float clear_color[4], const float clear
     const auto fb_index = m_swap_chain->CurrentFrameBufferIdx();
 
     VkClearValue clear_values[2] = {}; // color & depth
-	clear_values[0].color.float32[0]     = clear_color[0];
-	clear_values[0].color.float32[1]     = clear_color[1];
-	clear_values[0].color.float32[2]     = clear_color[2];
-	clear_values[0].color.float32[3]     = clear_color[3];
+    clear_values[0].color.float32[0]     = clear_color[0];
+    clear_values[0].color.float32[1]     = clear_color[1];
+    clear_values[0].color.float32[2]     = clear_color[2];
+    clear_values[0].color.float32[3]     = clear_color[3];
     clear_values[1].depthStencil.depth   = clear_depth;
     clear_values[1].depthStencil.stencil = clear_stencil;
 
@@ -69,6 +69,9 @@ void GraphicsContextVK::EndFrame()
     // No calls outside Begin/EndFrame
     m_command_buffer = nullptr;
     m_command_buffer_handle = nullptr;
+
+    m_current_vb = nullptr;
+    m_current_ib = nullptr;
 }
 
 void GraphicsContextVK::SetViewport(const int x, const int y, const int width, const int height)
@@ -89,10 +92,27 @@ void GraphicsContextVK::RestoreDepthRange()
 
 void GraphicsContextVK::SetVertexBuffer(const VertexBufferVK & vb)
 {
+    MRQ2_ASSERT(vb.m_buffer_handle != nullptr);
+
+    if (vb.m_buffer_handle != m_current_vb)
+    {
+        m_current_vb = vb.m_buffer_handle;
+
+        const VkBuffer buffers[] = { m_current_vb };
+        const VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers(m_command_buffer_handle, 0, 1, buffers, offsets);
+    }
 }
 
 void GraphicsContextVK::SetIndexBuffer(const IndexBufferVK & ib)
 {
+    MRQ2_ASSERT(ib.m_buffer_handle != nullptr);
+
+    if (ib.m_buffer_handle != m_current_ib)
+    {
+        m_current_ib = ib.m_buffer_handle;
+        vkCmdBindIndexBuffer(m_command_buffer_handle, m_current_ib, 0, ib.TypeVK());
+    }
 }
 
 void GraphicsContextVK::SetConstantBuffer(const ConstantBufferVK & cb, const uint32_t slot)

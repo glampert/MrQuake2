@@ -80,13 +80,13 @@ uint32_t VulkanMemoryTypeFromProperties(const DeviceVK & device, const uint32_t 
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void VulkanChangeImageLayout(CommandBufferVK & cmdBuff, VkImage image, const VkImageAspectFlags aspect_mask,
+void VulkanChangeImageLayout(CommandBufferVK & cmd_buff, VkImage image, const VkImageAspectFlags aspect_mask,
                              const VkImageLayout old_image_layout, const VkImageLayout new_image_layout,
                              const int base_mip_level, const int mip_level_count,
                              const int base_layer, const int layer_count)
 {
     MRQ2_ASSERT(image != nullptr);
-    MRQ2_ASSERT(cmdBuff.IsInRecordingState());
+    MRQ2_ASSERT(cmd_buff.IsInRecordingState());
 
     VkImageMemoryBarrier image_mem_barrier{};
     image_mem_barrier.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -139,7 +139,7 @@ void VulkanChangeImageLayout(CommandBufferVK & cmdBuff, VkImage image, const VkI
     }
 
     vkCmdPipelineBarrier(
-        /* commandBuffer            = */ cmdBuff.Handle(),
+        /* commandBuffer            = */ cmd_buff.Handle(),
         /* srcStageMask             = */ srcStageMask,
         /* dstStageMask             = */ dstStageMask,
         /* dependencyFlags          = */ 0,
@@ -149,6 +149,60 @@ void VulkanChangeImageLayout(CommandBufferVK & cmdBuff, VkImage image, const VkI
         /* pBufferMemoryBarriers    = */ nullptr,
         /* imageMemoryBarrierCount  = */ 1,
         /* pImageBarriers           = */ &image_mem_barrier);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VulkanCopyBuffer(CommandBufferVK & cmd_buff,
+                      VkBuffer src_buff, VkBuffer dst_buff,
+                      const VkDeviceSize size_to_copy,
+                      const VkDeviceSize src_offset,
+                      const VkDeviceSize dst_offset)
+{
+    MRQ2_ASSERT(size_to_copy != 0);
+    MRQ2_ASSERT(src_buff != nullptr && dst_buff != nullptr);
+    MRQ2_ASSERT(cmd_buff.IsInRecordingState());
+
+    VkBufferCopy copy_region{};
+    copy_region.srcOffset = src_offset;
+    copy_region.dstOffset = dst_offset;
+    copy_region.size      = size_to_copy;
+    vkCmdCopyBuffer(cmd_buff.Handle(), src_buff, dst_buff, 1, &copy_region);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VulkanAllocateBuffer(const DeviceVK & device, const VkDeviceSize size_bytes, const VkBufferUsageFlags usage,
+                          const VkMemoryPropertyFlags memory_properties, VkBuffer * out_buff,
+                          VkDeviceMemory * out_buff_memory, VkMemoryRequirements * out_opt_mem_reqs)
+{
+    MRQ2_ASSERT(size_bytes != 0);
+    MRQ2_ASSERT(out_buff != nullptr && out_buff_memory != nullptr);
+
+    VkBufferCreateInfo buffer_create_info{};
+    buffer_create_info.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_create_info.size        = size_bytes;
+    buffer_create_info.usage       = usage;
+    buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VULKAN_CHECK(vkCreateBuffer(device.Handle(), &buffer_create_info, nullptr, out_buff));
+
+    VkMemoryRequirements mem_requirements{};
+    vkGetBufferMemoryRequirements(device.Handle(), *out_buff, &mem_requirements);
+
+    VkMemoryAllocateInfo alloc_info{};
+    alloc_info.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.allocationSize  = mem_requirements.size;
+    alloc_info.memoryTypeIndex = VulkanMemoryTypeFromProperties(device, mem_requirements.memoryTypeBits, memory_properties);
+    MRQ2_ASSERT(alloc_info.memoryTypeIndex < UINT32_MAX);
+
+    VULKAN_CHECK(vkAllocateMemory(device.Handle(), &alloc_info, nullptr, out_buff_memory));
+    VULKAN_CHECK(vkBindBufferMemory(device.Handle(), *out_buff, *out_buff_memory, 0));
+
+    if (out_opt_mem_reqs != nullptr)
+    {
+        *out_opt_mem_reqs = mem_requirements;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

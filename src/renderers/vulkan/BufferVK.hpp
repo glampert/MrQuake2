@@ -10,11 +10,15 @@ namespace MrQ2
 
 class DeviceVK;
 class GraphicsContextVK;
+class UploadContextVK;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 class BufferVK
 {
+    friend GraphicsContextVK;
+    friend UploadContextVK;
+
 public:
 
     BufferVK() = default;
@@ -26,6 +30,21 @@ public:
     void Shutdown();
     void * Map();
     void Unmap();
+
+    uint32_t SizeInBytes() const { return m_size_in_bytes; }
+
+protected:
+
+    ~BufferVK() { Shutdown(); }
+    void InitBufferInternal(const DeviceVK & device, const uint32_t buffer_size_in_bytes, const VkBufferUsageFlags buffer_usage);
+
+    const DeviceVK *   m_device_vk{ nullptr };
+    VkBuffer           m_buffer_handle{ nullptr };
+    VkBuffer           m_staging_buffer_handle{ nullptr };
+    VkDeviceMemory     m_buffer_mem_handle{ nullptr };
+    VkDeviceMemory     m_staging_buffer_mem_handle{ nullptr };
+    uint32_t           m_size_in_bytes{ 0 };
+    VkBufferUsageFlags m_buffer_usage{ 0 };
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -38,12 +57,10 @@ public:
 
     bool Init(const DeviceVK & device, const uint32_t buffer_size_in_bytes, const uint32_t vertex_stride_in_bytes);
 
-    uint32_t SizeInBytes()   const { return m_size_in_bytes; }
     uint32_t StrideInBytes() const { return m_stride_in_bytes; }
 
 private:
 
-    uint32_t m_size_in_bytes{ 0 };
     uint32_t m_stride_in_bytes{ 0 };
 };
 
@@ -63,13 +80,12 @@ public:
 
     bool Init(const DeviceVK & device, const uint32_t buffer_size_in_bytes, const IndexFormat format);
 
-    uint32_t    SizeInBytes()   const { return m_size_in_bytes; }
     uint32_t    StrideInBytes() const { return (m_index_format == kFormatUInt16) ? sizeof(uint16_t) : sizeof(uint32_t); }
+    VkIndexType TypeVK()        const { return (m_index_format == kFormatUInt16) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32; }
     IndexFormat Format()        const { return m_index_format; }
 
 private:
 
-    uint32_t    m_size_in_bytes{ 0 };
     IndexFormat m_index_format{};
 };
 
@@ -95,12 +111,9 @@ public:
         Unmap();
     }
 
-    uint32_t SizeInBytes() const { return m_size_in_bytes; }
-
 private:
 
-    uint32_t m_size_in_bytes{ 0 };
-    Flags    m_flags{ kNoFlags };
+    Flags m_flags{ kNoFlags };
 };
 
 ///////////////////////////////////////////////////////////////////////////////

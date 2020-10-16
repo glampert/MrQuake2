@@ -17,7 +17,7 @@ void RenderInterfaceD3D11::Init(HINSTANCE hInst, WNDPROC wndProc, const int widt
     const auto window_name = debug ? "MrQuake2 (D3D11 Debug)" : "MrQuake2 (D3D11)";
     m_window.Init(window_name, hInst, wndProc, width, height, fullscreen);
     m_swap_chain.Init(m_window.WindowHandle(), fullscreen, width, height, debug);
-    m_device.Init(m_swap_chain, debug, m_upload_ctx, m_graphics_ctx);
+    m_device.Init(m_swap_chain, m_upload_ctx, m_graphics_ctx, debug);
 
     // Global renderer states setup:
     m_render_targets.Init(m_swap_chain, width, height);

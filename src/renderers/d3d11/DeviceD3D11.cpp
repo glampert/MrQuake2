@@ -8,7 +8,7 @@
 namespace MrQ2
 {
 
-void DeviceD3D11::Init(const SwapChainD3D11 & sc, const bool debug, UploadContextD3D11 & up_ctx, GraphicsContextD3D11 & gfx_ctx)
+void DeviceD3D11::Init(const SwapChainD3D11 & sc, UploadContextD3D11 & up_ctx, GraphicsContextD3D11 & gfx_ctx, const bool debug)
 {
     m_upload_ctx       = &up_ctx;
     m_graphics_ctx     = &gfx_ctx;

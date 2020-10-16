@@ -33,10 +33,20 @@ const char * VulkanResultToString(const VkResult result);
 
 uint32_t VulkanMemoryTypeFromProperties(const DeviceVK & device, const uint32_t type_bits, const VkFlags requirements_mask);
 
-void VulkanChangeImageLayout(CommandBufferVK & cmdBuff, VkImage image, const VkImageAspectFlags aspect_mask,
+void VulkanChangeImageLayout(CommandBufferVK & cmd_buff, VkImage image, const VkImageAspectFlags aspect_mask,
                              const VkImageLayout old_image_layout, const VkImageLayout new_image_layout,
                              const int base_mip_level = 0, const int mip_level_count = 1,
                              const int base_layer = 0, const int layer_count = 1);
+
+void VulkanCopyBuffer(CommandBufferVK & cmd_buff,
+                      VkBuffer src_buff, VkBuffer dst_buff,
+                      const VkDeviceSize size_to_copy,
+                      const VkDeviceSize src_offset = 0,
+                      const VkDeviceSize dst_offset = 0);
+
+void VulkanAllocateBuffer(const DeviceVK & device, const VkDeviceSize size_bytes, const VkBufferUsageFlags usage,
+                          const VkMemoryPropertyFlags memory_properties, VkBuffer * out_buff,
+                          VkDeviceMemory * out_buff_memory, VkMemoryRequirements * out_opt_mem_reqs = nullptr);
 
 inline void VulkanCheckImpl(const VkResult result, const char * const msg, const char * const file, const int line)
 {
