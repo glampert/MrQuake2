@@ -18,6 +18,12 @@ class TextureD3D11 final
 
 public:
 
+    TextureD3D11() = default;
+
+    // Disallow copy.
+    TextureD3D11(const TextureD3D11 &) = delete;
+    TextureD3D11 & operator=(const TextureD3D11 &) = delete;
+
     void Init(const DeviceD3D11 & device, const TextureType type, const bool is_scrap,
               const ColorRGBA32 * mip_init_data[], const Vec2u16 mip_dimensions[],
               const uint32_t num_mip_levels, const char * const debug_name);

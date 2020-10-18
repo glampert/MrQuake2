@@ -29,14 +29,22 @@ enum class PrimitiveTopologyVK : uint8_t
     kCount
 };
 
+///////////////////////////////////////////////////////////////////////////////
+// Helper functions
+///////////////////////////////////////////////////////////////////////////////
+
 const char * VulkanResultToString(const VkResult result);
 
 uint32_t VulkanMemoryTypeFromProperties(const DeviceVK & device, const uint32_t type_bits, const VkFlags requirements_mask);
 
 void VulkanChangeImageLayout(CommandBufferVK & cmd_buff, VkImage image, const VkImageAspectFlags aspect_mask,
                              const VkImageLayout old_image_layout, const VkImageLayout new_image_layout,
-                             const int base_mip_level = 0, const int mip_level_count = 1,
-                             const int base_layer = 0, const int layer_count = 1);
+                             const uint32_t base_mip_level = 0, const uint32_t mip_level_count = 1,
+                             const uint32_t base_layer = 0, const uint32_t layer_count = 1);
+
+void VulkanAllocateImage(const DeviceVK & device, const VkImageCreateInfo & image_info,
+                         const VkMemoryPropertyFlags memory_properties,
+                         VkImage * out_image, VkDeviceMemory * out_image_memory);
 
 void VulkanCopyBuffer(CommandBufferVK & cmd_buff,
                       VkBuffer src_buff, VkBuffer dst_buff,

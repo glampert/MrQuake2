@@ -12,16 +12,17 @@ namespace MrQ2
 // BufferVK
 ///////////////////////////////////////////////////////////////////////////////
 
-void BufferVK::InitBufferInternal(const DeviceVK & device, const uint32_t buffer_size_in_bytes, const VkBufferUsageFlags buffer_usage)
+void BufferVK::InitBufferInternal(const DeviceVK & device, const uint32_t buffer_size_in_bytes,
+                                  const VkBufferUsageFlags buffer_usage, VkMemoryRequirements * out_opt_mem_reqs)
 {
     MRQ2_ASSERT(m_device_vk == nullptr);
     MRQ2_ASSERT(buffer_size_in_bytes != 0);
 
     const auto memory_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    VulkanAllocateBuffer(device, buffer_size_in_bytes, buffer_usage, memory_flags, &m_buffer_handle, &m_buffer_mem_handle);
+    VulkanAllocateBuffer(device, buffer_size_in_bytes, buffer_usage, memory_flags, &m_buffer_handle, &m_buffer_mem_handle, out_opt_mem_reqs);
 
     m_device_vk    = &device;
-    m_buffer_size  = buffer_size_in_bytes;
+    m_buffer_size  = (out_opt_mem_reqs != nullptr) ? static_cast<uint32_t>(out_opt_mem_reqs->size) : buffer_size_in_bytes;
     m_buffer_usage = buffer_usage;
 }
 
@@ -44,7 +45,9 @@ void BufferVK::Shutdown()
         m_buffer_handle = nullptr;
     }
 
-    m_device_vk = nullptr;
+    m_buffer_size  = 0;
+    m_buffer_usage = 0;
+    m_device_vk    = nullptr;
 }
 
 void * BufferVK::Map()

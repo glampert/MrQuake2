@@ -17,6 +17,13 @@ class TextureD3D12 final
 
 public:
 
+    TextureD3D12() = default;
+    ~TextureD3D12() { Shutdown(); }
+
+    // Disallow copy.
+    TextureD3D12(const TextureD3D12 &) = delete;
+    TextureD3D12 & operator=(const TextureD3D12 &) = delete;
+
     void Init(const DeviceD3D12 & device, const TextureType type, const bool is_scrap,
               const ColorRGBA32 * mip_init_data[], const Vec2u16 mip_dimensions[],
               const uint32_t num_mip_levels, const char * const debug_name);

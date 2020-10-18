@@ -13,10 +13,14 @@ enum class TextureType : std::uint8_t;
 
 class TextureVK final
 {
-    friend class UploadContextVK;
-    friend class GraphicsContextVK;
-
 public:
+
+    TextureVK() = default;
+    ~TextureVK() { Shutdown(); }
+
+    // Disallow copy.
+    TextureVK(const TextureVK &) = delete;
+    TextureVK & operator=(const TextureVK &) = delete;
 
     void Init(const DeviceVK & device, const TextureType type, const bool is_scrap,
               const ColorRGBA32 * mip_init_data[], const Vec2u16 mip_dimensions[],
@@ -27,9 +31,16 @@ public:
 
     void Shutdown();
 
+    VkImage Handle() const { return m_image_handle; }
+
 private:
 
-    const DeviceVK * m_device{ nullptr };
+    const DeviceVK * m_device_vk{ nullptr };
+    VkSampler        m_sampler_handle{ nullptr };
+    VkImage          m_image_handle{ nullptr };
+    VkImageView      m_image_view_handle{ nullptr };
+    VkDeviceMemory   m_image_mem_handle{ nullptr };
+    bool             m_owns_resources{ false };
 };
 
 } // MrQ2

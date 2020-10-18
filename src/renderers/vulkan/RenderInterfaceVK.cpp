@@ -40,6 +40,9 @@ void RenderInterfaceVK::BeginFrame(const float clear_color[4], const float clear
     MRQ2_ASSERT(!m_frame_started);
     m_frame_started = true;
 
+    // Flush any textures created by the last level load.
+    m_upload_ctx.FlushTextureCreates();
+
     m_swap_chain.BeginFrame();
     m_graphics_ctx.BeginFrame(clear_color, clear_depth, clear_stencil);
     m_graphics_ctx.SetViewport(0, 0, RenderWidth(), RenderHeight());
@@ -50,6 +53,12 @@ void RenderInterfaceVK::EndFrame()
 {
     MRQ2_ASSERT(m_frame_started);
     m_frame_started = false;
+
+    // Flush any textures created within this frame.
+    m_upload_ctx.FlushTextureCreates();
+
+    // Finish any texture uploads that were submitted this fame.
+    m_upload_ctx.UpdateCompletedUploads();
 
     m_graphics_ctx.EndFrame();
     m_swap_chain.EndFrame();

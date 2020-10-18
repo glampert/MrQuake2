@@ -82,8 +82,8 @@ uint32_t VulkanMemoryTypeFromProperties(const DeviceVK & device, const uint32_t 
 
 void VulkanChangeImageLayout(CommandBufferVK & cmd_buff, VkImage image, const VkImageAspectFlags aspect_mask,
                              const VkImageLayout old_image_layout, const VkImageLayout new_image_layout,
-                             const int base_mip_level, const int mip_level_count,
-                             const int base_layer, const int layer_count)
+                             const uint32_t base_mip_level, const uint32_t mip_level_count,
+                             const uint32_t base_layer, const uint32_t layer_count)
 {
     MRQ2_ASSERT(image != nullptr);
     MRQ2_ASSERT(cmd_buff.IsInRecordingState());
@@ -101,8 +101,8 @@ void VulkanChangeImageLayout(CommandBufferVK & cmd_buff, VkImage image, const Vk
     image_mem_barrier.subresourceRange.baseArrayLayer = base_layer;
     image_mem_barrier.subresourceRange.layerCount     = layer_count;
 
-    VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    VkPipelineStageFlags src_stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    VkPipelineStageFlags dst_stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
     if (old_image_layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
     {
@@ -111,6 +111,7 @@ void VulkanChangeImageLayout(CommandBufferVK & cmd_buff, VkImage image, const Vk
     if (new_image_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
     {
         image_mem_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        dst_stage_mask = VK_PIPELINE_STAGE_TRANSFER_BIT;
     }
     if (new_image_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
     {
@@ -119,6 +120,7 @@ void VulkanChangeImageLayout(CommandBufferVK & cmd_buff, VkImage image, const Vk
     if (old_image_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
     {
         image_mem_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        src_stage_mask = VK_PIPELINE_STAGE_TRANSFER_BIT;
     }
     if (old_image_layout == VK_IMAGE_LAYOUT_PREINITIALIZED)
     {
@@ -127,6 +129,7 @@ void VulkanChangeImageLayout(CommandBufferVK & cmd_buff, VkImage image, const Vk
     if (new_image_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
     {
         image_mem_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        dst_stage_mask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
     if (new_image_layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
     {
@@ -135,13 +138,13 @@ void VulkanChangeImageLayout(CommandBufferVK & cmd_buff, VkImage image, const Vk
     if (new_image_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
     {
         image_mem_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        dst_stage_mask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
     }
 
     vkCmdPipelineBarrier(
         /* commandBuffer            = */ cmd_buff.Handle(),
-        /* srcStageMask             = */ srcStageMask,
-        /* dstStageMask             = */ dstStageMask,
+        /* srcStageMask             = */ src_stage_mask,
+        /* dstStageMask             = */ dst_stage_mask,
         /* dependencyFlags          = */ 0,
         /* memoryBarrierCount       = */ 0,
         /* pMemoryBarriers          = */ nullptr,
@@ -149,6 +152,28 @@ void VulkanChangeImageLayout(CommandBufferVK & cmd_buff, VkImage image, const Vk
         /* pBufferMemoryBarriers    = */ nullptr,
         /* imageMemoryBarrierCount  = */ 1,
         /* pImageBarriers           = */ &image_mem_barrier);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VulkanAllocateImage(const DeviceVK & device, const VkImageCreateInfo & image_info,
+                         const VkMemoryPropertyFlags memory_properties,
+                         VkImage * out_image, VkDeviceMemory * out_image_memory)
+{
+    MRQ2_ASSERT(out_image != nullptr && out_image_memory != nullptr);
+    VULKAN_CHECK(vkCreateImage(device.Handle(), &image_info, nullptr, out_image));
+
+    VkMemoryRequirements mem_requirements{};
+    vkGetImageMemoryRequirements(device.Handle(), *out_image, &mem_requirements);
+
+    VkMemoryAllocateInfo alloc_info{};
+    alloc_info.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.allocationSize  = mem_requirements.size;
+    alloc_info.memoryTypeIndex = VulkanMemoryTypeFromProperties(device, mem_requirements.memoryTypeBits, memory_properties);
+    MRQ2_ASSERT(alloc_info.memoryTypeIndex < UINT32_MAX);
+
+    VULKAN_CHECK(vkAllocateMemory(device.Handle(), &alloc_info, nullptr, out_image_memory));
+    VULKAN_CHECK(vkBindImageMemory(device.Handle(), *out_image, *out_image_memory, 0));
 }
 
 ///////////////////////////////////////////////////////////////////////////////

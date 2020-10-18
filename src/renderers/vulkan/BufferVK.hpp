@@ -9,7 +9,6 @@ namespace MrQ2
 {
 
 class DeviceVK;
-class GraphicsContextVK;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +32,8 @@ public:
 protected:
 
     ~BufferVK() { Shutdown(); }
-    void InitBufferInternal(const DeviceVK & device, const uint32_t buffer_size_in_bytes, const VkBufferUsageFlags buffer_usage);
+    void InitBufferInternal(const DeviceVK & device, const uint32_t buffer_size_in_bytes,
+                            const VkBufferUsageFlags buffer_usage, VkMemoryRequirements * out_opt_mem_reqs = nullptr);
 
     const DeviceVK *   m_device_vk{ nullptr };
     VkBuffer           m_buffer_handle{ nullptr };
