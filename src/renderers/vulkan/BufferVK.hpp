@@ -10,15 +10,11 @@ namespace MrQ2
 
 class DeviceVK;
 class GraphicsContextVK;
-class UploadContextVK;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 class BufferVK
 {
-    friend GraphicsContextVK;
-    friend UploadContextVK;
-
 public:
 
     BufferVK() = default;
@@ -31,7 +27,8 @@ public:
     void * Map();
     void Unmap();
 
-    uint32_t SizeInBytes() const { return m_size_in_bytes; }
+    uint32_t SizeInBytes() const { return m_buffer_size; }
+    VkBuffer Handle()      const { return m_buffer_handle; }
 
 protected:
 
@@ -40,10 +37,8 @@ protected:
 
     const DeviceVK *   m_device_vk{ nullptr };
     VkBuffer           m_buffer_handle{ nullptr };
-    VkBuffer           m_staging_buffer_handle{ nullptr };
     VkDeviceMemory     m_buffer_mem_handle{ nullptr };
-    VkDeviceMemory     m_staging_buffer_mem_handle{ nullptr };
-    uint32_t           m_size_in_bytes{ 0 };
+    uint32_t           m_buffer_size{ 0 };
     VkBufferUsageFlags m_buffer_usage{ 0 };
 };
 
@@ -51,8 +46,6 @@ protected:
 
 class VertexBufferVK final : public BufferVK
 {
-    friend GraphicsContextVK;
-
 public:
 
     bool Init(const DeviceVK & device, const uint32_t buffer_size_in_bytes, const uint32_t vertex_stride_in_bytes);
@@ -68,8 +61,6 @@ private:
 
 class IndexBufferVK final : public BufferVK
 {
-    friend GraphicsContextVK;
-
 public:
 
     enum IndexFormat : uint32_t
@@ -93,8 +84,6 @@ private:
 
 class ConstantBufferVK final : public BufferVK
 {
-    friend GraphicsContextVK;
-
 public:
 
     // Buffer is updated, used for a single draw call then discarded (PerDrawShaderConstants).

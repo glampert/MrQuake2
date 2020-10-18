@@ -4,7 +4,6 @@
 
 #include "BufferVK.hpp"
 #include "DeviceVK.hpp"
-#include "UploadContextVK.hpp"
 
 namespace MrQ2
 {
@@ -18,17 +17,12 @@ void BufferVK::InitBufferInternal(const DeviceVK & device, const uint32_t buffer
     MRQ2_ASSERT(m_device_vk == nullptr);
     MRQ2_ASSERT(buffer_size_in_bytes != 0);
 
-    const auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | buffer_usage;
-    const auto mem_props = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-    VulkanAllocateBuffer(device, buffer_size_in_bytes, usage, mem_props, &m_buffer_handle, &m_buffer_mem_handle);
+    const auto memory_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    VulkanAllocateBuffer(device, buffer_size_in_bytes, buffer_usage, memory_flags, &m_buffer_handle, &m_buffer_mem_handle);
 
-    const auto staging_usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    const auto staging_nem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT; // NOTE: Combine VK_MEMORY_PROPERTY_HOST_COHERENT_BIT for persistently mapped
-    VulkanAllocateBuffer(device, buffer_size_in_bytes, staging_usage, staging_nem_props, &m_staging_buffer_handle, &m_staging_buffer_mem_handle);
-
-    m_device_vk     = &device;
-    m_size_in_bytes = buffer_size_in_bytes;
-    m_buffer_usage  = buffer_usage;
+    m_device_vk    = &device;
+    m_buffer_size  = buffer_size_in_bytes;
+    m_buffer_usage = buffer_usage;
 }
 
 void BufferVK::Shutdown()
@@ -38,30 +32,16 @@ void BufferVK::Shutdown()
         return;
     }
 
-    VkDevice device_handle = m_device_vk->Handle();
-
-    // Buffer handles:
-    if (m_buffer_handle != nullptr)
-    {
-        vkDestroyBuffer(device_handle, m_buffer_handle, nullptr);
-        m_buffer_handle = nullptr;
-    }
-    if (m_staging_buffer_handle != nullptr)
-    {
-        vkDestroyBuffer(device_handle, m_staging_buffer_handle, nullptr);
-        m_staging_buffer_handle = nullptr;
-    }
-
-    // Memory:
     if (m_buffer_mem_handle != nullptr)
     {
-        vkFreeMemory(device_handle, m_buffer_mem_handle, nullptr);
+        vkFreeMemory(m_device_vk->Handle(), m_buffer_mem_handle, nullptr);
         m_buffer_mem_handle = nullptr;
     }
-    if (m_staging_buffer_mem_handle != nullptr)
+
+    if (m_buffer_handle != nullptr)
     {
-        vkFreeMemory(device_handle, m_staging_buffer_mem_handle, nullptr);
-        m_staging_buffer_mem_handle = nullptr;
+        vkDestroyBuffer(m_device_vk->Handle(), m_buffer_handle, nullptr);
+        m_buffer_handle = nullptr;
     }
 
     m_device_vk = nullptr;
@@ -71,16 +51,13 @@ void * BufferVK::Map()
 {
     // Map the staging buffer.
     void * memory = nullptr;
-    VULKAN_CHECK(vkMapMemory(m_device_vk->Handle(), m_staging_buffer_mem_handle, 0, m_size_in_bytes, 0, &memory));
+    VULKAN_CHECK(vkMapMemory(m_device_vk->Handle(), m_buffer_mem_handle, 0, m_buffer_size, 0, &memory));
     return memory;
 }
 
 void BufferVK::Unmap()
 {
-    vkUnmapMemory(m_device_vk->Handle(), m_staging_buffer_mem_handle);
-
-    // Assume a map operation modifies the staging buffer so now we need to upload it to the GPU render buffer.
-    m_device_vk->UploadContext().UploadStagingBuffer(*this);
+    vkUnmapMemory(m_device_vk->Handle(), m_buffer_mem_handle);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

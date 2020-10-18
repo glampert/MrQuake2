@@ -92,11 +92,11 @@ void GraphicsContextVK::RestoreDepthRange()
 
 void GraphicsContextVK::SetVertexBuffer(const VertexBufferVK & vb)
 {
-    MRQ2_ASSERT(vb.m_buffer_handle != nullptr);
+    MRQ2_ASSERT(vb.Handle() != nullptr);
 
-    if (vb.m_buffer_handle != m_current_vb)
+    if (vb.Handle() != m_current_vb)
     {
-        m_current_vb = vb.m_buffer_handle;
+        m_current_vb = vb.Handle();
 
         const VkBuffer buffers[] = { m_current_vb };
         const VkDeviceSize offsets[] = { 0 };
@@ -106,11 +106,11 @@ void GraphicsContextVK::SetVertexBuffer(const VertexBufferVK & vb)
 
 void GraphicsContextVK::SetIndexBuffer(const IndexBufferVK & ib)
 {
-    MRQ2_ASSERT(ib.m_buffer_handle != nullptr);
+    MRQ2_ASSERT(ib.Handle() != nullptr);
 
-    if (ib.m_buffer_handle != m_current_ib)
+    if (ib.Handle() != m_current_ib)
     {
-        m_current_ib = ib.m_buffer_handle;
+        m_current_ib = ib.Handle();
         vkCmdBindIndexBuffer(m_command_buffer_handle, m_current_ib, 0, ib.TypeVK());
     }
 }

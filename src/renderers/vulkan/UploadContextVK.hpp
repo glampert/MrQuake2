@@ -38,12 +38,11 @@ public:
     void Shutdown();
 
     void UploadTexture(const TextureUploadVK & upload_info);
-    void UploadStagingBuffer(const BufferVK & buffer);
 
 private:
 
     const DeviceVK * m_device_vk{ nullptr };
-    CommandBufferVK  m_upload_buffer;
+    CommandBufferVK  m_upload_cmd_buffer;
 };
 
 } // MrQ2

@@ -63,7 +63,7 @@ uint32_t VulkanMemoryTypeFromProperties(const DeviceVK & device, const uint32_t 
     auto bits = type_bits;
     for (uint32_t i = 0; i < device_info.memoryProperties.memoryTypeCount; ++i)
     {
-        if ((bits & 1) == 1)
+        if (bits & 1)
         {
             // Type is available, does it match user properties?
             if ((device_info.memoryProperties.memoryTypes[i].propertyFlags & requirements_mask) == requirements_mask)
