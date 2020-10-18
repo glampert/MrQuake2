@@ -4,6 +4,7 @@
 #pragma once
 
 #include "UtilsVK.hpp"
+#include <string>
 
 namespace MrQ2
 {
@@ -55,6 +56,7 @@ class ShaderProgramVK final
 public:
 
     ShaderProgramVK() = default;
+    ~ShaderProgramVK() { Shutdown(); }
 
     // Disallow copy.
     ShaderProgramVK(const ShaderProgramVK &) = delete;
@@ -72,6 +74,21 @@ public:
                       const bool debug);
 
     void Shutdown();
+
+private:
+
+    static constexpr int kNumShaderStages = 2; // Vertex[0] and Pixel[1] shaders
+    void GetPipelineStages(VkPipelineShaderStageCreateInfo out_stages[kNumShaderStages]) const;
+
+    const DeviceVK * m_device_vk{ nullptr };
+    VkShaderModule   m_vs_handle{ nullptr };
+    VkShaderModule   m_ps_handle{ nullptr };
+    std::string      m_ps_entry{};
+    std::string      m_vs_entry{};
+    bool             m_debug_mode{ false };
+
+    VkVertexInputBindingDescription   m_binding_description = {};
+    VkVertexInputAttributeDescription m_attribute_descriptions[VertexInputLayoutVK::kElementTypeCount] = {};
 };
 
 } // MrQ2

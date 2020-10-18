@@ -30,6 +30,7 @@ public:
     // Public to renderers/common
     UploadContextVK   & UploadContext()    const { return *m_upload_ctx;   }
     GraphicsContextVK & GraphicsContext()  const { return *m_graphics_ctx; }
+    bool DebugValidationEnabled()          const { return m_debug_validation; }
 
     // VK public handles
     VkDevice         Handle()              const { return m_device_handle; }
