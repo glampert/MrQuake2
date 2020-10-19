@@ -23,11 +23,11 @@ void UploadContextVK::Init(const DeviceVK & device)
 
 void UploadContextVK::Shutdown()
 {
-    for (uint32_t e = 0; e < m_num_creates; ++e)
+    for (uint32_t e = 0; e < m_num_pending_texture_creates; ++e)
     {
-        m_creates[e].upload_buffer.Shutdown();
+        m_pending_texture_creates[e].Shutdown();
     }
-    m_num_creates = 0;
+    m_num_pending_texture_creates = 0;
 
     m_upload_cmd_buffer.Shutdown();
     m_device_vk = nullptr;
@@ -54,20 +54,20 @@ void UploadContextVK::CreateTexture(const TextureUploadVK & upload_info)
     MRQ2_ASSERT(upload_info.texture->Handle() != nullptr);
     // NOTE: Not required to happen between Begin/EndFrame
 
-    if (m_num_creates == ArrayLength(m_creates))
+    if (m_num_pending_texture_creates == ArrayLength(m_pending_texture_creates))
     {
         // Flush any queued texture creates to make room
         FlushTextureCreates();
     }
 
-    MRQ2_ASSERT(m_num_creates < ArrayLength(m_creates));
-    CreateEntry & entry = m_creates[m_num_creates++];
-    CreateUploadBuffer(upload_info, &entry.upload_buffer);
+    MRQ2_ASSERT(m_num_pending_texture_creates < ArrayLength(m_pending_texture_creates));
+    StagingBuffer & upload_buffer = m_pending_texture_creates[m_num_pending_texture_creates++];
+    CreateUploadBuffer(upload_info, &upload_buffer);
 }
 
 void UploadContextVK::FlushTextureCreates()
 {
-    if (m_num_creates == 0)
+    if (m_num_pending_texture_creates == 0)
     {
         return;
     }
@@ -80,12 +80,12 @@ void UploadContextVK::FlushTextureCreates()
     m_upload_cmd_buffer.Reset();
     m_upload_cmd_buffer.BeginRecording();
 
-    // We have synced the queue, all pending upload_buffers can now be freed
-    for (uint32_t e = 0; e < m_num_creates; ++e)
+    // We have synced the command buffer, all pending upload buffers can now be freed.
+    for (uint32_t e = 0; e < m_num_pending_texture_creates; ++e)
     {
-        m_creates[e].upload_buffer.Shutdown();
+        m_pending_texture_creates[e].Shutdown();
     }
-    m_num_creates = 0;
+    m_num_pending_texture_creates = 0;
 }
 
 void UploadContextVK::UpdateCompletedUploads()
@@ -110,22 +110,19 @@ void UploadContextVK::CreateUploadBuffer(const TextureUploadVK & upload_info, St
     out_upload_buff->Init(*m_device_vk, buffer_size_in_bytes);
 
     // Copy texture data into the staging buffer:
-    void * memory = out_upload_buff->Map();
+    auto * dest_pixels = static_cast<std::uint8_t *>(out_upload_buff->Map());
+    for (uint32_t mip = 0; mip < num_mips; ++mip)
     {
-        auto * dest_pixels = static_cast<std::uint8_t *>(memory);
-        for (uint32_t mip = 0; mip < num_mips; ++mip)
-        {
-            const auto * mip_pixels = mipmaps.mip_init_data[mip];
-            const size_t mip_size   = mipmaps.mip_dimensions[mip].x * mipmaps.mip_dimensions[mip].y * TextureImage::kBytesPerPixel;
+        const auto * mip_pixels = mipmaps.mip_init_data[mip];
+        const size_t mip_size   = mipmaps.mip_dimensions[mip].x * mipmaps.mip_dimensions[mip].y * TextureImage::kBytesPerPixel;
 
-            std::memcpy(dest_pixels, mip_pixels, mip_size);
-            dest_pixels += mip_size;
-        }
+        std::memcpy(dest_pixels, mip_pixels, mip_size);
+        dest_pixels += mip_size;
     }
     out_upload_buff->Unmap();
 
     // Setup buffer copy regions for each mip level:
-    uint32_t buffer_offset = 0;
+    VkDeviceSize buffer_offset = 0;
     FixedSizeArray<VkBufferImageCopy, TextureImage::kMaxMipLevels> buffer_copy_regions;
 
     for (uint32_t mip = 0; mip < num_mips; ++mip)

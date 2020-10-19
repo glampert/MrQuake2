@@ -63,15 +63,10 @@ private:
 
     void CreateUploadBuffer(const TextureUploadVK & upload_info, StagingBuffer * out_upload_buff);
 
-    struct CreateEntry
-    {
-        StagingBuffer upload_buffer;
-    };
-
     const DeviceVK * m_device_vk{ nullptr };
     CommandBufferVK  m_upload_cmd_buffer;
-    uint32_t         m_num_creates{ 0 };
-    CreateEntry      m_creates[512];
+    uint32_t         m_num_pending_texture_creates{ 0 };
+    StagingBuffer    m_pending_texture_creates[512];
 };
 
 } // MrQ2
