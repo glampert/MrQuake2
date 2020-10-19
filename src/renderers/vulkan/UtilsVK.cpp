@@ -451,4 +451,78 @@ void RenderPassVK::Shutdown()
     m_device_vk = nullptr;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// DescriptorSetVK
+///////////////////////////////////////////////////////////////////////////////
+
+void DescriptorSetVK::Init(const DeviceVK & device, const VkDescriptorSetLayout & set_layout,
+                           ArrayBase<const VkDescriptorPoolSize> pool_sizes_and_types,
+                           ArrayBase<const VkDescriptorSetLayoutBinding> set_layout_bindings)
+{
+    MRQ2_ASSERT(m_device_vk == nullptr);
+    MRQ2_ASSERT(!pool_sizes_and_types.empty() && !set_layout_bindings.empty());
+
+    VkDescriptorPoolCreateInfo pool_create_info{};
+    pool_create_info.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_create_info.maxSets       = 1;
+    pool_create_info.poolSizeCount = pool_sizes_and_types.size();
+    pool_create_info.pPoolSizes    = pool_sizes_and_types.data();
+
+    VULKAN_CHECK(vkCreateDescriptorPool(device.Handle(), &pool_create_info, nullptr, &m_descriptor_pool_handle));
+    MRQ2_ASSERT(m_descriptor_pool_handle != nullptr);
+
+    VkDescriptorSetLayoutCreateInfo layout_create_info{};
+    layout_create_info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layout_create_info.bindingCount = set_layout_bindings.size();
+    layout_create_info.pBindings    = set_layout_bindings.data();
+
+    VULKAN_CHECK(vkCreateDescriptorSetLayout(device.Handle(), &layout_create_info, nullptr, &m_descriptor_set_layout_handle));
+    MRQ2_ASSERT(m_descriptor_set_layout_handle != nullptr);
+
+    VkDescriptorSetAllocateInfo set_alloc_info{};
+    set_alloc_info.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    set_alloc_info.descriptorPool     = m_descriptor_pool_handle;
+    set_alloc_info.descriptorSetCount = 1;
+    set_alloc_info.pSetLayouts        = &set_layout;
+
+    VULKAN_CHECK(vkAllocateDescriptorSets(device.Handle(), &set_alloc_info, &m_descript_set));
+    MRQ2_ASSERT(m_descript_set != nullptr);
+
+    m_device_vk = &device;
+}
+
+void DescriptorSetVK::Shutdown()
+{
+    if (m_device_vk == nullptr)
+    {
+        return;
+    }
+
+    if (m_descriptor_pool_handle != nullptr)
+    {
+        vkDestroyDescriptorPool(m_device_vk->Handle(), m_descriptor_pool_handle, nullptr);
+        m_descriptor_pool_handle = nullptr;
+    }
+
+    if (m_descriptor_set_layout_handle != nullptr)
+    {
+        vkDestroyDescriptorSetLayout(m_device_vk->Handle(), m_descriptor_set_layout_handle, nullptr);
+        m_descriptor_set_layout_handle = nullptr;
+    }
+
+    // NOTE: m_descript_set is allocated from the DescriptorPool so we do not need to explicitly free it
+    // (and we do not specify VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT on pool creation).
+    m_descript_set = nullptr;
+    m_device_vk    = nullptr;
+}
+
+void DescriptorSetVK::Update(ArrayBase<const VkWriteDescriptorSet> descriptor_writes,
+                             ArrayBase<const VkCopyDescriptorSet>  descriptor_copies) const
+{
+    MRQ2_ASSERT(m_device_vk != nullptr);
+    vkUpdateDescriptorSets(m_device_vk->Handle(),
+                           descriptor_writes.size(), descriptor_writes.data(),
+                           descriptor_copies.size(), descriptor_copies.data());
+}
+
 } // MrQ2

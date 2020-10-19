@@ -11,10 +11,31 @@ namespace MrQ2
 
 void PipelineStateVK::Init(const DeviceVK & device)
 {
+    MRQ2_ASSERT(m_device_vk == nullptr);
+
+    m_device_vk = &device;
 }
 
 void PipelineStateVK::Shutdown()
 {
+    if (m_device_vk == nullptr)
+    {
+        return;
+    }
+
+    if (m_pipeline_handle != nullptr)
+    {
+        vkDestroyPipeline(m_device_vk->Handle(), m_pipeline_handle, nullptr);
+        m_pipeline_handle = nullptr;
+    }
+
+    if (m_pipeline_layout_handle != nullptr)
+    {
+        vkDestroyPipelineLayout(m_device_vk->Handle(), m_pipeline_layout_handle, nullptr);
+        m_pipeline_layout_handle = nullptr;
+    }
+
+    m_device_vk = nullptr;
 }
 
 void PipelineStateVK::SetPrimitiveTopology(const PrimitiveTopologyVK topology)

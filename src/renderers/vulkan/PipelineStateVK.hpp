@@ -18,6 +18,7 @@ class PipelineStateVK final
 public:
 
     PipelineStateVK() = default;
+    ~PipelineStateVK() { Shutdown(); }
 
     // Disallow copy.
     PipelineStateVK(const PipelineStateVK &) = delete;
@@ -39,6 +40,10 @@ public:
     bool IsFinalized() const { return false; } // TODO
 
 private:
+
+    const DeviceVK * m_device_vk{ nullptr };
+    VkPipelineLayout m_pipeline_layout_handle{ nullptr };
+    VkPipeline       m_pipeline_handle{ nullptr };
 };
 
 } // MrQ2

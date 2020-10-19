@@ -22,6 +22,7 @@ class GraphicsContextVK final
 public:
 
     GraphicsContextVK() = default;
+    ~GraphicsContextVK() { Shutdown(); }
 
     // Disallow copy.
     GraphicsContextVK(const GraphicsContextVK &) = delete;

@@ -29,6 +29,7 @@ class UploadContextVK final
 public:
 
     UploadContextVK() = default;
+    ~UploadContextVK() { Shutdown(); }
 
     // Disallow copy.
     UploadContextVK(const UploadContextVK &) = delete;

@@ -24,6 +24,18 @@ public:
     using reference       = T &;
     using const_reference = const T &;
 
+    template<uint32_t kArraySize>
+    static ArrayBase<T> from_c_array(T (&arr)[kArraySize])
+    {
+        return ArrayBase<T>{ arr, kArraySize, kArraySize };
+    }
+
+    ArrayBase() // empty
+        : m_elements{ nullptr }
+        , m_count{ 0 }
+        , m_capacity{ 0 }
+    { }
+
     ArrayBase(T * elements, const size_type count, const size_type capacity)
         : m_elements{ elements }
         , m_count{ count }
@@ -136,11 +148,11 @@ public:
     size_type       capacity() const { return m_capacity; }
     bool            empty()    const { return m_count == 0; }
 
-    const_pointer   data()     const { return &m_elements[0]; }
-    pointer         data()           { return &m_elements[0]; }
+    const_pointer   data()     const { return m_elements; }
+    pointer         data()           { return m_elements; }
 
-    const_pointer   begin()    const { return &m_elements[0]; }
-    pointer         begin()          { return &m_elements[0]; }
+    const_pointer   begin()    const { return m_elements; }
+    pointer         begin()          { return m_elements; }
 
     const_pointer   end()      const { return &m_elements[m_count]; }
     pointer         end()            { return &m_elements[m_count]; }
