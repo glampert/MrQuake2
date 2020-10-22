@@ -41,10 +41,41 @@ cbuffer PerViewShaderConstants : register(b1)
     matrix view_proj_matrix;
 };
 
+///////////////////////////////////////////////////////////////////////////////
+#if VULKAN
+
+// On Vulkan the per-draw constants are supplied via PushConstants.
+struct PerDrawShaderConstants
+{
+    matrix model_matrix;
+};
+
+[[vk::push_constant]] PerDrawShaderConstants push_consts;
+
+float4 TransformVertex(float3 position)
+{
+    float4 vpos = mul(mul(view_proj_matrix, push_consts.model_matrix), float4(position, 1.0f));
+    return vpos;
+}
+
+#else // !VULKAN
+
+// Implemented as a regular cbuffer for D3D:
+// - Set from RootSignature inline constants on D3D12.
+// - Just a const buffer updated with UpdateSubresource for D3D11.
 cbuffer PerDrawShaderConstants : register(b2)
 {
     matrix model_matrix;
 };
+
+float4 TransformVertex(float3 position)
+{
+    float4 vpos = mul(mul(view_proj_matrix, model_matrix), float4(position, 1.0f));
+    return vpos;
+}
+
+#endif // VULKAN
+///////////////////////////////////////////////////////////////////////////////
 
 Texture2D    diffuse_texture  : register(t3);
 SamplerState diffuse_sampler  : register(s3);
@@ -59,7 +90,7 @@ SamplerState lightmap_sampler : register(s4);
 VertexShaderOutput VS_main(DrawVertex3D input)
 {
     VertexShaderOutput output;
-    output.vpos        = mul(mul(view_proj_matrix, model_matrix), float4(input.position, 1.0f));
+    output.vpos        = TransformVertex(input.position);
     output.texture_uv  = input.texture_uv;
     output.lightmap_uv = input.lightmap_uv;
     output.rgba        = input.rgba;

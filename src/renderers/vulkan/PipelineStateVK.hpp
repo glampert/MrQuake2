@@ -59,6 +59,9 @@ private:
         // Internal counts
         kCBufferCount = 3,
         kTextureCount = 2, // BaseTexture and Lightmap
+
+        // Max push constants (one Matrix4x4 worth of data for PerDrawShaderConstants)
+        kMaxPushConstantsSizeBytes = sizeof(float) * 16
     };
 
     enum Flags : uint32_t

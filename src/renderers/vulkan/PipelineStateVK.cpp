@@ -350,7 +350,7 @@ void PipelineStateVK::InitGlobalDescriptorSet(const DeviceVK & device)
 
     VkDescriptorSetLayoutBinding descriptor_set_bindings[kCBufferCount + kTextureCount] = {};
     {
-		unsigned i = 0;
+        unsigned i = 0;
 
         // Constant buffers:
         descriptor_set_bindings[i].binding         = 0; // cbuffer PerFrameShaderConstants : register(b0)
@@ -391,6 +391,10 @@ void PipelineStateVK::InitGlobalDescriptorSet(const DeviceVK & device)
                                   ArrayBase<const VkDescriptorPoolSize>::from_c_array(descriptor_pool_sizes),
                                   ArrayBase<const VkDescriptorSetLayoutBinding>::from_c_array(descriptor_set_bindings));
 
+    VkPushConstantRange push_constant_range{};
+    push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    push_constant_range.size       = kMaxPushConstantsSizeBytes;
+
     // VkPipelineLayout
     const VkDescriptorSetLayout descriptor_set_layouts[] = { sm_global_descriptor_set.LayoutHandle() };
 
@@ -398,8 +402,8 @@ void PipelineStateVK::InitGlobalDescriptorSet(const DeviceVK & device)
     pipeline_layout_info.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipeline_layout_info.setLayoutCount         = ArrayLength(descriptor_set_layouts);
     pipeline_layout_info.pSetLayouts            = descriptor_set_layouts;
-    pipeline_layout_info.pushConstantRangeCount = 0;       // TODO
-    pipeline_layout_info.pPushConstantRanges    = nullptr; // TODO
+    pipeline_layout_info.pushConstantRangeCount = 1;
+    pipeline_layout_info.pPushConstantRanges    = &push_constant_range;
 
     VULKAN_CHECK(vkCreatePipelineLayout(device.Handle(), &pipeline_layout_info, nullptr, &sm_pipeline_layout_handle));
     MRQ2_ASSERT(sm_pipeline_layout_handle != nullptr);

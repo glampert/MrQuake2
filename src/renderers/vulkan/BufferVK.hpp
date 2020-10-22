@@ -84,6 +84,8 @@ private:
 
 class ConstantBufferVK final : public BufferVK
 {
+    friend class GraphicsContextVK;
+
 public:
 
     // Buffer is updated, used for a single draw call then discarded (PerDrawShaderConstants).

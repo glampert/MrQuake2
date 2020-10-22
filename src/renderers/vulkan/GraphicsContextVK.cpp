@@ -10,6 +10,7 @@
 #include "PipelineStateVK.hpp"
 #include "ShaderProgramVK.hpp"
 
+// Useful links:
 // https://computergraphics.stackexchange.com/questions/4422/directx-openglvulkan-concepts-mapping-chart
 // https://zeux.io/2020/02/27/writing-an-efficient-vulkan-renderer/
 //
@@ -196,8 +197,19 @@ void GraphicsContextVK::SetConstantBuffer(const ConstantBufferVK & cb, const uin
 
 void GraphicsContextVK::SetAndUpdateConstantBuffer_Internal(const ConstantBufferVK & cb, const uint32_t slot, const void * data, const uint32_t data_size)
 {
-	// TODO: use push constants instead
-	SetConstantBuffer(cb, slot);
+    // Similarly to D3D12 where we use the RootSignature inline constants.
+
+    MRQ2_ASSERT(cb.Handle() != nullptr);
+    MRQ2_ASSERT(slot < PipelineStateVK::kCBufferCount);
+    MRQ2_ASSERT(data != nullptr && data_size != 0);
+    MRQ2_ASSERT(data_size <= PipelineStateVK::kMaxPushConstantsSizeBytes);
+    MRQ2_ASSERT((cb.m_flags & ConstantBufferVK::kOptimizeForSingleDraw) != 0);
+
+    vkCmdPushConstants(m_command_buffer_handle, PipelineStateVK::sm_pipeline_layout_handle, VK_SHADER_STAGE_VERTEX_BIT, 0, data_size, data);
+
+    // unused
+    (void)cb;
+    (void)slot;
 }
 
 void GraphicsContextVK::SetTexture(const TextureVK & texture, const uint32_t slot)
@@ -213,13 +225,6 @@ void GraphicsContextVK::SetTexture(const TextureVK & texture, const uint32_t slo
         descriptor_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         descriptor_image_info.imageView   = m_current_texture[slot];
         descriptor_image_info.sampler     = texture.SamplerHandle();
-
-		//TODO
-		/*
-		 If the descriptor type is VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, the sampler member of the pImageInfo parameter is 
-		 ignored and the immutable sampler is taken from the push descriptor set layout in the pipeline layout.
-		 ??? what does that mean ???
-		*/
 
         VkWriteDescriptorSet descriptor_set_writes{};
         descriptor_set_writes.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
