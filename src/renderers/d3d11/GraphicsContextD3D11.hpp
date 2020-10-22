@@ -63,8 +63,21 @@ public:
 private:
 
     // These match the D3D12 global RootSignature
-    static constexpr uint32_t kCBufferSlotCount = 3;
-    static constexpr uint32_t kTextureSlotCount = 2; // BaseTexture and Lightmap
+    enum ShaderBindings : uint32_t
+    {
+        // Buffers
+        kShaderBindingCBuffer0, // PerFrameShaderConstants
+        kShaderBindingCBuffer1, // PerViewShaderConstants
+        kShaderBindingCBuffer2, // PerDrawShaderConstants
+
+        // Textures/samplers
+        kShaderBindingTexture0,
+        kShaderBindingTexture1,
+
+        // Internal counts
+        kCBufferCount = 3,
+        kTextureCount = 2, // BaseTexture and Lightmap
+    };
 
     const DeviceD3D11 *                  m_device{ nullptr };
     const SwapChainD3D11 *               m_swap_chain{ nullptr };
@@ -74,10 +87,10 @@ private:
 
     // Cached states:
     const PipelineStateD3D11 *           m_current_pipeline_state{ nullptr };
-    const VertexBufferD3D11 *            m_current_vb{ nullptr };
-    const IndexBufferD3D11 *             m_current_ib{ nullptr };
-    const ConstantBufferD3D11 *          m_current_cb[kCBufferSlotCount] = {};
-    const TextureD3D11 *                 m_current_texture[kTextureSlotCount] = {};
+    ID3D11Buffer *                       m_current_vb{ nullptr };
+    ID3D11Buffer *                       m_current_ib{ nullptr };
+    ID3D11Buffer *                       m_current_cb[kCBufferCount] = {};
+    ID3D11Texture2D *                    m_current_texture[kTextureCount] = {};
     D3D11_VIEWPORT                       m_current_viewport{};
     RECT                                 m_current_scissor_rect{};
     PrimitiveTopologyD3D11               m_current_topology{ PrimitiveTopologyD3D11::kCount };

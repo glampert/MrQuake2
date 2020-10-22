@@ -44,7 +44,7 @@ void RootSignatureD3D12::CreateGlobalRootSignature(const DeviceD3D12 & device)
         {
             D3D12_ROOT_PARAMETER1 param = {};
             param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-            param.Descriptor.ShaderRegister = cbuffer_slot;
+            param.Descriptor.ShaderRegister = cbuffer_slot + kRootParamIndexCBuffer0;
             param.Descriptor.RegisterSpace = 0;
             param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
             params.push_back(param);
@@ -54,7 +54,7 @@ void RootSignatureD3D12::CreateGlobalRootSignature(const DeviceD3D12 & device)
         {
             D3D12_ROOT_PARAMETER1 param = {};
             param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-            param.Constants.ShaderRegister = cbuffer_slot;
+            param.Constants.ShaderRegister = cbuffer_slot + kRootParamIndexCBuffer0;
             param.Constants.RegisterSpace  = 0;
             param.Constants.Num32BitValues = kMaxInlineRootConstants;
             param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -68,7 +68,7 @@ void RootSignatureD3D12::CreateGlobalRootSignature(const DeviceD3D12 & device)
     {
         texture_descriptor_ranges[tex_slot].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
         texture_descriptor_ranges[tex_slot].NumDescriptors = 1;
-        texture_descriptor_ranges[tex_slot].BaseShaderRegister = tex_slot;
+        texture_descriptor_ranges[tex_slot].BaseShaderRegister = tex_slot + kRootParamIndexTexture0;
         texture_descriptor_ranges[tex_slot].RegisterSpace = 0;
 
         D3D12_ROOT_PARAMETER1 param = {};
@@ -85,7 +85,7 @@ void RootSignatureD3D12::CreateGlobalRootSignature(const DeviceD3D12 & device)
     {
         sampler_descriptor_ranges[sampler_slot].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
         sampler_descriptor_ranges[sampler_slot].NumDescriptors = 1;
-        sampler_descriptor_ranges[sampler_slot].BaseShaderRegister = sampler_slot;
+        sampler_descriptor_ranges[sampler_slot].BaseShaderRegister = sampler_slot + kRootParamIndexTexture0;
         sampler_descriptor_ranges[sampler_slot].RegisterSpace = 0;
 
         D3D12_ROOT_PARAMETER1 param = {};

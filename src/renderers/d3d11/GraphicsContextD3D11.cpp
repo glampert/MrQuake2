@@ -116,47 +116,47 @@ void GraphicsContextD3D11::RestoreDepthRange()
 
 void GraphicsContextD3D11::SetVertexBuffer(const VertexBufferD3D11 & vb)
 {
-    if (m_current_vb != &vb)
+    if (m_current_vb != vb.m_resource.Get())
     {
-        m_current_vb = &vb;
-        const UINT stride = m_current_vb->StrideInBytes();
+        m_current_vb = vb.m_resource.Get();
+        const UINT stride = vb.StrideInBytes();
         const UINT offset = 0;
-        m_context->IASetVertexBuffers(0, 1, m_current_vb->m_resource.GetAddressOf(), &stride, &offset);
+        m_context->IASetVertexBuffers(0, 1, &m_current_vb, &stride, &offset);
     }
 }
 
 void GraphicsContextD3D11::SetIndexBuffer(const IndexBufferD3D11 & ib)
 {
-    if (m_current_ib != &ib)
+    if (m_current_ib != ib.m_resource.Get())
     {
-        m_current_ib = &ib;
-        const DXGI_FORMAT format = (m_current_ib->Format() == IndexBufferD3D11::kFormatUInt16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
+        m_current_ib = ib.m_resource.Get();
+        const DXGI_FORMAT format = (ib.Format() == IndexBufferD3D11::kFormatUInt16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
         const UINT offset = 0;
-        m_context->IASetIndexBuffer(m_current_ib->m_resource.Get(), format, offset);
+        m_context->IASetIndexBuffer(m_current_ib, format, offset);
     }
 }
 
 void GraphicsContextD3D11::SetConstantBuffer(const ConstantBufferD3D11 & cb, const uint32_t slot)
 {
-    MRQ2_ASSERT(slot < kCBufferSlotCount);
+    MRQ2_ASSERT(slot < kCBufferCount);
 
-    if (m_current_cb[slot] != &cb)
+    if (m_current_cb[slot] != cb.m_resource.Get())
     {
-        m_current_cb[slot] = &cb;
-        m_context->VSSetConstantBuffers(slot, 1, m_current_cb[slot]->m_resource.GetAddressOf());
-        m_context->PSSetConstantBuffers(slot, 1, m_current_cb[slot]->m_resource.GetAddressOf());
+        m_current_cb[slot] = cb.m_resource.Get();
+        m_context->VSSetConstantBuffers(slot + kShaderBindingCBuffer0, 1, &m_current_cb[slot]);
+        m_context->PSSetConstantBuffers(slot + kShaderBindingCBuffer0, 1, &m_current_cb[slot]);
     }
 }
 
 void GraphicsContextD3D11::SetTexture(const TextureD3D11 & texture, const uint32_t slot)
 {
-    MRQ2_ASSERT(slot < kTextureSlotCount);
+    MRQ2_ASSERT(slot < kTextureCount);
 
-    if (m_current_texture[slot] != &texture)
+    if (m_current_texture[slot] != texture.m_resource.Get())
     {
-        m_current_texture[slot] = &texture;
-        m_context->PSSetShaderResources(slot, 1, m_current_texture[slot]->m_srv.GetAddressOf());
-        m_context->PSSetSamplers(slot, 1, m_current_texture[slot]->m_sampler.GetAddressOf());
+        m_current_texture[slot] = texture.m_resource.Get();
+        m_context->PSSetShaderResources(slot + kShaderBindingTexture0, 1, texture.m_srv.GetAddressOf());
+        m_context->PSSetSamplers(slot + kShaderBindingTexture0, 1, texture.m_sampler.GetAddressOf());
     }
 }
 
@@ -218,7 +218,7 @@ void GraphicsContextD3D11::DrawIndexed(const uint32_t first_index, const uint32_
 
 void GraphicsContextD3D11::SetAndUpdateConstantBuffer_Internal(const ConstantBufferD3D11 & cb, const uint32_t slot, const void * data, const uint32_t data_size)
 {
-    MRQ2_ASSERT(slot < kCBufferSlotCount);
+    MRQ2_ASSERT(slot < kCBufferCount);
     MRQ2_ASSERT(data != nullptr && data_size != 0);
     MRQ2_ASSERT(data_size >= cb.SizeInBytes());
 

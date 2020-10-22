@@ -46,11 +46,11 @@ cbuffer PerDrawShaderConstants : register(b2)
     matrix model_matrix;
 };
 
-Texture2D    diffuse_texture  : register(t0);
-SamplerState diffuse_sampler  : register(s0);
+Texture2D    diffuse_texture  : register(t3);
+SamplerState diffuse_sampler  : register(s3);
 
-Texture2D    lightmap_texture : register(t1);
-SamplerState lightmap_sampler : register(s1);
+Texture2D    lightmap_texture : register(t4);
+SamplerState lightmap_sampler : register(s4);
 
 ///////////////////////////////////////////////////////////////////////////////
 // Vertex Shader

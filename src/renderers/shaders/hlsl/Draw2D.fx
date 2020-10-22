@@ -28,8 +28,8 @@ cbuffer PerFrameShaderConstants : register(b0)
     float4 vertex_color_scaling;
 };
 
-Texture2D    glyphs_texture : register(t0);
-SamplerState glyphs_sampler : register(s0);
+Texture2D    glyphs_texture : register(t3);
+SamplerState glyphs_sampler : register(s3);
 
 ///////////////////////////////////////////////////////////////////////////////
 // Vertex Shader
