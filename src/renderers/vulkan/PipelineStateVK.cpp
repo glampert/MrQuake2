@@ -99,6 +99,18 @@ void PipelineStateCreateInfoVK::SetDefaults()
     pipeline_state.pDynamicState              = &dynamic_states;
 }
 
+static inline VkPrimitiveTopology ToVkPrimitiveTopology(const PrimitiveTopologyVK topology)
+{
+    switch (topology)
+    {
+    case PrimitiveTopologyVK::kTriangleList  : return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    case PrimitiveTopologyVK::kTriangleStrip : return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    case PrimitiveTopologyVK::kTriangleFan   : return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; // Converted by the front-end
+    case PrimitiveTopologyVK::kLineList      : return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    default : GameInterface::Errorf("Bad PrimitiveTopology enum!");
+    } // switch
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // PipelineStateVK
 ///////////////////////////////////////////////////////////////////////////////
@@ -113,6 +125,20 @@ void PipelineStateVK::Init(const DeviceVK & device)
     //  Rasterizer state: Backface cull ON
     //  Depth-stencil state: Depth test ON, depth write ON, stencil OFF
     m_flags = kDepthTestEnabled | kDepthWriteEnabled | kCullEnabled;
+}
+
+void PipelineStateVK::Init(const PipelineStateVK & other)
+{
+    MRQ2_ASSERT(m_device_vk == nullptr);
+    MRQ2_ASSERT(other.m_device_vk != nullptr);
+
+    m_device_vk = other.m_device_vk;
+    m_flags     = other.m_flags;
+
+    SetShaderProgram(*other.m_shader_prog);
+    SetPrimitiveTopology(other.m_topology);
+
+    m_flags &= ~kFinalized; // clear
 }
 
 void PipelineStateVK::Shutdown()
@@ -130,12 +156,9 @@ void PipelineStateVK::Shutdown()
 
     m_device_vk   = nullptr;
     m_shader_prog = nullptr;
+    m_signature   = 0;
     m_flags       = kNoFlags;
-}
-
-void PipelineStateVK::SetPrimitiveTopology(const PrimitiveTopologyVK topology)
-{
-    m_topology = topology;
+    m_topology    = {};
 }
 
 void PipelineStateVK::SetShaderProgram(const ShaderProgramVK & shader_prog)
@@ -216,14 +239,34 @@ void PipelineStateVK::Finalize() const
         return;
     }
 
+    PipelineStateCreateInfoVK pipeline_info;
+    pipeline_info.SetDefaults();
+
+    MakePipelineStateCreateInfo(pipeline_info);
+
+    // Pipelines should not be created before we have the cache initialized!
+    MRQ2_ASSERT(sm_pipeline_cache_handle != nullptr);
+    VULKAN_CHECK(vkCreateGraphicsPipelines(m_device_vk->Handle(), sm_pipeline_cache_handle, 1, &pipeline_info.pipeline_state, nullptr, &m_pipeline_handle));
+    MRQ2_ASSERT(m_pipeline_handle != nullptr);
+
+    // Compute a unique signature for this combination of pipeline states:
+    uint64_t signature = 0;
+    signature += FnvHash64(reinterpret_cast<const std::uint8_t *>(&m_flags), sizeof(m_flags));
+    signature += FnvHash64(reinterpret_cast<const std::uint8_t *>(&m_topology), sizeof(m_topology));
+    signature += FnvHash64(reinterpret_cast<const std::uint8_t *>(m_shader_prog->m_filename.c_str()), m_shader_prog->m_filename.length());
+    m_signature = signature;
+
+    m_flags |= kFinalized;
+}
+
+void PipelineStateVK::MakePipelineStateCreateInfo(PipelineStateCreateInfoVK & pipeline_info) const
+{
     MRQ2_ASSERT(m_device_vk != nullptr);
+
     if (m_shader_prog == nullptr)
     {
         GameInterface::Errorf("PipelineStateVK: No shader program has been set!");
     }
-
-    PipelineStateCreateInfoVK pipeline_info;
-    pipeline_info.SetDefaults();
 
     // Depth-stencil states:
     if (m_flags & kDepthTestEnabled)
@@ -292,14 +335,7 @@ void PipelineStateVK::Finalize() const
     }
 
     // Debug lines or filled triangles?
-    if (m_topology == PrimitiveTopologyVK::kLineList)
-    {
-        pipeline_info.input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-    }
-    else
-    {
-        pipeline_info.input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    }
+    pipeline_info.input_assembly_state.topology = ToVkPrimitiveTopology(m_topology);
 
     // Shader stages and vertex input layout:
     pipeline_info.vertex_input_state.pVertexBindingDescriptions      = &m_shader_prog->m_binding_description;
@@ -307,29 +343,24 @@ void PipelineStateVK::Finalize() const
     pipeline_info.vertex_input_state.pVertexAttributeDescriptions    = m_shader_prog->m_attribute_descriptions;
     pipeline_info.vertex_input_state.vertexAttributeDescriptionCount = m_shader_prog->m_attribute_count;
 
-    static_assert(ArrayLength(pipeline_info.shader_stages) == ShaderProgramVK::kNumShaderStages);
+    MRQ2_ASSERT(ArrayLength(pipeline_info.shader_stages) == ShaderProgramVK::kNumShaderStages);
     m_shader_prog->GetPipelineStages(pipeline_info.shader_stages);
     pipeline_info.pipeline_state.stageCount = ArrayLength(pipeline_info.shader_stages);
 
     MRQ2_ASSERT(sm_pipeline_layout_handle != nullptr);
     pipeline_info.pipeline_state.layout = sm_pipeline_layout_handle;
     pipeline_info.pipeline_state.renderPass = m_device_vk->ScRenderTargets().MainRenderPassHandle();
-
-    VULKAN_CHECK(vkCreateGraphicsPipelines(m_device_vk->Handle(), nullptr, 1, &pipeline_info.pipeline_state, nullptr, &m_pipeline_handle));
-    MRQ2_ASSERT(m_pipeline_handle != nullptr);
-
-    m_flags |= kFinalized;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Global Descriptor Set & Pipeline Layout
+// Global Descriptor Set & Pipeline Layout/Cache
 ///////////////////////////////////////////////////////////////////////////////
 
-// All shaders share the same descriptor set.
-VkPipelineLayout PipelineStateVK::sm_pipeline_layout_handle;
-DescriptorSetVK  PipelineStateVK::sm_global_descriptor_set;
+VkPipelineCache  PipelineStateVK::sm_pipeline_cache_handle{ nullptr };
+VkPipelineLayout PipelineStateVK::sm_pipeline_layout_handle{ nullptr };
+DescriptorSetVK  PipelineStateVK::sm_global_descriptor_set; // All shaders share the same descriptor set.
 
-void PipelineStateVK::InitGlobalDescriptorSet(const DeviceVK & device)
+void PipelineStateVK::InitGlobalState(const DeviceVK & device)
 {
     VkDescriptorPoolSize descriptor_pool_sizes[2] = {};
     {
@@ -387,8 +418,7 @@ void PipelineStateVK::InitGlobalDescriptorSet(const DeviceVK & device)
         MRQ2_ASSERT(i == ArrayLength(descriptor_set_bindings));
     }
 
-    sm_global_descriptor_set.Init(device, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR, // We are using VK_KHR_push_descriptor
-                                  ArrayBase<const VkDescriptorPoolSize>::from_c_array(descriptor_pool_sizes),
+    sm_global_descriptor_set.Init(device, ArrayBase<const VkDescriptorPoolSize>::from_c_array(descriptor_pool_sizes),
                                   ArrayBase<const VkDescriptorSetLayoutBinding>::from_c_array(descriptor_set_bindings));
 
     VkPushConstantRange push_constant_range{};
@@ -407,10 +437,23 @@ void PipelineStateVK::InitGlobalDescriptorSet(const DeviceVK & device)
 
     VULKAN_CHECK(vkCreatePipelineLayout(device.Handle(), &pipeline_layout_info, nullptr, &sm_pipeline_layout_handle));
     MRQ2_ASSERT(sm_pipeline_layout_handle != nullptr);
+
+    // VkPipelineCache
+    VkPipelineCacheCreateInfo pipeline_cache_info{};
+    pipeline_cache_info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+
+    VULKAN_CHECK(vkCreatePipelineCache(device.Handle(), &pipeline_cache_info, nullptr, &sm_pipeline_cache_handle));
+    MRQ2_ASSERT(sm_pipeline_cache_handle != nullptr);
 }
 
-void PipelineStateVK::ShutdownGlobalDescriptorSet(const DeviceVK & device)
+void PipelineStateVK::ShutdownGlobalState(const DeviceVK & device)
 {
+    if (sm_pipeline_cache_handle != nullptr)
+    {
+        vkDestroyPipelineCache(device.Handle(), sm_pipeline_cache_handle, nullptr);
+        sm_pipeline_cache_handle = nullptr;
+    }
+
     if (sm_pipeline_layout_handle != nullptr)
     {
         vkDestroyPipelineLayout(device.Handle(), sm_pipeline_layout_handle, nullptr);

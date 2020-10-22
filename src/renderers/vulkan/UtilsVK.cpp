@@ -455,9 +455,7 @@ void RenderPassVK::Shutdown()
 // DescriptorSetVK
 ///////////////////////////////////////////////////////////////////////////////
 
-void DescriptorSetVK::Init(const DeviceVK & device, const VkDescriptorSetLayoutCreateFlags flags,
-                           ArrayBase<const VkDescriptorPoolSize> pool_sizes_and_types,
-                           ArrayBase<const VkDescriptorSetLayoutBinding> set_layout_bindings)
+void DescriptorSetVK::Init(const DeviceVK & device, ArrayBase<const VkDescriptorPoolSize> pool_sizes_and_types, ArrayBase<const VkDescriptorSetLayoutBinding> set_layout_bindings)
 {
     MRQ2_ASSERT(m_device_vk == nullptr);
     MRQ2_ASSERT(!pool_sizes_and_types.empty() && !set_layout_bindings.empty());
@@ -473,7 +471,7 @@ void DescriptorSetVK::Init(const DeviceVK & device, const VkDescriptorSetLayoutC
 
     VkDescriptorSetLayoutCreateInfo layout_create_info{};
     layout_create_info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layout_create_info.flags        = flags;
+    layout_create_info.flags        = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR; // We are using VK_KHR_push_descriptor;
     layout_create_info.bindingCount = set_layout_bindings.size();
     layout_create_info.pBindings    = set_layout_bindings.data();
 
@@ -485,9 +483,6 @@ void DescriptorSetVK::Init(const DeviceVK & device, const VkDescriptorSetLayoutC
     set_alloc_info.descriptorPool     = m_descriptor_pool_handle;
     set_alloc_info.descriptorSetCount = 1;
     set_alloc_info.pSetLayouts        = &m_descriptor_set_layout_handle;
-
-    VULKAN_CHECK(vkAllocateDescriptorSets(device.Handle(), &set_alloc_info, &m_descript_set));
-    MRQ2_ASSERT(m_descript_set != nullptr);
 
     m_device_vk = &device;
 }
@@ -511,19 +506,7 @@ void DescriptorSetVK::Shutdown()
         m_descriptor_set_layout_handle = nullptr;
     }
 
-    // NOTE: m_descript_set is allocated from the DescriptorPool so we do not need to explicitly free it
-    // (and we do not specify VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT on pool creation).
-    m_descript_set = nullptr;
-    m_device_vk    = nullptr;
-}
-
-void DescriptorSetVK::Update(ArrayBase<const VkWriteDescriptorSet> descriptor_writes,
-                             ArrayBase<const VkCopyDescriptorSet>  descriptor_copies) const
-{
-    MRQ2_ASSERT(m_device_vk != nullptr);
-    vkUpdateDescriptorSets(m_device_vk->Handle(),
-                           descriptor_writes.size(), descriptor_writes.data(),
-                           descriptor_copies.size(), descriptor_copies.data());
+    m_device_vk = nullptr;
 }
 
 } // MrQ2

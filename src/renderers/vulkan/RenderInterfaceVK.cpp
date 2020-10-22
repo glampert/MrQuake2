@@ -21,14 +21,14 @@ void RenderInterfaceVK::Init(HINSTANCE hInst, WNDPROC wndProc, const int width, 
     m_render_targets.Init(m_device, m_swap_chain);
     m_upload_ctx.Init(m_device);
     m_graphics_ctx.Init(m_device, m_swap_chain, m_render_targets);
-    PipelineStateVK::InitGlobalDescriptorSet(m_device);
+    PipelineStateVK::InitGlobalState(m_device);
 }
 
 void RenderInterfaceVK::Shutdown()
 {
     GameInterface::Printf("**** RenderInterfaceVK::Shutdown ****");
 
-    PipelineStateVK::ShutdownGlobalDescriptorSet(m_device);
+    PipelineStateVK::ShutdownGlobalState(m_device);
     m_graphics_ctx.Shutdown();
     m_upload_ctx.Shutdown();
     m_render_targets.Shutdown();

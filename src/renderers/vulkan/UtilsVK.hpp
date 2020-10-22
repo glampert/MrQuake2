@@ -196,16 +196,9 @@ public:
     DescriptorSetVK(const DescriptorSetVK &) = delete;
     DescriptorSetVK & operator=(const DescriptorSetVK &) = delete;
 
-    void Init(const DeviceVK & device, const VkDescriptorSetLayoutCreateFlags flags,
-              ArrayBase<const VkDescriptorPoolSize> pool_sizes_and_types,
-              ArrayBase<const VkDescriptorSetLayoutBinding> set_layout_bindings);
-
+    void Init(const DeviceVK & device, ArrayBase<const VkDescriptorPoolSize> pool_sizes_and_types, ArrayBase<const VkDescriptorSetLayoutBinding> set_layout_bindings);
     void Shutdown();
 
-    void Update(ArrayBase<const VkWriteDescriptorSet> descriptor_writes,
-                ArrayBase<const VkCopyDescriptorSet>  descriptor_copies) const;
-
-    VkDescriptorSet Handle() const { return m_descript_set; }
     VkDescriptorSetLayout LayoutHandle() const { return m_descriptor_set_layout_handle; }
 
 private:
@@ -213,7 +206,6 @@ private:
     const DeviceVK *      m_device_vk{ nullptr };
     VkDescriptorPool      m_descriptor_pool_handle{ nullptr };
     VkDescriptorSetLayout m_descriptor_set_layout_handle{ nullptr };
-    VkDescriptorSet       m_descript_set{ nullptr };
 };
 
 } // MrQ2

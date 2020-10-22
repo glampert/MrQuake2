@@ -10,6 +10,7 @@ namespace MrQ2
 
 class DeviceVK;
 class ShaderProgramVK;
+struct PipelineStateCreateInfoVK;
 
 class PipelineStateVK final
 {
@@ -24,7 +25,12 @@ public:
     PipelineStateVK(const PipelineStateVK &) = delete;
     PipelineStateVK & operator=(const PipelineStateVK &) = delete;
 
+    // Movable.
+    PipelineStateVK(PipelineStateVK && other);
+    PipelineStateVK & operator=(PipelineStateVK && other);
+
     void Init(const DeviceVK & device);
+    void Init(const PipelineStateVK & other);
     void Shutdown();
 
     void SetPrimitiveTopology(const PrimitiveTopologyVK topology);
@@ -40,10 +46,13 @@ public:
     bool IsFinalized() const { return (m_flags & kFinalized) != 0; }
 
     // VK Internal
-    static void InitGlobalDescriptorSet(const DeviceVK & device);
-    static void ShutdownGlobalDescriptorSet(const DeviceVK & device);
+    static void InitGlobalState(const DeviceVK & device);
+    static void ShutdownGlobalState(const DeviceVK & device);
+    uint64_t GetSignature() const { return m_signature; }
 
 private:
+
+    void MakePipelineStateCreateInfo(PipelineStateCreateInfoVK & pipeline_info) const;
 
     enum ShaderBindings : uint32_t
     {
@@ -78,11 +87,59 @@ private:
     const DeviceVK *         m_device_vk{ nullptr };
     const ShaderProgramVK *  m_shader_prog{ nullptr };
     mutable VkPipeline       m_pipeline_handle{ nullptr };
+    mutable uint64_t         m_signature{ 0 };
     mutable uint32_t         m_flags{ kNoFlags };
     PrimitiveTopologyVK      m_topology{ PrimitiveTopologyVK::kTriangleList };
 
+    static VkPipelineCache   sm_pipeline_cache_handle;
     static VkPipelineLayout  sm_pipeline_layout_handle;
     static DescriptorSetVK   sm_global_descriptor_set;
 };
+
+///////////////////////////////////////////////////////////////////////////////
+
+inline PipelineStateVK::PipelineStateVK(PipelineStateVK && other)
+    : m_device_vk{ other.m_device_vk }
+    , m_shader_prog{ other.m_shader_prog }
+    , m_pipeline_handle{ other.m_pipeline_handle }
+    , m_signature{ other.m_signature }
+    , m_flags{ other.m_flags }
+    , m_topology{ other.m_topology }
+{
+    other.m_device_vk       = nullptr;
+    other.m_shader_prog     = nullptr;
+    other.m_pipeline_handle = nullptr;
+    other.m_signature       = 0;
+    other.m_flags           = kNoFlags;
+    other.m_topology        = {};
+}
+
+inline PipelineStateVK & PipelineStateVK::operator=(PipelineStateVK && other)
+{
+    Shutdown();
+
+    m_device_vk             = other.m_device_vk;
+    m_shader_prog           = other.m_shader_prog;
+    m_pipeline_handle       = other.m_pipeline_handle;
+    m_signature             = other.m_signature;
+    m_flags                 = other.m_flags;
+    m_topology              = other.m_topology;
+
+    other.m_device_vk       = nullptr;
+    other.m_shader_prog     = nullptr;
+    other.m_pipeline_handle = nullptr;
+    other.m_signature       = 0;
+    other.m_flags           = kNoFlags;
+    other.m_topology        = {};
+
+    return *this;
+}
+
+inline void PipelineStateVK::SetPrimitiveTopology(const PrimitiveTopologyVK topology)
+{
+    m_topology = topology;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 } // MrQ2

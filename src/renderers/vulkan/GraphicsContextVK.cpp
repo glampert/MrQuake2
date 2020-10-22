@@ -33,10 +33,13 @@ void GraphicsContextVK::Init(const DeviceVK & device, SwapChainVK & swap_chain, 
     m_current_viewport.maxDepth = 1.0f;
 
     m_gpu_markers_enabled = Config::r_debug_frame_events.IsSet();
+    m_pipeline_cache.reserve(16);
 }
 
 void GraphicsContextVK::Shutdown()
 {
+    m_pipeline_cache.clear();
+
     m_device_vk             = nullptr;
     m_swap_chain            = nullptr;
     m_render_targets        = nullptr;
@@ -252,28 +255,42 @@ void GraphicsContextVK::SetPipelineState(const PipelineStateVK & pipeline_state)
     }
 }
 
-static inline VkPrimitiveTopology ToVkPrimitiveTopology(const PrimitiveTopologyVK topology)
-{
-    switch (topology)
-    {
-    case PrimitiveTopologyVK::kTriangleList  : return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    case PrimitiveTopologyVK::kTriangleStrip : return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-    case PrimitiveTopologyVK::kTriangleFan   : return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; // Converted by the front-end
-    case PrimitiveTopologyVK::kLineList      : return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-    default : GameInterface::Errorf("Bad PrimitiveTopology enum!");
-    } // switch
-}
-
 void GraphicsContextVK::SetPrimitiveTopology(const PrimitiveTopologyVK topology)
 {
+    MRQ2_ASSERT(m_current_pipeline_state != nullptr);
+
     if (m_current_topology != topology)
     {
         m_current_topology = topology;
 
-        // FIXME: cannot rely on this EXT :(
-        // Will need to have multiple pipeline states?
-        //vkCmdSetPrimitiveTopologyEXT(m_command_buffer_handle, ToVkPrimitiveTopology(m_current_topology));
+        if (m_current_topology != m_current_pipeline_state->m_topology)
+        {
+            PipelineStateVK dynamic_pipeline;
+            dynamic_pipeline.Init(*m_current_pipeline_state);
+            dynamic_pipeline.SetPrimitiveTopology(m_current_topology);
+            dynamic_pipeline.Finalize();
+
+            auto * cached_pipeline = FindOrRegisterPipeline(&dynamic_pipeline);
+            MRQ2_ASSERT(cached_pipeline != nullptr);
+
+            m_current_pipeline_state = cached_pipeline;
+            vkCmdBindPipeline(m_command_buffer_handle, VK_PIPELINE_BIND_POINT_GRAPHICS, m_current_pipeline_state->m_pipeline_handle);
+        }
     }
+}
+
+const PipelineStateVK * GraphicsContextVK::FindOrRegisterPipeline(PipelineStateVK * dynamic_pipeline)
+{
+    for (const PipelineStateVK & p : m_pipeline_cache)
+    {
+        if (p.GetSignature() == dynamic_pipeline->GetSignature())
+        {
+            return &p;
+        }
+    }
+
+    m_pipeline_cache.emplace_back(std::move(*dynamic_pipeline));
+    return &m_pipeline_cache.back();
 }
 
 void GraphicsContextVK::Draw(const uint32_t first_vertex, const uint32_t vertex_count)
@@ -293,6 +310,7 @@ void GraphicsContextVK::DrawIndexed(const uint32_t first_index, const uint32_t i
 void GraphicsContextVK::PushMarker(const wchar_t * name)
 {
     // TODO
+    (void)name;
 }
 
 void GraphicsContextVK::PopMarker()

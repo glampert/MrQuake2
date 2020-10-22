@@ -4,6 +4,7 @@
 #pragma once
 
 #include "PipelineStateVK.hpp"
+#include <vector>
 
 namespace MrQ2
 {
@@ -67,6 +68,7 @@ private:
     const SwapChainRenderTargetsVK * m_render_targets{ nullptr };
     CommandBufferVK *                m_command_buffer{ nullptr };
     VkCommandBuffer                  m_command_buffer_handle{ nullptr }; // Cached from m_command_buffer
+    std::vector<PipelineStateVK>     m_pipeline_cache;
 
     // Cached states:
     const PipelineStateVK *          m_current_pipeline_state{ nullptr };
@@ -81,6 +83,7 @@ private:
     bool                             m_gpu_markers_enabled{ false };
 
     void SetAndUpdateConstantBuffer_Internal(const ConstantBufferVK & cb, const uint32_t slot, const void * data, const uint32_t data_size);
+    const PipelineStateVK * FindOrRegisterPipeline(PipelineStateVK * dynamic_pipeline);
 };
 
 //

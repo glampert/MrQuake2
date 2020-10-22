@@ -85,6 +85,7 @@ private:
     VkShaderModule   m_ps_handle{ nullptr };
     std::string      m_ps_entry{};
     std::string      m_vs_entry{};
+    std::string      m_filename{};
     bool             m_debug_mode{ false };
 
     VkVertexInputBindingDescription   m_binding_description = {};

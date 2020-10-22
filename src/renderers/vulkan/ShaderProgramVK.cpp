@@ -144,6 +144,7 @@ bool ShaderProgramVK::LoadFromFile(const DeviceVK & device, const VertexInputLay
 
     m_vs_entry   = vs_entry;
     m_ps_entry   = ps_entry;
+    m_filename   = filename;
     m_debug_mode = debug;
     m_device_vk  = &device;
 
