@@ -37,13 +37,49 @@ public:
     void SetCullEnabled(const bool enabled);
 
     void Finalize() const;
-    bool IsFinalized() const { return false; } // TODO
+    bool IsFinalized() const { return (m_flags & kFinalized) != 0; }
+
+    // VK Internal
+    static void InitGlobalDescriptorSet(const DeviceVK & device);
+    static void ShutdownGlobalDescriptorSet(const DeviceVK & device);
 
 private:
 
-    const DeviceVK * m_device_vk{ nullptr };
-    VkPipelineLayout m_pipeline_layout_handle{ nullptr };
-    VkPipeline       m_pipeline_handle{ nullptr };
+    enum ShaderBindings : uint32_t
+    {
+        // Buffers
+        kShaderBindingCBuffer0, // PerFrameShaderConstants
+        kShaderBindingCBuffer1, // PerViewShaderConstants
+        kShaderBindingCBuffer2, // PerDrawShaderConstants
+
+        // Textures/samplers
+        kShaderBindingTexture0,
+        kShaderBindingTexture1,
+
+        // Internal counts
+        kCBufferCount = 3,
+        kTextureCount = 2, // BaseTexture and Lightmap
+    };
+
+    enum Flags : uint32_t
+    {
+        kNoFlags           = 0,
+        kFinalized         = (1 << 1),
+        kDepthTestEnabled  = (1 << 2),
+        kDepthWriteEnabled = (1 << 3),
+        kAlphaBlendEnabled = (1 << 4),
+        kAdditiveBlending  = (1 << 5),
+        kCullEnabled       = (1 << 6),
+    };
+
+    const DeviceVK *         m_device_vk{ nullptr };
+    const ShaderProgramVK *  m_shader_prog{ nullptr };
+    mutable VkPipeline       m_pipeline_handle{ nullptr };
+    mutable uint32_t         m_flags{ kNoFlags };
+    PrimitiveTopologyVK      m_topology{ PrimitiveTopologyVK::kTriangleList };
+
+    static VkPipelineLayout  sm_pipeline_layout_handle;
+    static DescriptorSetVK   sm_global_descriptor_set;
 };
 
 } // MrQ2

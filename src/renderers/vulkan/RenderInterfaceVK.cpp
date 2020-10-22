@@ -14,19 +14,21 @@ void RenderInterfaceVK::Init(HINSTANCE hInst, WNDPROC wndProc, const int width, 
     // Window, device and swap-chain setup:
     const auto window_name = debug ? "MrQuake2 (Vulkan Debug)" : "MrQuake2 (Vulkan)";
     m_window.Init(window_name, hInst, wndProc, width, height, fullscreen);
-    m_device.Init(m_window, m_upload_ctx, m_graphics_ctx, debug);
+    m_device.Init(m_window, m_upload_ctx, m_graphics_ctx, m_render_targets, debug);
     m_swap_chain.Init(m_device, width, height, m_render_targets);
 
     // Global renderer states setup:
     m_render_targets.Init(m_device, m_swap_chain);
     m_upload_ctx.Init(m_device);
     m_graphics_ctx.Init(m_device, m_swap_chain, m_render_targets);
+    PipelineStateVK::InitGlobalDescriptorSet(m_device);
 }
 
 void RenderInterfaceVK::Shutdown()
 {
     GameInterface::Printf("**** RenderInterfaceVK::Shutdown ****");
 
+    PipelineStateVK::ShutdownGlobalDescriptorSet(m_device);
     m_graphics_ctx.Shutdown();
     m_upload_ctx.Shutdown();
     m_render_targets.Shutdown();

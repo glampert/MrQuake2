@@ -89,6 +89,7 @@ private:
 
     VkVertexInputBindingDescription   m_binding_description = {};
     VkVertexInputAttributeDescription m_attribute_descriptions[VertexInputLayoutVK::kElementTypeCount] = {};
+    uint32_t                          m_attribute_count{ 0 };
 };
 
 } // MrQ2

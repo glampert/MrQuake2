@@ -31,7 +31,9 @@ public:
 
     void Shutdown();
 
-    VkImage Handle() const { return m_image_handle; }
+    VkImage     Handle()        const { return m_image_handle; }
+    VkImageView ViewHandle()    const { return m_image_view_handle; }
+    VkSampler   SamplerHandle() const { return m_sampler_handle; }
 
 private:
 

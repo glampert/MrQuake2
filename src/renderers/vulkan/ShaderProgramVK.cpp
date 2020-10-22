@@ -125,7 +125,6 @@ bool ShaderProgramVK::LoadFromFile(const DeviceVK & device, const VertexInputLay
     const VkFormat vk_element_formats[] = { VK_FORMAT_UNDEFINED, VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT };
     static_assert(ArrayLength(vk_element_formats) == VertexInputLayoutVK::kElementFormatCount);
 
-    uint32_t e = 0;
     for (const auto & element : input_layout.elements)
     {
         if (element.type   == VertexInputLayoutVK::kInvalidElementType ||
@@ -134,13 +133,13 @@ bool ShaderProgramVK::LoadFromFile(const DeviceVK & device, const VertexInputLay
             continue;
         }
 
-        m_attribute_descriptions[e].location = e;
-        m_attribute_descriptions[e].binding  = 0;
-        m_attribute_descriptions[e].format   = vk_element_formats[element.format];
-        m_attribute_descriptions[e].offset   = element.offset;
+        m_attribute_descriptions[m_attribute_count].location = m_attribute_count;
+        m_attribute_descriptions[m_attribute_count].binding  = 0;
+        m_attribute_descriptions[m_attribute_count].format   = vk_element_formats[element.format];
+        m_attribute_descriptions[m_attribute_count].offset   = element.offset;
 
         m_binding_description.stride += vk_element_sizes[element.format];
-        ++e;
+        ++m_attribute_count;
     }
 
     m_vs_entry   = vs_entry;
@@ -171,6 +170,7 @@ void ShaderProgramVK::Shutdown()
     }
 
     m_device_vk = nullptr;
+    m_attribute_count = 0;
 }
 
 void ShaderProgramVK::GetPipelineStages(VkPipelineShaderStageCreateInfo out_stages[kNumShaderStages]) const

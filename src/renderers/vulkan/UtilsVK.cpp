@@ -455,7 +455,7 @@ void RenderPassVK::Shutdown()
 // DescriptorSetVK
 ///////////////////////////////////////////////////////////////////////////////
 
-void DescriptorSetVK::Init(const DeviceVK & device, const VkDescriptorSetLayout & set_layout,
+void DescriptorSetVK::Init(const DeviceVK & device, const VkDescriptorSetLayoutCreateFlags flags,
                            ArrayBase<const VkDescriptorPoolSize> pool_sizes_and_types,
                            ArrayBase<const VkDescriptorSetLayoutBinding> set_layout_bindings)
 {
@@ -473,6 +473,7 @@ void DescriptorSetVK::Init(const DeviceVK & device, const VkDescriptorSetLayout 
 
     VkDescriptorSetLayoutCreateInfo layout_create_info{};
     layout_create_info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layout_create_info.flags        = flags;
     layout_create_info.bindingCount = set_layout_bindings.size();
     layout_create_info.pBindings    = set_layout_bindings.data();
 
@@ -483,7 +484,7 @@ void DescriptorSetVK::Init(const DeviceVK & device, const VkDescriptorSetLayout 
     set_alloc_info.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     set_alloc_info.descriptorPool     = m_descriptor_pool_handle;
     set_alloc_info.descriptorSetCount = 1;
-    set_alloc_info.pSetLayouts        = &set_layout;
+    set_alloc_info.pSetLayouts        = &m_descriptor_set_layout_handle;
 
     VULKAN_CHECK(vkAllocateDescriptorSets(device.Handle(), &set_alloc_info, &m_descript_set));
     MRQ2_ASSERT(m_descript_set != nullptr);

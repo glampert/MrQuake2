@@ -14,10 +14,11 @@
 namespace MrQ2
 {
 
-void DeviceVK::Init(Win32Window & window, UploadContextVK & up_ctx, GraphicsContextVK & gfx_ctx, const bool debug)
+void DeviceVK::Init(Win32Window & window, UploadContextVK & up_ctx, GraphicsContextVK & gfx_ctx, SwapChainRenderTargetsVK & rts, const bool debug)
 {
     m_upload_ctx       = &up_ctx;
     m_graphics_ctx     = &gfx_ctx;
+    m_render_targets   = &rts;
     m_debug_validation = debug;
 
     InitInstanceLayerProperties();
@@ -47,8 +48,9 @@ void DeviceVK::Shutdown()
         m_instance_handle = nullptr;
     }
 
-    m_upload_ctx   = nullptr;
-    m_graphics_ctx = nullptr;
+    m_upload_ctx     = nullptr;
+    m_graphics_ctx   = nullptr;
+    m_render_targets = nullptr;
 
     m_instance_layer_properties.clear();
     m_physical_devices.clear();
@@ -161,17 +163,16 @@ void DeviceVK::InitInstance()
         "VK_KHR_win32_surface"
     };
 
-    VkApplicationInfo app_info  = {};
+    VkApplicationInfo app_info{};
     app_info.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName   = "MrQuake2VK";
     app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     app_info.pEngineName        = "MrQuake2VK";
     app_info.engineVersion      = VK_MAKE_VERSION(1, 0, 0);
-    app_info.apiVersion         = VK_API_VERSION_1_0;
+    app_info.apiVersion         = VK_API_VERSION_1_1;
 
-    VkInstanceCreateInfo inst_info    = {};
+    VkInstanceCreateInfo inst_info{};
     inst_info.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    inst_info.flags                   = 0;
     inst_info.pApplicationInfo        = &app_info;
     inst_info.enabledLayerCount       = instance_layer_count;
     inst_info.ppEnabledLayerNames     = instance_layer_names;
@@ -202,14 +203,17 @@ void DeviceVK::EnumerateDevices()
     vkGetPhysicalDeviceQueueFamilyProperties(m_physical_devices[0], &num_queue_families, m_queue_family_properties.data());
     MRQ2_ASSERT(num_queue_families >= 1);
 
+    m_device_info.features2.sType   = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    m_device_info.properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+
     // NOTE: For now we only care about GPU 0 - no support for multi-GPU systems.
-    vkGetPhysicalDeviceFeatures(m_physical_devices[0], &m_device_info.features);
-    vkGetPhysicalDeviceProperties(m_physical_devices[0], &m_device_info.properties);
+    vkGetPhysicalDeviceFeatures2(m_physical_devices[0], &m_device_info.features2);
+    vkGetPhysicalDeviceProperties2(m_physical_devices[0], &m_device_info.properties2);
     vkGetPhysicalDeviceMemoryProperties(m_physical_devices[0], &m_device_info.memoryProperties);
 
     GameInterface::Printf("Found %u physical GPUs. Using GPU [0]...", num_devices);
     GameInterface::Printf("GPU 0 has %u queues", num_queue_families);
-    GameInterface::Printf("GPU 0 name: %s", m_device_info.properties.deviceName);
+    GameInterface::Printf("GPU 0 name: %s", m_device_info.properties2.properties.deviceName);
 }
 
 void DeviceVK::InitSwapChainExtensions(Win32Window & window)
@@ -303,8 +307,33 @@ void DeviceVK::InitSwapChainExtensions(Win32Window & window)
 
 void DeviceVK::InitDevice()
 {
+    // Dump list of supported extensions
+    if (m_debug_validation)
+    {
+        uint32_t ext_count = 0;
+        vkEnumerateDeviceExtensionProperties(PhysDevice(), nullptr, &ext_count, nullptr);
+        if (ext_count != 0)
+        {
+            GameInterface::Printf("------ VK Device extensions available ------");
+
+            std::vector<VkExtensionProperties> extensions;
+            extensions.resize(ext_count);
+
+            if (vkEnumerateDeviceExtensionProperties(PhysDevice(), nullptr, &ext_count, extensions.data()) == VK_SUCCESS)
+            {
+                for (const auto & ext : extensions)
+                {
+                    GameInterface::Printf("%s", ext.extensionName);
+                }
+            }
+
+            GameInterface::Printf("--------------------------------------------");
+        }
+    }
+
     static const char * const s_device_extension_names[] = {
-        "VK_KHR_swapchain"
+        "VK_KHR_swapchain",
+        "VK_KHR_push_descriptor"
     };
 
     // Dummy priorities - don't care atm
@@ -322,7 +351,7 @@ void DeviceVK::InitDevice()
     device_create_info.pQueueCreateInfos       = &queue_create_info;
     device_create_info.enabledExtensionCount   = ArrayLength(s_device_extension_names);
     device_create_info.ppEnabledExtensionNames = s_device_extension_names;
-    device_create_info.pEnabledFeatures        = &m_device_info.features;
+    device_create_info.pEnabledFeatures        = &m_device_info.features2.features;
 
     VULKAN_CHECK(vkCreateDevice(m_physical_devices[0], &device_create_info, nullptr, &m_device_handle));
     MRQ2_ASSERT(m_device_handle != nullptr);
@@ -342,6 +371,12 @@ void DeviceVK::InitDevice()
     {
         vkGetDeviceQueue(m_device_handle, m_present_queue.family_index, 0, &m_present_queue.queue_handle);
         MRQ2_ASSERT(m_present_queue.queue_handle != nullptr);
+    }
+
+    pVkCmdPushDescriptorSetKHR = (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(m_device_handle, "vkCmdPushDescriptorSetKHR");
+    if (pVkCmdPushDescriptorSetKHR == nullptr)
+    {
+        GameInterface::Errorf("Could not get a valid function pointer for vkCmdPushDescriptorSetKHR");
     }
 }
 

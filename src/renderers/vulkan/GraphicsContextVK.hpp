@@ -3,7 +3,7 @@
 //
 #pragma once
 
-#include "UtilsVK.hpp"
+#include "PipelineStateVK.hpp"
 
 namespace MrQ2
 {
@@ -15,7 +15,6 @@ class TextureVK;
 class VertexBufferVK;
 class IndexBufferVK;
 class ConstantBufferVK;
-class PipelineStateVK;
 
 class GraphicsContextVK final
 {
@@ -50,10 +49,7 @@ public:
     template<typename T>
     void SetAndUpdateConstantBufferForDraw(const ConstantBufferVK & cb, const uint32_t slot, const T & data)
     {
-        (void)cb;
-        (void)slot;
-        (void)data;
-        // TODO: probably use vkCmdPushConstants for this.
+        SetAndUpdateConstantBuffer_Internal(cb, slot, &data, sizeof(T));
     }
 
     // Draw calls
@@ -73,8 +69,18 @@ private:
     VkCommandBuffer                  m_command_buffer_handle{ nullptr }; // Cached from m_command_buffer
 
     // Cached states:
+    const PipelineStateVK *          m_current_pipeline_state{ nullptr };
     VkBuffer                         m_current_vb{ nullptr };
     VkBuffer                         m_current_ib{ nullptr };
+    VkBuffer                         m_current_cb[PipelineStateVK::kCBufferCount] = {};
+    VkImageView                      m_current_texture[PipelineStateVK::kTextureCount] = {};
+    VkViewport                       m_current_viewport{};
+    VkRect2D                         m_current_scissor_rect{};
+    PrimitiveTopologyVK              m_current_topology{ PrimitiveTopologyVK::kCount };
+    bool                             m_depth_range_changed{ false };
+    bool                             m_gpu_markers_enabled{ false };
+
+    void SetAndUpdateConstantBuffer_Internal(const ConstantBufferVK & cb, const uint32_t slot, const void * data, const uint32_t data_size);
 };
 
 //

@@ -196,7 +196,7 @@ public:
     DescriptorSetVK(const DescriptorSetVK &) = delete;
     DescriptorSetVK & operator=(const DescriptorSetVK &) = delete;
 
-    void Init(const DeviceVK & device, const VkDescriptorSetLayout & set_layout,
+    void Init(const DeviceVK & device, const VkDescriptorSetLayoutCreateFlags flags,
               ArrayBase<const VkDescriptorPoolSize> pool_sizes_and_types,
               ArrayBase<const VkDescriptorSetLayoutBinding> set_layout_bindings);
 

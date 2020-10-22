@@ -12,6 +12,7 @@ namespace MrQ2
 class Win32Window;
 class UploadContextVK;
 class GraphicsContextVK;
+class SwapChainRenderTargetsVK;
 
 class DeviceVK final
 {
@@ -24,13 +25,14 @@ public:
     DeviceVK(const DeviceVK &) = delete;
     DeviceVK & operator=(const DeviceVK &) = delete;
 
-    void Init(Win32Window & window, UploadContextVK & up_ctx, GraphicsContextVK & gfx_ctx, const bool debug);
+    void Init(Win32Window & window, UploadContextVK & up_ctx, GraphicsContextVK & gfx_ctx, SwapChainRenderTargetsVK & rts, const bool debug);
     void Shutdown();
 
     // Public to renderers/common
-    UploadContextVK   & UploadContext()    const { return *m_upload_ctx;   }
-    GraphicsContextVK & GraphicsContext()  const { return *m_graphics_ctx; }
-    bool DebugValidationEnabled()          const { return m_debug_validation; }
+    UploadContextVK   &        UploadContext()          const { return *m_upload_ctx; }
+    GraphicsContextVK &        GraphicsContext()        const { return *m_graphics_ctx; }
+    SwapChainRenderTargetsVK & ScRenderTargets()        const { return *m_render_targets; }
+    bool                       DebugValidationEnabled() const { return m_debug_validation; }
 
     // VK public handles
     VkDevice         Handle()              const { return m_device_handle; }
@@ -40,6 +42,9 @@ public:
     const auto &     GraphicsQueue()       const { return m_graphics_queue; }
     const auto &     PresentQueue()        const { return m_present_queue; }
     const auto &     DeviceInfo()          const { return m_device_info; }
+
+    // Extension function pointers
+    PFN_vkCmdPushDescriptorSetKHR pVkCmdPushDescriptorSetKHR{ nullptr };
 
 private:
 
@@ -51,8 +56,8 @@ private:
 
     struct DeviceHWInfo
     {
-        VkPhysicalDeviceFeatures features{};
-        VkPhysicalDeviceProperties properties{};
+        VkPhysicalDeviceFeatures2 features2{};
+        VkPhysicalDeviceProperties2 properties2{};
         VkPhysicalDeviceMemoryProperties memoryProperties{};
     };
 
@@ -71,18 +76,19 @@ private:
 
 private:
 
-    UploadContextVK *   m_upload_ctx{ nullptr };
-    GraphicsContextVK * m_graphics_ctx{ nullptr };
+    UploadContextVK *                    m_upload_ctx{ nullptr };
+    GraphicsContextVK *                  m_graphics_ctx{ nullptr };
+    SwapChainRenderTargetsVK *           m_render_targets{ nullptr };
 
-    VkInstance   m_instance_handle{ nullptr };
-    VkDevice     m_device_handle{ nullptr };
-    VkSurfaceKHR m_render_surface{ nullptr };                    // Render target surface for the rendering window (screen framebuffer).
-    VkFormat     m_render_surface_format{ VK_FORMAT_UNDEFINED }; // Texture format of the rendering surface (the framebuffer).
-    bool         m_debug_validation{ false };                    // With Vulkan debug validation layers?
+    VkInstance                           m_instance_handle{ nullptr };
+    VkDevice                             m_device_handle{ nullptr };
+    VkSurfaceKHR                         m_render_surface{ nullptr };                    // Render target surface for the rendering window (screen framebuffer).
+    VkFormat                             m_render_surface_format{ VK_FORMAT_UNDEFINED }; // Texture format of the rendering surface (the framebuffer).
+    bool                                 m_debug_validation{ false };                    // With Vulkan debug validation layers?
 
     // Queues
-    DeviceQueueInfo m_present_queue;
-    DeviceQueueInfo m_graphics_queue;
+    DeviceQueueInfo                      m_present_queue;
+    DeviceQueueInfo                      m_graphics_queue;
 
     // Device info
     std::vector<LayerProperties>         m_instance_layer_properties; // Layers and extensions available for the VK Instance.

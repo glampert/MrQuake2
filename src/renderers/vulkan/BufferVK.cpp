@@ -24,6 +24,8 @@ void BufferVK::InitBufferInternal(const DeviceVK & device, const uint32_t buffer
     m_device_vk    = &device;
     m_buffer_size  = (out_opt_mem_reqs != nullptr) ? static_cast<uint32_t>(out_opt_mem_reqs->size) : buffer_size_in_bytes;
     m_buffer_usage = buffer_usage;
+
+    // TODO: Might need to pad uniform buffers based on device limits minUniformBufferOffsetAlignment.
 }
 
 void BufferVK::Shutdown()
