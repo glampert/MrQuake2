@@ -206,6 +206,19 @@ public:
         std::copy_n(arr, kArraySize, m_array);
     }
 
+    FixedSizeArray(const FixedSizeArray & other)
+        : Base{ m_array, other.m_count, kCapacity }
+    {
+        std::copy_n(other.m_array, other.m_count, this->m_array);
+    }
+
+    FixedSizeArray & operator=(const FixedSizeArray & other)
+    {
+        std::copy_n(other.m_array, other.m_count, this->m_array);
+        this->m_count = other.m_count;
+        return *this;
+    }
+
 private:
 
     static_assert(kCapacity > 0, "Cannot allocate FixedSizeArray of zero capacity!");

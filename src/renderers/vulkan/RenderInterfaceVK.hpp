@@ -38,7 +38,7 @@ public:
 
     int RenderWidth() const;
     int RenderHeight() const;
-    bool IsFrameStarted() const;
+    static bool IsFrameStarted();
     const DeviceVK & Device() const;
 
 private:
@@ -49,7 +49,7 @@ private:
 	SwapChainRenderTargetsVK m_render_targets;
     UploadContextVK          m_upload_ctx;
     GraphicsContextVK        m_graphics_ctx;
-    bool                     m_frame_started{ false };
+    static bool              sm_frame_started;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -64,9 +64,9 @@ inline int RenderInterfaceVK::RenderHeight() const
     return m_render_targets.RenderTargetHeight();
 }
 
-inline bool RenderInterfaceVK::IsFrameStarted() const
+inline bool RenderInterfaceVK::IsFrameStarted()
 {
-    return m_frame_started;
+    return sm_frame_started;
 }
 
 inline const DeviceVK & RenderInterfaceVK::Device() const

@@ -7,6 +7,8 @@
 namespace MrQ2
 {
 
+bool RenderInterfaceVK::sm_frame_started{ false };
+
 void RenderInterfaceVK::Init(HINSTANCE hInst, WNDPROC wndProc, const int width, const int height, const bool fullscreen, const bool debug)
 {
     GameInterface::Printf("**** RenderInterfaceVK::Init ****");
@@ -19,7 +21,7 @@ void RenderInterfaceVK::Init(HINSTANCE hInst, WNDPROC wndProc, const int width, 
 
     // Global renderer states setup:
     m_render_targets.Init(m_device, m_swap_chain);
-    m_upload_ctx.Init(m_device);
+    m_upload_ctx.Init(m_device, m_swap_chain);
     m_graphics_ctx.Init(m_device, m_swap_chain, m_render_targets);
     PipelineStateVK::InitGlobalState(m_device);
 }
@@ -39,8 +41,8 @@ void RenderInterfaceVK::Shutdown()
 
 void RenderInterfaceVK::BeginFrame(const float clear_color[4], const float clear_depth, const uint8_t clear_stencil)
 {
-    MRQ2_ASSERT(!m_frame_started);
-    m_frame_started = true;
+    MRQ2_ASSERT(!sm_frame_started);
+    sm_frame_started = true;
 
     // Flush any textures created by the last level load.
     m_upload_ctx.FlushTextureCreates();
@@ -53,8 +55,11 @@ void RenderInterfaceVK::BeginFrame(const float clear_color[4], const float clear
 
 void RenderInterfaceVK::EndFrame()
 {
-    MRQ2_ASSERT(m_frame_started);
-    m_frame_started = false;
+    MRQ2_ASSERT(sm_frame_started);
+    sm_frame_started = false;
+
+    // Finish the main VK RenderPass.
+    m_graphics_ctx.EndFrame();
 
     // Flush any textures created within this frame.
     m_upload_ctx.FlushTextureCreates();
@@ -62,7 +67,6 @@ void RenderInterfaceVK::EndFrame()
     // Finish any texture uploads that were submitted this fame.
     m_upload_ctx.UpdateCompletedUploads();
 
-    m_graphics_ctx.EndFrame();
     m_swap_chain.EndFrame();
 }
 

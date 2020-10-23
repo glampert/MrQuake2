@@ -139,6 +139,7 @@ public:
 
     bool IsInRecordingState()  const { return (m_state_flags & kFlagRecordingState)  != 0; }
     bool IsInSubmissionState() const { return (m_state_flags & kFlagSubmissionState) != 0; }
+    bool IsFinishedExecuting() const { return m_fence.IsSignaled(); }
 
     // Submit/execute previously recorded buffer without waiting.
     void Submit();
@@ -199,7 +200,7 @@ public:
     void Init(const DeviceVK & device, ArrayBase<const VkDescriptorPoolSize> pool_sizes_and_types, ArrayBase<const VkDescriptorSetLayoutBinding> set_layout_bindings);
     void Shutdown();
 
-    VkDescriptorSetLayout LayoutHandle() const { return m_descriptor_set_layout_handle; }
+    VkDescriptorSetLayout Handle() const { return m_descriptor_set_layout_handle; }
 
 private:
 

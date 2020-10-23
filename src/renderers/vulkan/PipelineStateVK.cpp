@@ -437,7 +437,7 @@ void PipelineStateVK::InitGlobalState(const DeviceVK & device)
     push_constant_range.size       = kMaxPushConstantsSizeBytes;
 
     // VkPipelineLayout
-    const VkDescriptorSetLayout descriptor_set_layouts[] = { sm_global_descriptor_set.LayoutHandle() };
+    const VkDescriptorSetLayout descriptor_set_layouts[] = { sm_global_descriptor_set.Handle() };
 
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
     pipeline_layout_info.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;

@@ -5,20 +5,22 @@
 #include "../common/TextureStore.hpp"
 #include "../common/OptickProfiler.hpp"
 #include "UploadContextVK.hpp"
-#include "TextureVK.hpp"
 #include "DeviceVK.hpp"
+#include "SwapChainVK.hpp"
+#include "TextureVK.hpp"
 
 namespace MrQ2
 {
 
-void UploadContextVK::Init(const DeviceVK & device)
+void UploadContextVK::Init(const DeviceVK & device, SwapChainVK & swap_chain)
 {
     MRQ2_ASSERT(m_device_vk == nullptr);
 
     m_upload_cmd_buffer.Init(device);
     m_upload_cmd_buffer.BeginRecording();
 
-    m_device_vk = &device;
+    m_device_vk  = &device;
+    m_swap_chain = &swap_chain;
 }
 
 void UploadContextVK::Shutdown()
@@ -29,8 +31,15 @@ void UploadContextVK::Shutdown()
     }
     m_num_pending_texture_creates = 0;
 
+    for (UploadEntry & entry : m_pending_texture_uploads)
+    {
+        entry.Reset();
+    }
+    m_num_pending_texture_uploads = 0;
+
     m_upload_cmd_buffer.Shutdown();
-    m_device_vk = nullptr;
+    m_device_vk  = nullptr;
+    m_swap_chain = nullptr;
 }
 
 void UploadContextVK::UploadTexture(const TextureUploadVK & upload_info)
@@ -38,11 +47,29 @@ void UploadContextVK::UploadTexture(const TextureUploadVK & upload_info)
     OPTICK_EVENT();
 
     MRQ2_ASSERT(m_device_vk != nullptr);
-    MRQ2_ASSERT(upload_info.mipmaps.mip_dimensions[0].x != 0);
-    MRQ2_ASSERT(upload_info.mipmaps.mip_init_data[0] != nullptr);
-    MRQ2_ASSERT(upload_info.mipmaps.num_mip_levels >= 1 && upload_info.mipmaps.num_mip_levels <= TextureImage::kMaxMipLevels);
+    MRQ2_ASSERT(RenderInterfaceVK::IsFrameStarted()); // Must happen between a Begin/EndFrame
 
-    // TODO
+    if (m_num_pending_texture_uploads == ArrayLength(m_pending_texture_uploads))
+    {
+        GameInterface::Errorf("Max number of pending Vulkan texture uploads reached!");
+    }
+
+    // Find a free entry
+    UploadEntry * free_entry = nullptr;
+    for (UploadEntry & entry : m_pending_texture_uploads)
+    {
+        if (entry.texture_handle == nullptr)
+        {
+            free_entry = &entry;
+            break;
+        }
+    }
+
+    MRQ2_ASSERT(free_entry != nullptr);
+    MRQ2_ASSERT(free_entry->cmd_buffer == nullptr); // not kicked
+
+    ++m_num_pending_texture_uploads;
+    CreateUploadBuffer(upload_info, nullptr, free_entry, &free_entry->upload_buffer);
 }
 
 void UploadContextVK::CreateTexture(const TextureUploadVK & upload_info)
@@ -50,8 +77,6 @@ void UploadContextVK::CreateTexture(const TextureUploadVK & upload_info)
     OPTICK_EVENT();
 
     MRQ2_ASSERT(m_device_vk != nullptr);
-    MRQ2_ASSERT(upload_info.texture != nullptr);
-    MRQ2_ASSERT(upload_info.texture->Handle() != nullptr);
     // NOTE: Not required to happen between Begin/EndFrame
 
     if (m_num_pending_texture_creates == ArrayLength(m_pending_texture_creates))
@@ -62,7 +87,7 @@ void UploadContextVK::CreateTexture(const TextureUploadVK & upload_info)
 
     MRQ2_ASSERT(m_num_pending_texture_creates < ArrayLength(m_pending_texture_creates));
     StagingBuffer & upload_buffer = m_pending_texture_creates[m_num_pending_texture_creates++];
-    CreateUploadBuffer(upload_info, &upload_buffer);
+    CreateUploadBuffer(upload_info, &m_upload_cmd_buffer, nullptr, &upload_buffer);
 }
 
 void UploadContextVK::FlushTextureCreates()
@@ -90,15 +115,64 @@ void UploadContextVK::FlushTextureCreates()
 
 void UploadContextVK::UpdateCompletedUploads()
 {
+    if (m_num_pending_texture_uploads == 0)
+    {
+        return;
+    }
+
     OPTICK_EVENT();
 
-    // TODO
+    // Kick this frame's deferred uploads
+    for (UploadEntry & entry : m_pending_texture_uploads)
+    {
+        if ((entry.texture_handle != nullptr) && (entry.cmd_buffer == nullptr))
+        {
+            KickTextureUpload(&entry);
+        }
+    }
+
+    // Garbage collect upload_buffers from completed uploads of previous frames
+    for (UploadEntry & entry : m_pending_texture_uploads)
+    {
+        if (entry.cmd_buffer != nullptr)
+        {
+            if (entry.cmd_buffer->IsFinishedExecuting())
+            {
+                entry.Reset();
+
+                --m_num_pending_texture_uploads;
+                MRQ2_ASSERT(m_num_pending_texture_uploads >= 0);
+                if (m_num_pending_texture_uploads == 0)
+                {
+                    break; // Freed all.
+                }
+            }
+        }
+    }
 }
 
-void UploadContextVK::CreateUploadBuffer(const TextureUploadVK & upload_info, StagingBuffer * out_upload_buff)
+void UploadContextVK::KickTextureUpload(UploadEntry * entry)
 {
+    CommandBufferVK & current_cmd_buffer = m_swap_chain->CurrentCmdBuffer();
+    entry->cmd_buffer = &current_cmd_buffer;
+
+    PushTextureCopyCommands(&current_cmd_buffer, &entry->upload_buffer, entry->texture_handle,
+                            entry->old_image_layout, entry->new_image_layout, entry->num_mips, entry->copy_regions);
+}
+
+void UploadContextVK::CreateUploadBuffer(const TextureUploadVK & upload_info, CommandBufferVK * upload_cmd_buffer,
+                                         UploadEntry * deferred_upload_entry, StagingBuffer * out_upload_buff)
+{
+    MRQ2_ASSERT(upload_info.texture != nullptr);
+    MRQ2_ASSERT(upload_info.texture->Handle() != nullptr);
+
     const auto &   mipmaps  = upload_info.mipmaps;
     const uint32_t num_mips = mipmaps.num_mip_levels;
+
+    // At least 1 mipmap level.
+    MRQ2_ASSERT(mipmaps.mip_init_data[0] != nullptr);
+    MRQ2_ASSERT(mipmaps.mip_dimensions[0].x != 0 && mipmaps.mip_dimensions[0].y != 0);
+    MRQ2_ASSERT(num_mips >= 1 && num_mips <= TextureImage::kMaxMipLevels);
 
     uint32_t buffer_size_in_bytes = 0;
     for (uint32_t mip = 0; mip < num_mips; ++mip)
@@ -123,7 +197,7 @@ void UploadContextVK::CreateUploadBuffer(const TextureUploadVK & upload_info, St
 
     // Setup buffer copy regions for each mip level:
     VkDeviceSize buffer_offset = 0;
-    FixedSizeArray<VkBufferImageCopy, TextureImage::kMaxMipLevels> buffer_copy_regions;
+    TextureCopyRegions texture_copy_regions;
 
     for (uint32_t mip = 0; mip < num_mips; ++mip)
     {
@@ -136,33 +210,76 @@ void UploadContextVK::CreateUploadBuffer(const TextureUploadVK & upload_info, St
         copy_region.imageExtent.height              = mipmaps.mip_dimensions[mip].y;
         copy_region.imageExtent.depth               = 1;
         copy_region.bufferOffset                    = buffer_offset;
-        buffer_copy_regions.push_back(copy_region);
+        texture_copy_regions.push_back(copy_region);
 
         buffer_offset += mipmaps.mip_dimensions[mip].x * mipmaps.mip_dimensions[mip].y * TextureImage::kBytesPerPixel;
     }
 
-    MRQ2_ASSERT(!upload_info.is_scrap);
+    VkImageLayout old_image_layout, new_image_layout;
+
+    // If the texture is a scrap (dynamic upload) it will be already in VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL state.
+    if (upload_info.is_scrap)
+    {
+        old_image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        new_image_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    }
+    else // If we're creating a new texture then we're in VK_IMAGE_LAYOUT_UNDEFINED state.
+    {
+        old_image_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        new_image_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    }
+
+    if (deferred_upload_entry != nullptr)
+    {
+        MRQ2_ASSERT(upload_cmd_buffer == nullptr);
+        MRQ2_ASSERT(out_upload_buff   == &deferred_upload_entry->upload_buffer);
+
+        // Defer the upload to the end of the frame after we have completed the main render pass
+        // since Vulkan disallows texture updates while inside a render pass.
+        // Note that this will introduce a frame of delay to the update of cinematic textures
+        // and the scrap atlas. For lightmaps we already have a frame of delay in the update since
+        // they are only submitted at the end of the frame after draw commands have been pushed.
+        deferred_upload_entry->texture_handle   = upload_info.texture->Handle();
+        deferred_upload_entry->num_mips         = num_mips;
+        deferred_upload_entry->old_image_layout = old_image_layout;
+        deferred_upload_entry->new_image_layout = new_image_layout;
+        deferred_upload_entry->copy_regions     = texture_copy_regions;
+    }
+    else
+    {
+        PushTextureCopyCommands(upload_cmd_buffer, out_upload_buff, upload_info.texture->Handle(),
+                                old_image_layout, new_image_layout, num_mips, texture_copy_regions);
+    }
+}
+
+void UploadContextVK::PushTextureCopyCommands(CommandBufferVK * upload_cmd_buffer, const StagingBuffer * upload_buffer,
+                                              VkImage texture_handle, const VkImageLayout old_image_layout, const VkImageLayout new_image_layout,
+                                              const uint32_t num_mips, const TextureCopyRegions & copy_regions) const
+{
+    MRQ2_ASSERT(upload_cmd_buffer != nullptr);
+    MRQ2_ASSERT(upload_buffer     != nullptr);
+    MRQ2_ASSERT(texture_handle    != nullptr);
 
     // Image barrier for optimal image (target)
     // Optimal image will be used as destination for the copy.
-    VulkanChangeImageLayout(m_upload_cmd_buffer,
-                            upload_info.texture->Handle(),
+    VulkanChangeImageLayout(*upload_cmd_buffer,
+                            texture_handle,
                             VK_IMAGE_ASPECT_COLOR_BIT,
-                            VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                            old_image_layout,
+                            new_image_layout,
                             0, num_mips);
 
     // Copy mip levels from staging buffer:
-    vkCmdCopyBufferToImage(m_upload_cmd_buffer.Handle(),
-                           out_upload_buff->Handle(),
-                           upload_info.texture->Handle(),
+    vkCmdCopyBufferToImage(upload_cmd_buffer->Handle(),
+                           upload_buffer->Handle(),
+                           texture_handle,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                           buffer_copy_regions.size(),
-                           buffer_copy_regions.data());
+                           copy_regions.size(),
+                           copy_regions.data());
 
     // Change texture image layout to shader read after all mip levels have been copied:
-    VulkanChangeImageLayout(m_upload_cmd_buffer,
-                            upload_info.texture->Handle(),
+    VulkanChangeImageLayout(*upload_cmd_buffer,
+                            texture_handle,
                             VK_IMAGE_ASPECT_COLOR_BIT,
                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
