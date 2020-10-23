@@ -249,14 +249,25 @@ void PipelineStateVK::Finalize() const
     VULKAN_CHECK(vkCreateGraphicsPipelines(m_device_vk->Handle(), sm_pipeline_cache_handle, 1, &pipeline_info.pipeline_state, nullptr, &m_pipeline_handle));
     MRQ2_ASSERT(m_pipeline_handle != nullptr);
 
+    if (m_signature == 0)
+    {
+        CalcSignature();
+    }
+
+    m_flags |= kFinalized;
+}
+
+void PipelineStateVK::CalcSignature() const
+{
+    // This flag is not in the signature.
+    MRQ2_ASSERT((m_flags & kFinalized) == 0);
+
     // Compute a unique signature for this combination of pipeline states:
     uint64_t signature = 0;
     signature += FnvHash64(reinterpret_cast<const std::uint8_t *>(&m_flags), sizeof(m_flags));
     signature += FnvHash64(reinterpret_cast<const std::uint8_t *>(&m_topology), sizeof(m_topology));
     signature += FnvHash64(reinterpret_cast<const std::uint8_t *>(m_shader_prog->m_filename.c_str()), m_shader_prog->m_filename.length());
     m_signature = signature;
-
-    m_flags |= kFinalized;
 }
 
 void PipelineStateVK::MakePipelineStateCreateInfo(PipelineStateCreateInfoVK & pipeline_info) const

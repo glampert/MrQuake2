@@ -263,12 +263,19 @@ void GraphicsContextVK::SetPrimitiveTopology(const PrimitiveTopologyVK topology)
     {
         m_current_topology = topology;
 
+        //
+        // We're not able to dynamically set the primitive topology individually
+        // without VK_EXT_extended_dynamic_state/vkCmdSetPrimitiveTopologyEXT extension
+        // which doesn't seem to be widely supported yet, so create a new dynamic pipeline
+        // with the same properties of whatever it the current one but with the desired
+        // primitive topology.
+        //
         if (m_current_topology != m_current_pipeline_state->m_topology)
         {
             PipelineStateVK dynamic_pipeline;
             dynamic_pipeline.Init(*m_current_pipeline_state);
             dynamic_pipeline.SetPrimitiveTopology(m_current_topology);
-            dynamic_pipeline.Finalize();
+            dynamic_pipeline.CalcSignature();
 
             auto * cached_pipeline = FindOrRegisterPipeline(&dynamic_pipeline);
             MRQ2_ASSERT(cached_pipeline != nullptr);
@@ -289,6 +296,7 @@ const PipelineStateVK * GraphicsContextVK::FindOrRegisterPipeline(PipelineStateV
         }
     }
 
+    dynamic_pipeline->Finalize();
     m_pipeline_cache.emplace_back(std::move(*dynamic_pipeline));
     return &m_pipeline_cache.back();
 }

@@ -30,7 +30,6 @@ public:
     PipelineStateVK & operator=(PipelineStateVK && other);
 
     void Init(const DeviceVK & device);
-    void Init(const PipelineStateVK & other);
     void Shutdown();
 
     void SetPrimitiveTopology(const PrimitiveTopologyVK topology);
@@ -48,11 +47,13 @@ public:
     // VK Internal
     static void InitGlobalState(const DeviceVK & device);
     static void ShutdownGlobalState(const DeviceVK & device);
-    uint64_t GetSignature() const { return m_signature; }
 
 private:
 
+    void Init(const PipelineStateVK & other);
+    void CalcSignature() const;
     void MakePipelineStateCreateInfo(PipelineStateCreateInfoVK & pipeline_info) const;
+    uint64_t GetSignature() const { return m_signature; }
 
     enum ShaderBindings : uint32_t
     {
