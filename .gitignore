@@ -21,11 +21,13 @@ bld/
 [Oo]bj/
 [Ll]og/
 
-# Include debug and release copies of the Optick Profiler binaries we link against
+# Include debug and release copies of the Optick Profiler and RenderDoc binaries we link against
 !src/external/optick/lib/x64/debug/OptickCore.dll
 !src/external/optick/lib/x64/debug/OptickCore.lib
 !src/external/optick/lib/x64/release/OptickCore.dll
 !src/external/optick/lib/x64/release/OptickCore.lib
+!src/external/renderdoc/lib/dbghelp.dll
+!src/external/renderdoc/lib/renderdoc.dll
 
 # Visual Studio 2015 cache/options directory
 .vs/
