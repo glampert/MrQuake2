@@ -26,6 +26,7 @@ void DeviceVK::Init(Win32Window & window, UploadContextVK & up_ctx, GraphicsCont
     EnumerateDevices();
     InitSwapChainExtensions(window);
     InitDevice();
+    InitDebugExtensions();
 }
 
 void DeviceVK::Shutdown()
@@ -122,12 +123,17 @@ void DeviceVK::InitInstanceExtensionProperties(LayerProperties & layer_props)
 
 void DeviceVK::InitInstance()
 {
-    const char * const * instance_layer_names;
-    std::uint32_t instance_layer_count;
+    const bool renderdoc = Config::r_renderdoc.IsSet();
+
+    const char * const * instance_layer_names = nullptr;
+    std::uint32_t instance_layer_count = 0;
+
+    const char * const * instance_extension_names = nullptr;
+    std::uint32_t instance_extension_count = 0;
 
     if (m_debug_validation)
     {
-        if (Config::r_renderdoc.IsSet())
+        if (renderdoc)
         {
             GameInterface::Printf("Creating VK Instance with debug validation + RenderDoc.");
 
@@ -158,10 +164,25 @@ void DeviceVK::InitInstance()
         instance_layer_count = 0;
     }
 
-    static const char * const s_instance_extension_names[] = {
-        "VK_KHR_surface",
-        "VK_KHR_win32_surface"
-    };
+    if (renderdoc)
+    {
+        static const char * const s_instance_extension_names_debug_rdoc[] = {
+            "VK_KHR_surface",
+            "VK_KHR_win32_surface",
+            "VK_EXT_debug_utils"
+        };
+        instance_extension_names = s_instance_extension_names_debug_rdoc;
+        instance_extension_count = ArrayLength(s_instance_extension_names_debug_rdoc);
+    }
+    else
+    {
+        static const char * const s_instance_extension_names[] = {
+            "VK_KHR_surface",
+            "VK_KHR_win32_surface"
+        };
+        instance_extension_names = s_instance_extension_names;
+        instance_extension_count = ArrayLength(s_instance_extension_names);
+    }
 
     VkApplicationInfo app_info{};
     app_info.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -176,8 +197,8 @@ void DeviceVK::InitInstance()
     inst_info.pApplicationInfo        = &app_info;
     inst_info.enabledLayerCount       = instance_layer_count;
     inst_info.ppEnabledLayerNames     = instance_layer_names;
-    inst_info.enabledExtensionCount   = ArrayLength(s_instance_extension_names);
-    inst_info.ppEnabledExtensionNames = s_instance_extension_names;
+    inst_info.enabledExtensionCount   = instance_extension_count;
+    inst_info.ppEnabledExtensionNames = instance_extension_names;
 
     VULKAN_CHECK(vkCreateInstance(&inst_info, nullptr, &m_instance_handle));
     MRQ2_ASSERT(m_instance_handle != nullptr);
@@ -377,6 +398,17 @@ void DeviceVK::InitDevice()
     if (pVkCmdPushDescriptorSetKHR == nullptr)
     {
         GameInterface::Errorf("Could not get a valid function pointer for vkCmdPushDescriptorSetKHR");
+    }
+}
+
+void DeviceVK::InitDebugExtensions()
+{
+    if (Config::r_renderdoc.IsSet())
+    {
+        // VK_EXT_debug_utils is not part of the core, so function pointers need to be loaded manually
+        pVkCmdBeginDebugUtilsLabelEXT = (PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetDeviceProcAddr(m_device_handle, "vkCmdBeginDebugUtilsLabelEXT");
+        pVkCmdEndDebugUtilsLabelEXT   = (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetDeviceProcAddr(m_device_handle,   "vkCmdEndDebugUtilsLabelEXT");
+        pVkSetDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetDeviceProcAddr(m_device_handle, "vkSetDebugUtilsObjectNameEXT");
     }
 }
 

@@ -160,6 +160,10 @@ void SwapChainVK::Init(const DeviceVK & device, uint32_t width, uint32_t height,
 
         rts.m_fb[i].image = swap_chain_images[i];
         VULKAN_CHECK(vkCreateImageView(device.Handle(), &view_create_info, nullptr, &rts.m_fb[i].view));
+
+        char name[128];
+        sprintf_s(name, "SwapChainImage[%u]", i);
+        m_device_vk->SetObjectDebugName(VK_OBJECT_TYPE_IMAGE, rts.m_fb[i].image, name);
     }
     rts.m_frame_buffer_count = m_frame_buffer_count;
 
@@ -386,6 +390,8 @@ void SwapChainRenderTargetsVK::InitDepthBuffer()
     temp_cmd_buffer.EndRecording();
     temp_cmd_buffer.Submit();
     temp_cmd_buffer.WaitComplete();
+
+    m_device_vk->SetObjectDebugName(VK_OBJECT_TYPE_IMAGE, m_depth.image, "DepthBuffer");
 
     GameInterface::Printf("Depth buffer created.");
 }

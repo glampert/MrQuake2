@@ -13,10 +13,6 @@
 // Useful links:
 // https://computergraphics.stackexchange.com/questions/4422/directx-openglvulkan-concepts-mapping-chart
 // https://zeux.io/2020/02/27/writing-an-efficient-vulkan-renderer/
-//
-// TODO:
-// Look into using vkSetDebugUtilsObjectNameEXT to debug tag API objects and resources (textures, shaders, etc).
-// https://github.com/SaschaWillems/Vulkan/blob/master/examples/debugmarker/debugmarker.cpp
 
 namespace MrQ2
 {
@@ -267,7 +263,7 @@ void GraphicsContextVK::SetPrimitiveTopology(const PrimitiveTopologyVK topology)
         // We're not able to dynamically set the primitive topology individually
         // without VK_EXT_extended_dynamic_state/vkCmdSetPrimitiveTopologyEXT extension
         // which doesn't seem to be widely supported yet, so create a new dynamic pipeline
-        // with the same properties of whatever it the current one but with the desired
+        // with the same properties of whatever its the current one but with the desired
         // primitive topology.
         //
         if (m_current_topology != m_current_pipeline_state->m_topology)
@@ -315,15 +311,27 @@ void GraphicsContextVK::DrawIndexed(const uint32_t first_index, const uint32_t i
     vkCmdDrawIndexed(m_command_buffer_handle, index_count, instance_count, first_index, base_vertex, first_instance);
 }
 
-void GraphicsContextVK::PushMarker(const wchar_t * name)
+void GraphicsContextVK::PushMarker(const char * name)
 {
-    // TODO
-    (void)name;
+    if (m_gpu_markers_enabled && m_device_vk->pVkCmdBeginDebugUtilsLabelEXT)
+    {
+        VkDebugUtilsLabelEXT label{};
+        label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+        label.pLabelName = name;
+        label.color[0] = 0.7f;
+        label.color[1] = 0.0f;
+        label.color[2] = 0.0f;
+        label.color[3] = 1.0f;
+        m_device_vk->pVkCmdBeginDebugUtilsLabelEXT(m_command_buffer_handle, &label);
+    }
 }
 
 void GraphicsContextVK::PopMarker()
 {
-    // TODO
+    if (m_gpu_markers_enabled && m_device_vk->pVkCmdEndDebugUtilsLabelEXT)
+    {
+        m_device_vk->pVkCmdEndDebugUtilsLabelEXT(m_command_buffer_handle);
+    }
 }
 
 } // MrQ2

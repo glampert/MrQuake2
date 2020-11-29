@@ -154,6 +154,8 @@ void TextureVK::Init(const DeviceVK & device, const TextureType type, const bool
 
     m_owns_resources = true;
     m_device_vk = &device;
+
+    m_device_vk->SetObjectDebugName(VK_OBJECT_TYPE_IMAGE, m_image_handle, debug_name);
 }
 
 void TextureVK::Init(const TextureVK & other)

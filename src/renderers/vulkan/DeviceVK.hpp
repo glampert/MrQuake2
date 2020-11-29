@@ -44,7 +44,24 @@ public:
     const auto &     DeviceInfo()          const { return m_device_info; }
 
     // Extension function pointers
-    PFN_vkCmdPushDescriptorSetKHR pVkCmdPushDescriptorSetKHR{ nullptr };
+    PFN_vkCmdPushDescriptorSetKHR    pVkCmdPushDescriptorSetKHR{ nullptr };
+    PFN_vkCmdBeginDebugUtilsLabelEXT pVkCmdBeginDebugUtilsLabelEXT{ nullptr };
+    PFN_vkCmdEndDebugUtilsLabelEXT   pVkCmdEndDebugUtilsLabelEXT{ nullptr };
+    PFN_vkSetDebugUtilsObjectNameEXT pVkSetDebugUtilsObjectNameEXT{ nullptr };
+
+    template<typename VkHandleT>
+    void SetObjectDebugName(const VkObjectType type, VkHandleT handle, const char * name) const
+    {
+        if (pVkSetDebugUtilsObjectNameEXT != nullptr)
+        {
+            VkDebugUtilsObjectNameInfoEXT name_info{};
+            name_info.sType        = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+            name_info.objectType   = type;
+            name_info.objectHandle = (uint64_t)handle;
+            name_info.pObjectName  = name;
+            pVkSetDebugUtilsObjectNameEXT(m_device_handle, &name_info);
+        }
+    }
 
 private:
 
@@ -73,6 +90,7 @@ private:
     void EnumerateDevices();
     void InitSwapChainExtensions(Win32Window & window);
     void InitDevice();
+    void InitDebugExtensions();
 
 private:
 

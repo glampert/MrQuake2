@@ -58,7 +58,7 @@ public:
     void DrawIndexed(const uint32_t first_index, const uint32_t index_count, const uint32_t base_vertex);
 
     // Debug markers
-    void PushMarker(const wchar_t * name);
+    void PushMarker(const char * name);
     void PopMarker();
 
 private:
@@ -93,7 +93,7 @@ struct ScopedGpuMarkerVK final
 {
     GraphicsContextVK & m_context;
 
-    ScopedGpuMarkerVK(GraphicsContextVK & ctx, const wchar_t * name)
+    ScopedGpuMarkerVK(GraphicsContextVK & ctx, const char * name)
         : m_context{ ctx }
     {
         m_context.PushMarker(name);
@@ -105,10 +105,10 @@ struct ScopedGpuMarkerVK final
     }
 };
 
-#define MRQ2_SCOPED_GPU_MARKER(context, name) MrQ2::ScopedGpuMarkerVK MRQ2_CAT_TOKEN(gpu_scope_marker_, __LINE__){ context, MRQ2_MAKE_WIDE_STR(name) }
-#define MRQ2_FUNCTION_GPU_MARKER(context)     MrQ2::ScopedGpuMarkerVK MRQ2_CAT_TOKEN(gpu_funct_marker_, __LINE__){ context, MRQ2_MAKE_WIDE_STR(__FUNCTION__) }
+#define MRQ2_SCOPED_GPU_MARKER(context, name) MrQ2::ScopedGpuMarkerVK MRQ2_CAT_TOKEN(gpu_scope_marker_, __LINE__){ context, name }
+#define MRQ2_FUNCTION_GPU_MARKER(context)     MrQ2::ScopedGpuMarkerVK MRQ2_CAT_TOKEN(gpu_funct_marker_, __LINE__){ context, __FUNCTION__ }
 
-#define MRQ2_PUSH_GPU_MARKER(context, name)   context.PushMarker(MRQ2_MAKE_WIDE_STR(name))
+#define MRQ2_PUSH_GPU_MARKER(context, name)   context.PushMarker(name)
 #define MRQ2_POP_GPU_MARKER(context)          context.PopMarker()
 
 } // MrQ2
