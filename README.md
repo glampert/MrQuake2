@@ -14,3 +14,17 @@ We also support loading higher quality textures such as the HD texture pack from
 This project is based on the [original Quake 2 source release](https://github.com/id-Software/Quake-2) from id Software.
 
 See [`src/renderers`](https://github.com/glampert/MrQuake2/tree/master/src/renderers) for the back end implementations (C++) which compile into individual DLLs and the shaders used.
+
+## Miscellaneous screenshots
+
+### VK render
+![VK render](https://github.com/glampert/MrQuake2/blob/master/screenshots/std_render_vk.png)
+
+### Debug lightmaps
+![Debug lightmaps](https://github.com/glampert/MrQuake2/blob/master/screenshots/debug_lightmaps.png)
+
+### Debug mipmaps
+![Debug mipmaps](https://github.com/glampert/MrQuake2/blob/master/screenshots/debug_mipmaps.png)
+
+### Debug surfaces
+![Debug surfaces](https://github.com/glampert/MrQuake2/blob/master/screenshots/debug_surfaces.png)
