@@ -221,6 +221,7 @@ void GraphicsContextD3D11::SetAndUpdateConstantBuffer_Internal(const ConstantBuf
     MRQ2_ASSERT(slot < kCBufferCount);
     MRQ2_ASSERT(data != nullptr && data_size != 0);
     MRQ2_ASSERT(data_size >= cb.SizeInBytes());
+    (void)data_size; // unused
 
     m_context->UpdateSubresource(cb.m_resource.Get(), 0, nullptr, data, 0, 0);
 

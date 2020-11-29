@@ -69,6 +69,7 @@ static inline void * Stb_MemReAlloc(const void * old_ptr, const size_t old_size,
     MRQ2_ASSERT(header->size != 0);
     MRQ2_ASSERT(header->magic == Stb_AllocHeader::kMagic);
     MRQ2_ASSERT(old_size == (header->size - sizeof(Stb_AllocHeader) - Stb_AllocHeader::kAlignment));
+    (void)header; // unused
 
     void * new_ptr = Stb_MemAlloc(new_size);
     std::memcpy(new_ptr, old_ptr, old_size);

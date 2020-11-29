@@ -50,6 +50,8 @@ void TextureD3D12::Init(const DeviceD3D12 & device, const TextureType type, cons
     mbstowcs_s(&num_converted, m_debug_name, debug_name, ArrayLength(m_debug_name));
     MRQ2_ASSERT(num_converted != 0);
     D12SetDebugName(m_resource, m_debug_name);
+#else
+    (void)debug_name;
 #endif // NDEBUG
 
     // Upload texture pixels:
