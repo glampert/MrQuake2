@@ -21,8 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // sys_null.h -- null system driver to aid porting efforts
 
 #include "common/q_common.h"
+#include <stdlib.h>
+#include <stdio.h>
 
-int curtime;
+int sys_curtime;
 unsigned sys_frame_time;
 
 //=============================================================================
@@ -65,6 +67,7 @@ char * Sys_ConsoleInput(void)
 
 void Sys_ConsoleOutput(const char * string)
 {
+    printf("%s", string);
 }
 
 void Sys_SendKeyEvents(void)
@@ -105,6 +108,17 @@ char * Sys_FindNext(unsigned musthave, unsigned canthave)
 
 void Sys_FindClose(void)
 {
+}
+
+void * Sys_Malloc(size_t size_bytes, game_memtag_t mem_tag)
+{
+    return malloc(size_bytes);
+}
+
+void Sys_Mfree(void * ptr, size_t size_bytes, game_memtag_t mem_tag)
+{
+    if (ptr)
+        free(ptr);
 }
 
 //=============================================================================

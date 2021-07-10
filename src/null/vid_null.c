@@ -26,11 +26,62 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 viddef_t viddef; // global video state
 refexport_t re;
 
-// dummy placeholder
+/*
+==========================================================================
+
+NULL RENDERER
+
+==========================================================================
+*/
+
+static int NullRef_Init(void * hInstance, void * wndproc, int fullscreen) { return 0; }
+static void NullRef_Shutdown(void) {}
+static void NullRef_BeginRegistration(const char * map_name) {}
+static struct model_s * NullRef_RegisterModel(const char * name) { return NULL; }
+static struct image_s * NullRef_RegisterSkin(const char * name) { return NULL; }
+static struct image_s * NullRef_RegisterPic(const char * name) { return NULL; }
+static void NullRef_SetSky(const char * name, float rotate, vec3_t axis) {}
+static void NullRef_EndRegistration(void) {}
+static void NullRef_RenderFrame(refdef_t * fd) {}
+static void NullRef_DrawGetPicSize(int * w, int * h, const char * name) {}
+static void NullRef_DrawPic(int x, int y, const char * name) {}
+static void NullRef_DrawStretchPic(int x, int y, int w, int h, const char * name) {}
+static void NullRef_DrawChar(int x, int y, int c) {}
+static void NullRef_DrawTileClear(int x, int y, int w, int h, const char * name) {}
+static void NullRef_DrawFill(int x, int y, int w, int h, int c) {}
+static void NullRef_DrawFadeScreen(void) {}
+static void NullRef_DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, const qbyte * data) {}
+static void NullRef_CinematicSetPalette(const qbyte * palette) {}
+static void NullRef_BeginFrame(float camera_separation) {}
+static void NullRef_EndFrame(void) {}
+static void NullRef_AppActivate(int activate) {}
+
 refexport_t GetRefAPI(refimport_t rimp)
 {
     (void)rimp;
-    static refexport_t refexp;
+    refexport_t refexp = {};
+    refexp.api_version = REF_API_VERSION;
+    refexp.Init = NullRef_Init;
+    refexp.Shutdown = NullRef_Shutdown;
+    refexp.BeginRegistration = NullRef_BeginRegistration;
+    refexp.RegisterModel = NullRef_RegisterModel;
+    refexp.RegisterSkin = NullRef_RegisterSkin;
+    refexp.RegisterPic = NullRef_RegisterPic;
+    refexp.SetSky = NullRef_SetSky;
+    refexp.EndRegistration = NullRef_EndRegistration;
+    refexp.RenderFrame = NullRef_RenderFrame;
+    refexp.DrawGetPicSize = NullRef_DrawGetPicSize;
+    refexp.DrawPic = NullRef_DrawPic;
+    refexp.DrawStretchPic = NullRef_DrawStretchPic;
+    refexp.DrawChar = NullRef_DrawChar;
+    refexp.DrawTileClear = NullRef_DrawTileClear;
+    refexp.DrawFill = NullRef_DrawFill;
+    refexp.DrawFadeScreen = NullRef_DrawFadeScreen;
+    refexp.DrawStretchRaw = NullRef_DrawStretchRaw;
+    refexp.CinematicSetPalette = NullRef_CinematicSetPalette;
+    refexp.BeginFrame = NullRef_BeginFrame;
+    refexp.EndFrame = NullRef_EndFrame;
+    refexp.AppActivate = NullRef_AppActivate;
     return refexp;
 }
 
@@ -94,7 +145,7 @@ typedef struct vidmode_s
     int mode;
 } vidmode_t;
 
-vidmode_t vid_modes[] =
+static const vidmode_t vid_modes[] =
 {
   { "Mode 0: 320x240", 320, 240, 0 },
   { "Mode 1: 400x300", 400, 300, 1 },
@@ -127,7 +178,7 @@ int VID_GetModeInfo(int * width, int * height, int mode)
 
 void VID_Init(void)
 {
-    refimport_t ri;
+    refimport_t ri = {};
 
     viddef.width = 320;
     viddef.height = 240;
