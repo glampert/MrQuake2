@@ -18,7 +18,7 @@ void PipelineStateD3D11::Init(const DeviceD3D11 & device)
     //  Blending: Alpha blending OFF
     //  Rasterizer state: Backface cull ON
     //  Depth-stencil state: Depth test ON, depth write ON, stencil OFF
-    m_flags = kDepthTestEnabled | kDepthWriteEnabled | kCullEnabled;
+    SetFlags(kDepthTestEnabled | kDepthWriteEnabled | kCullEnabled);
 }
 
 void PipelineStateD3D11::Shutdown()
@@ -38,7 +38,7 @@ void PipelineStateD3D11::SetPrimitiveTopology(const PrimitiveTopologyD3D11 topol
 
 void PipelineStateD3D11::SetShaderProgram(const ShaderProgramD3D11 & shader_prog)
 {
-    if (!shader_prog.m_is_loaded)
+    if (!shader_prog.IsLoaded())
     {
         GameInterface::Errorf("PipelineStateD3D11: Trying to set an invalid shader program.");
     }
@@ -49,11 +49,11 @@ void PipelineStateD3D11::SetDepthTestEnabled(const bool enabled)
 {
     if (enabled)
     {
-        m_flags |= kDepthTestEnabled;
+        SetFlags(m_flags | kDepthTestEnabled);
     }
     else
     {
-        m_flags &= ~kDepthTestEnabled;
+        SetFlags(m_flags & ~kDepthTestEnabled);
     }
 }
 
@@ -61,11 +61,11 @@ void PipelineStateD3D11::SetDepthWritesEnabled(const bool enabled)
 {
     if (enabled)
     {
-        m_flags |= kDepthWriteEnabled;
+        SetFlags(m_flags | kDepthWriteEnabled);
     }
     else
     {
-        m_flags &= ~kDepthWriteEnabled;
+        SetFlags(m_flags & ~kDepthWriteEnabled);
     }
 }
 
@@ -73,12 +73,12 @@ void PipelineStateD3D11::SetAlphaBlendingEnabled(const bool enabled)
 {
     if (enabled)
     {
-        m_flags |= kAlphaBlendEnabled;
+        SetFlags(m_flags | kAlphaBlendEnabled);
         m_blend_factor[0] = m_blend_factor[1] = m_blend_factor[2] = m_blend_factor[3] = 1.0f;
     }
     else
     {
-        m_flags &= ~kAlphaBlendEnabled;
+        SetFlags(m_flags & ~kAlphaBlendEnabled);
         m_blend_factor[0] = m_blend_factor[1] = m_blend_factor[2] = m_blend_factor[3] = 0.0f;
     }
 }
@@ -87,11 +87,11 @@ void PipelineStateD3D11::SetAdditiveBlending(const bool enabled)
 {
     if (enabled)
     {
-        m_flags |= kAdditiveBlending;
+        SetFlags(m_flags | kAdditiveBlending);
     }
     else
     {
-        m_flags &= ~kAdditiveBlending;
+        SetFlags(m_flags & ~kAdditiveBlending);
     }
 }
 
@@ -99,11 +99,11 @@ void PipelineStateD3D11::SetCullEnabled(const bool enabled)
 {
     if (enabled)
     {
-        m_flags |= kCullEnabled;
+        SetFlags(m_flags | kCullEnabled);
     }
     else
     {
-        m_flags &= ~kCullEnabled;
+        SetFlags(m_flags & ~kCullEnabled);
     }
 }
 
@@ -212,7 +212,7 @@ void PipelineStateD3D11::Finalize() const
         D11CHECK(m_device->Device()->CreateBlendState(&bs_desc, m_blend_state.GetAddressOf()));
     }
 
-    m_flags |= kFinalized;
+    SetFlags(m_flags | kFinalized);
 }
 
 } // MrQ2

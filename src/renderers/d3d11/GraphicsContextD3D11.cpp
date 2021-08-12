@@ -177,7 +177,7 @@ void GraphicsContextD3D11::SetPipelineState(const PipelineStateD3D11 & pipeline_
         SetPrimitiveTopology(m_current_pipeline_state->m_topology);
 
         auto * shader = m_current_pipeline_state->m_shader_prog;
-        MRQ2_ASSERT(shader != nullptr && shader->m_is_loaded);
+        MRQ2_ASSERT(shader != nullptr && shader->IsLoaded());
 
         m_context->IASetInputLayout(shader->m_vertex_layout.Get());
         m_context->VSSetShader(shader->m_vertex_shader.Get(), nullptr, 0);

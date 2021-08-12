@@ -98,7 +98,7 @@ void PipelineStateD3D12::SetPrimitiveTopology(const PrimitiveTopologyD3D12 topol
 
 void PipelineStateD3D12::SetShaderProgram(const ShaderProgramD3D12 & shader_prog)
 {
-    if (!shader_prog.m_is_loaded)
+    if (!shader_prog.IsLoaded())
     {
         GameInterface::Errorf("PipelineStateD3D12: Trying to set an invalid shader program.");
     }

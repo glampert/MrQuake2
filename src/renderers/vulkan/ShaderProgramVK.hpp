@@ -75,6 +75,8 @@ public:
 
     void Shutdown();
 
+    bool IsLoaded() const { return m_vs_handle != nullptr && m_ps_handle != nullptr; }
+
 private:
 
     static constexpr int kNumShaderStages = 2; // Vertex[0] and Pixel[1] shaders

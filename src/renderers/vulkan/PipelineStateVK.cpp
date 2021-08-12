@@ -124,7 +124,7 @@ void PipelineStateVK::Init(const DeviceVK & device)
     //  Blending: Alpha blending OFF
     //  Rasterizer state: Backface cull ON
     //  Depth-stencil state: Depth test ON, depth write ON, stencil OFF
-    m_flags = kDepthTestEnabled | kDepthWriteEnabled | kCullEnabled;
+    SetFlags(kDepthTestEnabled | kDepthWriteEnabled | kCullEnabled);
 }
 
 void PipelineStateVK::Init(const PipelineStateVK & other)
@@ -138,7 +138,7 @@ void PipelineStateVK::Init(const PipelineStateVK & other)
     SetShaderProgram(*other.m_shader_prog);
     SetPrimitiveTopology(other.m_topology);
 
-    m_flags &= ~kFinalized; // clear
+    SetFlags(m_flags & ~kFinalized); // clear
 }
 
 void PipelineStateVK::Shutdown()
@@ -174,11 +174,11 @@ void PipelineStateVK::SetDepthTestEnabled(const bool enabled)
 {
     if (enabled)
     {
-        m_flags |= kDepthTestEnabled;
+        SetFlags(m_flags | kDepthTestEnabled);
     }
     else
     {
-        m_flags &= ~kDepthTestEnabled;
+        SetFlags(m_flags & ~kDepthTestEnabled);
     }
 }
 
@@ -186,11 +186,11 @@ void PipelineStateVK::SetDepthWritesEnabled(const bool enabled)
 {
     if (enabled)
     {
-        m_flags |= kDepthWriteEnabled;
+        SetFlags(m_flags | kDepthWriteEnabled);
     }
     else
     {
-        m_flags &= ~kDepthWriteEnabled;
+        SetFlags(m_flags & ~kDepthWriteEnabled);
     }
 }
 
@@ -198,12 +198,12 @@ void PipelineStateVK::SetAlphaBlendingEnabled(const bool enabled)
 {
     if (enabled)
     {
-        m_flags |= kAlphaBlendEnabled;
+        SetFlags(m_flags | kAlphaBlendEnabled);
         // blendConstants = {1,1,1,1}
     }
     else
     {
-        m_flags &= ~kAlphaBlendEnabled;
+        SetFlags(m_flags & ~kAlphaBlendEnabled);
         // blendConstants = {0,0,0,0}
     }
 }
@@ -212,11 +212,11 @@ void PipelineStateVK::SetAdditiveBlending(const bool enabled)
 {
     if (enabled)
     {
-        m_flags |= kAdditiveBlending;
+        SetFlags(m_flags | kAdditiveBlending);
     }
     else
     {
-        m_flags &= ~kAdditiveBlending;
+        SetFlags(m_flags & ~kAdditiveBlending);
     }
 }
 
@@ -224,11 +224,11 @@ void PipelineStateVK::SetCullEnabled(const bool enabled)
 {
     if (enabled)
     {
-        m_flags |= kCullEnabled;
+        SetFlags(m_flags | kCullEnabled);
     }
     else
     {
-        m_flags &= ~kCullEnabled;
+        SetFlags(m_flags & ~kCullEnabled);
     }
 }
 
@@ -254,7 +254,7 @@ void PipelineStateVK::Finalize() const
         CalcSignature();
     }
 
-    m_flags |= kFinalized;
+    SetFlags(m_flags | kFinalized);
 }
 
 void PipelineStateVK::CalcSignature() const

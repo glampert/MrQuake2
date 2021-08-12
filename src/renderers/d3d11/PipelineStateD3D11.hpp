@@ -51,12 +51,14 @@ private:
         kCullEnabled       = (1 << 6),
     };
 
+    void SetFlags(const uint32_t newFlags) const { m_flags = Flags(newFlags); }
+
     const DeviceD3D11 *                        m_device{ nullptr };
     const ShaderProgramD3D11 *                 m_shader_prog{ nullptr };
     mutable D11ComPtr<ID3D11DepthStencilState> m_ds_state{};
     mutable D11ComPtr<ID3D11RasterizerState>   m_rasterizer_state{};
     mutable D11ComPtr<ID3D11BlendState>        m_blend_state{};
-    mutable uint32_t                           m_flags{ kNoFlags };
+    mutable Flags                              m_flags{ kNoFlags };
     float                                      m_blend_factor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     PrimitiveTopologyD3D11                     m_topology{ PrimitiveTopologyD3D11::kTriangleList };
 };

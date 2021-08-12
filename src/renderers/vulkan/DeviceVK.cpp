@@ -5,7 +5,7 @@
 // To enable vkCreateWin32SurfaceKHR extensions.
 // Defined here before the include so vulkan.h exposes the structure.
 #if !defined(VK_USE_PLATFORM_WIN32_KHR)
-	#define VK_USE_PLATFORM_WIN32_KHR 1
+    #define VK_USE_PLATFORM_WIN32_KHR 1
 #endif // !VK_USE_PLATFORM_WIN32_KHR
 
 #include "DeviceVK.hpp"
@@ -121,6 +121,11 @@ void DeviceVK::InitInstanceExtensionProperties(LayerProperties & layer_props)
     } while (res == VK_INCOMPLETE);
 }
 
+// NOTE: Disabled as it's been causing problems on some drivers.
+// Likely because VK_LAYER_LUNARG_standard_validation has been deprecated in favor
+// of VK_LAYER_KHRONOS_validation and newer drivers are not accepting it anymore.
+#define MRQ2_ENABLE_VK_LAYER_LUNARG_STANDARD_VALIDATION 0
+
 void DeviceVK::InitInstance()
 {
     const bool renderdoc = Config::r_renderdoc.IsSet();
@@ -138,7 +143,9 @@ void DeviceVK::InitInstance()
             GameInterface::Printf("Creating VK Instance with debug validation + RenderDoc.");
 
             static const char * const s_instance_layer_names_debug_rdoc[] = {
-                "VK_LAYER_LUNARG_standard_validation",
+                #if MRQ2_ENABLE_VK_LAYER_LUNARG_STANDARD_VALIDATION
+                    "VK_LAYER_LUNARG_standard_validation",
+                #endif
                 "VK_LAYER_KHRONOS_validation",
                 "VK_LAYER_RENDERDOC_Capture"
             };
@@ -150,7 +157,9 @@ void DeviceVK::InitInstance()
             GameInterface::Printf("Creating VK Instance with debug validation.");
 
             static const char * const s_instance_layer_names_debug[] = {
-                "VK_LAYER_LUNARG_standard_validation",
+                #if MRQ2_ENABLE_VK_LAYER_LUNARG_STANDARD_VALIDATION
+                    "VK_LAYER_LUNARG_standard_validation",
+                #endif
                 "VK_LAYER_KHRONOS_validation"
             };
             instance_layer_names = s_instance_layer_names_debug;

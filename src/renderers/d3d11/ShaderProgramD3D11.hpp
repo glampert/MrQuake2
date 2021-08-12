@@ -73,6 +73,8 @@ public:
 
     void Shutdown();
 
+    bool IsLoaded() const { return m_is_loaded; }
+
 private:
 
     struct FxLoaderInfo

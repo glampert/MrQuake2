@@ -85,11 +85,13 @@ private:
         kCullEnabled       = (1 << 6),
     };
 
+    void SetFlags(const uint32_t newFlags) const { m_flags = Flags(newFlags); }
+
     const DeviceVK *         m_device_vk{ nullptr };
     const ShaderProgramVK *  m_shader_prog{ nullptr };
     mutable VkPipeline       m_pipeline_handle{ nullptr };
     mutable uint64_t         m_signature{ 0 };
-    mutable uint32_t         m_flags{ kNoFlags };
+    mutable Flags            m_flags{ kNoFlags };
     PrimitiveTopologyVK      m_topology{ PrimitiveTopologyVK::kTriangleList };
 
     static VkPipelineCache   sm_pipeline_cache_handle;
