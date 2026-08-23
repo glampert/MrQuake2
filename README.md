@@ -18,13 +18,13 @@ See [`src/renderers`](https://github.com/glampert/MrQuake2/tree/master/src/rende
 ## Miscellaneous screenshots
 
 ### VK render
-![VK render](https://github.com/glampert/MrQuake2/blob/master/screenshots/std_render_vk.png)
+![VK render](https://github.com/glampert/MrQuake2/blob/main/screenshots/std_render_vk.png)
 
 ### Debug lightmaps
-![Debug lightmaps](https://github.com/glampert/MrQuake2/blob/master/screenshots/debug_lightmaps.png)
+![Debug lightmaps](https://github.com/glampert/MrQuake2/blob/main/screenshots/debug_lightmaps.png)
 
 ### Debug mipmaps
-![Debug mipmaps](https://github.com/glampert/MrQuake2/blob/master/screenshots/debug_mipmaps.png)
+![Debug mipmaps](https://github.com/glampert/MrQuake2/blob/main/screenshots/debug_mipmaps.png)
 
 ### Debug surfaces
-![Debug surfaces](https://github.com/glampert/MrQuake2/blob/master/screenshots/debug_surfaces.png)
+![Debug surfaces](https://github.com/glampert/MrQuake2/blob/main/screenshots/debug_surfaces.png)
